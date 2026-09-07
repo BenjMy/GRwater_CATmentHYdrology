@@ -1,8 +1,7 @@
 # Agramon/Hellín Catchment Hydrology
 
 > **⚠️ This is a living repository.** Code, data paths, and documentation are
-> actively evolving alongside the 2026 TFG work — expect breaking changes,
-> `[FILL IN]` placeholders, and hard-coded paths (§4.3) until the first
+> actively evolving alongside the 2026 TFG work — expect breaking changes until the first
 > tagged release. Check [`CHANGELOG.md`](./CHANGELOG.md) for what has
 > changed between releases, and open an issue if something you relied on
 > shifted under you.
