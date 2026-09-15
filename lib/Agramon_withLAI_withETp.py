@@ -24,6 +24,8 @@ Usage
     python Agramon_withLAI_withETp_fixed.py --zroot 0.5 --pmin -10
     python Agramon_withLAI_withETp_fixed.py --dem-plot 4
     python Agramon_withLAI_withETp_fixed.py --no-plots
+    python Agramon_withLAI_withETp_fixed.py --zroot-factors 0.1 0.3 1.0 1.5 2.5
+    python Agramon_withLAI_withETp_fixed.py --permx 1e-5 --permy-ratio 1.0 --permz-ratio 0.1
 
 Forcing switch
 --------------
@@ -44,7 +46,7 @@ import xarray as xr
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 import rioxarray as rxr  # noqa: F401  (activates .rio accessor)
-from scipy.ndimage import binary_dilation, label as sp_label
+from scipy.ndimage import binary_dilation, label as sp_label, gaussian_filter
 from scipy.stats import mode
 from pyCATHY import meshtools as mt
 
@@ -58,25 +60,25 @@ USE_ETP_FORCING = True
 # ── Path setup ────────────────────────────────────────────────────────────────
 
 MODULE_PATH = Path(
-    #"/home/z0272571a@campus.csic.es/Nextcloud/BenCSIC/Codes"
-    "/home/ben/Nextcloud/BenCSIC/Codes"
+    "/home/z0272571a@campus.csic.es/Nextcloud/BenCSIC/Codes"
+    #"/home/ben/Nextcloud/BenCSIC/Codes"
     "/Tech4agro_org/GRwater_geophy"
 ).resolve()
 
 EO_PATH = Path(
-    #"/home/z0272571a@campus.csic.es/Nextcloud/BenCSIC/Codes"
-    "/home/ben/Nextcloud/BenCSIC/Codes"
+    "/home/z0272571a@campus.csic.es/Nextcloud/BenCSIC/Codes"
+    #"/home/ben/Nextcloud/BenCSIC/Codes"
     "/Tech4agro_org/GRwater_CATmentHYdrology"
 ).resolve()
 
 LAI_PATH = Path(
-    #"/home/z0272571a@campus.csic.es/Nextcloud/BenCSIC/Training_Supervision"
-    "/home/ben/Nextcloud/BenCSIC/Training_Supervision"
+    "/home/z0272571a@campus.csic.es/Nextcloud/BenCSIC/Training_Supervision"
+    #"/home/ben/Nextcloud/BenCSIC/Training_Supervision"
     "/Supervision/Xela_Carracedo_Practicas_2026_data/301a-biophysical/agramon/input"
 ).resolve()
 
-#PathET    = Path("/home/z0272571a@campus.csic.es/Nextcloud/GRwater/data/satellite/Agramon")
-PathET    = Path("/home/ben/Nextcloud/GRwater/data/satellite/Agramon")
+PathET    = Path("/home/z0272571a@campus.csic.es/Nextcloud/GRwater/data/satellite/Agramon")
+#PathET    = Path("/home/ben/Nextcloud/GRwater/data/satellite/Agramon")
 etp_path  = PathET / "20161001_20241231_ET0.nc"
 rain_path = PathET / "20161001_20241231_TP.nc"
 
@@ -100,6 +102,13 @@ NATIVE_CRS = "EPSG:32630"
 # Calibrated to the observed Agramon LAI range (0 – 0.6 m² m⁻²).
 LAI_THRESHOLDS = [0.1, 0.25, 0.4, 0.55]
 
+# Fixed number of semantic vegetation classes (bare/sparse/moderate/dense/very
+# dense). This must stay constant for the whole run and match MAXVEG passed
+# to simu.update_cathyH(), since pyCATHY's SOIL vegetation table has a fixed
+# row count for the whole project — it is NOT allowed to vary month to month
+# with however many classes happen to be spatially present.
+N_VEG_CLASSES = len(LAI_THRESHOLDS) + 1  # = 5
+
 # Vegetation zone → root-depth multiplier
 ZROOT_FACTORS = {
     1: 0.05,   # bare soil
@@ -108,6 +117,27 @@ ZROOT_FACTORS = {
     4: 1.5,    # dense vegetation
     5: 2.0,    # very dense vegetation
 }
+
+
+def zroot_factors_from_args(args: argparse.Namespace) -> dict[int, float]:
+    """
+    Build the semantic-zone → root-depth-multiplier mapping consumed by
+    ``update_soil_for_active_zones`` from ``--zroot-factors`` (5 values,
+    positional order: bare, sparse, moderate, dense, very dense —
+    matching ``ZROOT_FACTORS``' key order 1-5). Centralised here so the
+    spin-up and main-loop call sites build the exact same mapping from
+    the exact same CLI values instead of risking drift between the two.
+    """
+    return {i + 1: v for i, v in enumerate(args.zroot_factors)}
+
+# ── Sanity-check thresholds (monthly loop) ─────────────────────────────────
+# Tolerances for the physical-bounds and water-balance checks run after
+# every month (see `check_monthly_sanity`). Not physical hard limits —
+# just flags for "this deserves a look", so kept generous on purpose.
+SW_TOL           = 0.01     # SW allowed slightly outside [0, 1] before flagging
+PSI_SANITY_MIN   = -50.0    # m — PSI below this is flagged as extreme drying
+ETA_TOL          = 1e-8     # m/s — ETa allowed slightly above ETp before flagging
+WB_RESIDUAL_FRAC = 0.5      # flag if |water balance residual| > this fraction of rain_in
 
 
 # ── Markdown run log ─────────────────────────────────────────────────────────
@@ -225,8 +255,40 @@ def _parse_args() -> argparse.Namespace:
                      metavar="PATH",
                      help="Shared CSV log file")
 
+    veg = p.add_argument_group("Root depth mapping")
+    veg.add_argument(
+        "--zroot-factors", type=float, nargs=5, default=list(ZROOT_FACTORS.values()),
+        metavar=("BARE", "SPARSE", "MODERATE", "DENSE", "VERY_DENSE"),
+        help="Root-depth multiplier for each of the 5 fixed LAI-derived "
+             "vegetation classes, applied per-class as "
+             "ZROOT = --zroot * factor (replaces the hardcoded "
+             "ZROOT_FACTORS mapping in update_soil_for_active_zones()). "
+             "Must be given as 5 values in class order: bare soil, sparse, "
+             "moderate, dense, very dense vegetation."
+    )
+
+    soil = p.add_argument_group("Soil hydraulic conductivity (PERMX / Ks)")
+    soil.add_argument(
+        "--permx", type=float, default=None, metavar="M/S",
+        help="Override the saturated hydraulic conductivity Ks in the x "
+             "direction (SOIL SPP column PERMX, m/s) for every soil zone. "
+             "Applied uniformly across the SPP_map returned by "
+             "simu.set_SOIL_defaults(SPP_map_default=True). Default: leave "
+             "pyCATHY's own SPP default untouched."
+    )
+    soil.add_argument(
+        "--permy-ratio", type=float, default=1.0, metavar="RATIO",
+        help="Anisotropy ratio: PERMY = --permx * this value. Only takes "
+             "effect when --permx is set."
+    )
+    soil.add_argument(
+        "--permz-ratio", type=float, default=1.0, metavar="RATIO",
+        help="Anisotropy ratio: PERMZ = --permx * this value. Only takes "
+             "effect when --permx is set."
+    )
+
     bc = p.add_argument_group("Boundary conditions")
-    bc.add_argument("--outlet-flux", type=float, default=-1e-6, metavar="M/S",
+    bc.add_argument("--outlet-flux", type=float, default=0.0, metavar="M/S",
                     help="Prescribed Neumann outflow (m/s, negative = leaving "
                          "the domain) applied on the topographically lowest "
                          "mesh side, so the outlet is open instead of a "
@@ -253,10 +315,31 @@ def _parse_args() -> argparse.Namespace:
                          "DEM pixel area (res_x * res_y) — see "
                          "configure_boundary_conditions() for details.")
 
+    ic = p.add_argument_group("Initial conditions")
+    ic.add_argument("--ic-mode", default="wt", choices=["wt", "pressure"],
+                    help="How the initial pressure-head field is set: "
+                         "'wt' places a hydrostatic water table at depth "
+                         "--ic-wtposition below the surface (simu.update_ic("
+                         "INDP=3, WTPOSITION=...)); 'pressure' sets a "
+                         "uniform pressure head everywhere via "
+                         "--ic-pressure-head (simu.update_ic(INDP=0, "
+                         "pressure_head_ini=...)). Only affects the initial "
+                         "condition of the very first run — subsequent "
+                         "spin-up cycles / monthly steps still carry "
+                         "forward the previous run's psi field regardless "
+                         "of this setting.")
+    ic.add_argument("--ic-wtposition", type=float, default=1.0, metavar="M",
+                    help="Water-table depth (m) below the surface, used "
+                         "when --ic-mode=wt")
+    ic.add_argument("--ic-pressure-head", type=float, default=-10.0,
+                    metavar="M",
+                    help="Uniform initial pressure head (m), used when "
+                         "--ic-mode=pressure")
+
     spinup = p.add_argument_group("Spin-up (pre-2016 equilibration)")
     spinup.add_argument("--no-spinup", action="store_true",
                         help="Disable pre-run spin-up (spin-up runs by default)")
-    spinup.add_argument("--spinup-cycles", type=int, default=3, metavar="N",
+    spinup.add_argument("--spinup-cycles", type=int, default=0, metavar="N",
                         help="Number of times to repeat the spin-up year")
     spinup.add_argument("--spinup-year", type=int, default=None, metavar="YEAR",
                         help="Calendar year of forcing to cycle for spin-up "
@@ -265,15 +348,27 @@ def _parse_args() -> argparse.Namespace:
                              "is skipped automatically)")
 
     dem = p.add_argument_group("DEM selection")
-    dem.add_argument("--dem-plot",   type=int, default=3, choices=range(1, 10), metavar="N",
-                     help="DTM plot index (1-9)")
+    dem.add_argument("--dem-tif", default=str(MODULE_PATH / "DTMplots/20250618_AGRAMON100m_micasense_dtm.tif"),
+                     metavar="PATH",
+                     help="Full path to the GeoTIFF DEM used to build the mesh "
+                          "(default: 20250618_AGRAMON100m_micasense_dtm.tif in MODULE_PATH)")
+    dem.add_argument("--dem-plot",   type=int, default=3, choices=range(1, 14), metavar="N",
+                     help="Plot index (1-13, matches gdf_Agramon's fid_1 column) used to "
+                          "clip the DEM (loaded from --dem-tif) to that plot's footprint")
     dem.add_argument("--dem-folder", default=None, metavar="PATH",
-                     help="Override: full path to .adf raster folder")
+                     help="Legacy override: full path to .adf raster folder "
+                          "(unused now that --dem-tif is the DEM source)")
+    dem.add_argument("--dem-smooth-sigma", type=float, default=0.0, metavar="SIGMA",
+                     help="Gaussian smoothing sigma (in pixels) applied to the DEM "
+                          "elevation after masking (default: 0.0 = no smoothing). "
+                          "Array shape and NaN mask are preserved exactly — only "
+                          "valid-pixel elevations are blended, so grid dims (N, M) "
+                          "stay unaffected. Typical values: 0.5-2.0.")
 
     solver = p.add_argument_group("Solver parameters")
-    solver.add_argument("--dtmin",  type=float, default=1e-2, metavar="S")
-    solver.add_argument("--dtmax",  type=float, default=1e3,  metavar="S")
-    solver.add_argument("--deltat", type=float, default=1e2,  metavar="S")
+    solver.add_argument("--dtmin",  type=float, default=1e-1, metavar="S")
+    solver.add_argument("--dtmax",  type=float, default=1e4,  metavar="S")
+    solver.add_argument("--deltat", type=float, default=1e3,  metavar="S")
 
     out = p.add_argument_group("Output")
     out.add_argument(
@@ -284,6 +379,13 @@ def _parse_args() -> argparse.Namespace:
     )
     out.add_argument("--no-plots", action="store_true",
                      help="Skip all matplotlib visualisations")
+    out.add_argument("--save-monthly", action="store_true",
+                     help="Also write a standalone NetCDF file per month per "
+                          "variable to outputs/<scenario>/monthly/ (psi, sw, "
+                          "et, recharge). Off by default — the single running "
+                          "psi_output.nc / sw_output.nc / et_output.nc / "
+                          "recharge_output.nc files in outputs/<scenario>/ "
+                          "are always refreshed after every month regardless.")
 
     return p.parse_args()
 
@@ -312,6 +414,162 @@ def load_shapefiles():
         gdf = gdf.to_crs(TARGET_CRS)
     print(f"  Shapefile CRS : {gdf.crs}")
     return gdf
+def load_dem_from_tif(
+    tif_path: Path, target_crs: str = TARGET_CRS,
+    gdf_clip: gpd.GeoDataFrame | None = None,
+    fid: int | str | None = None,
+    plot_id: str | None = None,
+    gbuffer: float | None = None,
+    show: bool = False,
+    resample_resolution: float | None = None,
+):
+    """
+    Load a DEM directly from a GeoTIFF, independent of ``AgUtils.load_dem``
+    (which expects a folder of .adf grids). Mirrors that function's
+    conventions exactly so it's a drop-in swap at the call site:
+
+      - reprojects to ``target_crs`` (assumes EPSG:25830 if the GeoTIFF
+        has no CRS embedded, same fallback as ``AgUtils.load_dem``);
+      - by default, does NOT clip to any shapefile — it only crops to
+        the DEM's own valid-data bounding box (trims all-NaN rows/cols
+        at the edges), exactly like ``AgUtils.load_dem`` does (its
+        shapefile-clip code path is present but disabled/dead there
+        too). Pass ``gdf_clip`` to additionally clip to a shape's
+        bounding box + buffer if the new DEM's extent turns out to be
+        much larger than the catchment of interest;
+      - fills nodata with ``-9999`` (CATHY's expected DEM no-data
+        sentinel), NOT NaN — matching ``AgUtils.load_dem`` bit for bit,
+        since the pyCATHY preprocessor/mesh writer expects this value;
+      - sets ``xllcorner``/``yllcorner`` to the raw min(x)/min(y) pixel
+        centre coordinates (no half-pixel edge offset), same as
+        ``AgUtils.load_dem``.
+
+    Parameters
+    ----------
+    tif_path : Path
+        Full path to the GeoTIFF DEM.
+    target_crs : str
+        CRS every spatial dataset in the pipeline is aligned to.
+    gdf_clip : gpd.GeoDataFrame, optional
+        GeoDataFrame whose bounding box is used to clip the DEM.
+        If provided, the DEM is clipped to this bounding box + buffer.
+    fid : int or str, optional
+        Feature ID to select a single polygon from ``gdf_clip`` by its
+        ``fid_1`` column. Mutually exclusive with ``plot_id``.
+    plot_id : str, optional
+        Plot ID to select polygons from ``gdf_clip`` by its ``PlotID``
+        column (e.g., ``args.dem_plot``). Mutually exclusive with ``fid``.
+    gbuffer : float, optional
+        Padding in metres around ``gdf_clip``'s bbox. Defaults to 1
+        pixel of the current raster resolution.
+    show : bool
+        If True, plot the masked DEM for a quick visual sanity check.
+    resample_resolution : float, optional
+        Target resolution in metres for resampling (assumes square
+        pixels). If provided, the DEM is resampled to this resolution
+        after CRS transformation but before cropping to valid data.
+
+    Returns
+    -------
+    raster_DEM : xr.DataArray
+        DEM reprojected/cropped to its own valid-data extent, with
+        ``.rio.crs`` set. Same x/y grid as ``raster_DEM_masked``.
+    raster_DEM_masked : np.ndarray
+        DEM elevations, with NaN → -9999 (CATHY no-data convention).
+    xllcorner, yllcorner : float
+        Lower-left corner of the grid (pixel-centre coordinate, not
+        cell edge — matches ``AgUtils.load_dem``).
+    res_x, res_y : float
+        Pixel size (positive values).
+    """
+    tif_path = Path(tif_path)
+    if not tif_path.is_file():
+        raise FileNotFoundError(f"DEM GeoTIFF not found: {tif_path}")
+
+    print(f"  DEM source (tif) : {tif_path}")
+    raster_DEM = rxr.open_rasterio(tif_path, masked=True).isel(band=0)
+
+    if raster_DEM.rio.crs is None:
+        raster_DEM = raster_DEM.rio.write_crs("EPSG:25830")
+        print("  DEM CRS was missing — assumed EPSG:25830")
+
+    # Handle CRS transformation and resampling together
+    needs_reproject = str(raster_DEM.rio.crs) != target_crs
+    needs_resample = resample_resolution is not None
+
+    if needs_reproject or needs_resample:
+        dst_crs = target_crs if needs_reproject else raster_DEM.rio.crs
+        kwargs = {"resolution": resample_resolution} if needs_resample else {}
+        print(f"  Transforming DEM to {dst_crs} at {resample_resolution} m" if needs_resample
+              else f"  Transforming DEM to {dst_crs}")
+        raster_DEM = raster_DEM.rio.reproject(dst_crs, **kwargs)
+
+    print(f"  DEM CRS : {raster_DEM.rio.crs}")
+
+    res_x = abs(float(raster_DEM.rio.resolution()[0]))
+    res_y = abs(float(raster_DEM.rio.resolution()[1]))
+    print(f"  DEM resolution : {res_x:.2f} × {res_y:.2f} m")
+
+    # Select and clip to gdf_clip bounding box + buffer if provided
+    if gdf_clip is not None:
+        # Select specific feature(s) from gdf_clip if fid or plot_id is provided
+        if fid is not None and plot_id is not None:
+            raise ValueError("Cannot specify both 'fid' and 'plot_id'. Use one or the other.")
+        if fid is not None:
+            gdf_clip = gdf_clip[gdf_clip["fid_1"] == fid].copy()
+            print(f"  Selected fid={fid} from gdf_clip ({len(gdf_clip)} features)")
+        elif plot_id is not None:
+            gdf_clip = gdf_clip[gdf_clip["PlotID"] == plot_id].copy()
+            print(f"  Selected PlotID={plot_id} from gdf_clip ({len(gdf_clip)} features)")
+
+        if len(gdf_clip) == 0:
+            raise ValueError(f"No features found in gdf_clip for {'fid' if fid is not None else 'PlotID'}={fid if fid is not None else plot_id}")
+
+        if str(gdf_clip.crs) != target_crs:
+            gdf_clip = gdf_clip.to_crs(target_crs)
+            print(f"  Reprojected gdf_clip to {target_crs}")
+
+        if gbuffer is None:
+            gbuffer = res_x  # Default: 1 pixel of current resolution
+        minx, miny, maxx, maxy = gdf_clip.total_bounds
+        minx -= gbuffer
+        miny -= gbuffer
+        maxx += gbuffer
+        maxy += gbuffer
+        print(f"  Clipping DEM to gdf_clip bbox + {gbuffer:.2f} m buffer")
+        #raster_DEM = raster_DEM.rio.clip_box(minx, miny, maxx, maxy)
+        raster_DEM = raster_DEM.rio.clip(gdf_clip.geometry, all_touched=True)
+
+    # Crop to valid-data bounding box (trim all-NaN rows/cols)
+    valid_mask = ~np.isnan(raster_DEM)
+    valid_x = raster_DEM["x"].where(valid_mask.any(dim="y"), drop=True)
+    valid_y = raster_DEM["y"].where(valid_mask.any(dim="x"), drop=True)
+    raster_DEM = (
+        raster_DEM
+        .where((raster_DEM["x"] >= float(valid_x.min())) &
+               (raster_DEM["x"] <= float(valid_x.max())), drop=True)
+        .where((raster_DEM["y"] >= float(valid_y.min())) &
+               (raster_DEM["y"] <= float(valid_y.max())), drop=True)
+    )
+
+    xllcorner = float(raster_DEM["x"].min())
+    yllcorner = float(raster_DEM["y"].min())
+
+    raster_DEM_masked = np.where(np.isnan(raster_DEM), -9999, raster_DEM.values)
+
+    print(f"  DEM shape      : {raster_DEM_masked.shape}")
+    print(f"  xllcorner={xllcorner:.2f}, yllcorner={yllcorner:.2f}")
+
+    if show:
+        valid = raster_DEM_masked[raster_DEM_masked != -9999]
+        fig, ax = plt.subplots(figsize=(8, 6))
+        img = ax.imshow(raster_DEM_masked, cmap="terrain",
+                        vmin=valid.min(), vmax=valid.max())
+        plt.colorbar(img, ax=ax, label="Elevation (m)")
+        ax.set_title(f"DEM — masked ({target_crs})")
+        plt.tight_layout()
+
+    return raster_DEM, raster_DEM_masked, xllcorner, yllcorner, res_x, res_y
 
 
 def load_monthly_lai(lai_input_dir: Path) -> xr.Dataset:
@@ -385,12 +643,27 @@ def load_rain(path: Path = rain_path) -> xr.Dataset:
 def log_simulation(log_path: Path, start_year: int, end_year: int,
                    zroot: float, pmin: float, watershed_nb: int,
                    with_lai: int, outlet_flux: float = None,
-                   bottom_flux: float = None, spinup: str = None) -> int:
+                   bottom_flux: float = None, spinup: str = None,
+                   ic_mode: str = None, ic_wtposition: float = None,
+                   ic_pressure_head: float = None,
+                   zroot_factors: list = None,
+                   permx: float = None,
+                   permy_ratio: float = None,
+                   permz_ratio: float = None) -> int:
     """Register parameters in the shared CSV log and return the sim_index.
 
-    outlet_flux / bottom_flux / spinup are recorded too (not just used to
-    tag the folder name) so `--list-scenarios` and the CSV itself are
-    enough to compare runs without having to parse folder names.
+    outlet_flux / bottom_flux / spinup / ic_* are recorded too (not just
+    used to tag the folder name) so `--list-scenarios` and the CSV itself
+    are enough to compare runs without having to parse folder names — and
+    so batch runners can tell whether a given parameter combination
+    (including initial condition) has already been logged, e.g. to skip
+    re-running scenarios that already completed successfully.
+
+    zroot_factors / permx / permy_ratio / permz_ratio are logged the same
+    way — a run's root-depth mapping and Ks override (incl. anisotropy)
+    are as much a part of its identity as ZROOT or PMIN, so they belong
+    in the CSV rather than only ever showing up in the console/markdown
+    log.
     """
     params = {
         "start_year":   start_year,
@@ -402,6 +675,14 @@ def log_simulation(log_path: Path, start_year: int, end_year: int,
         "outlet_flux":  outlet_flux,
         "bottom_flux":  bottom_flux,
         "spinup":       spinup,
+        "ic_mode":          ic_mode,
+        "ic_wtposition":    ic_wtposition,
+        "ic_pressure_head": ic_pressure_head,
+        "zroot_factors": (",".join(f"{v:g}" for v in zroot_factors)
+                           if zroot_factors is not None else None),
+        "permx":        permx,
+        "permy_ratio":  permy_ratio if permx is not None else None,
+        "permz_ratio":  permz_ratio if permx is not None else None,
     }
     sim_index = uCATHY.log_simulation(log_path, params)
     print(f"  sim_index = {sim_index}  (withLAI={with_lai})")
@@ -411,7 +692,7 @@ def log_simulation(log_path: Path, start_year: int, end_year: int,
 def build_scenario_dirname(sim_index: int, dem_plot: int,
                            outlet_flux: float, bottom_flux: float,
                            no_spinup: bool, spinup_cycles: int,
-                           pmin: float) -> str:
+                           pmin: float, ic_mode: str = "wt") -> str:
     """
     Human-readable, self-describing scenario folder name.
 
@@ -419,12 +700,18 @@ def build_scenario_dirname(sim_index: int, dem_plot: int,
     place that keys off the CSV-assigned sim_index (post-processing
     scripts, --scenario N, log lookups) keeps working unchanged — but a
     short tag is appended describing the axes that actually differ
-    between batch runs (dem-plot, outlet/bottom BC, spin-up, PMIN), so
-    scenarios run with different args can be told apart, and compared,
-    just by reading folder names side by side instead of cross-
-    referencing the CSV log for every one of them.
+    between batch runs (dem-plot, outlet/bottom BC, spin-up, PMIN,
+    initial condition), so scenarios run with different args can be told
+    apart, and compared, just by reading folder names side by side
+    instead of cross-referencing the CSV log for every one of them.
 
-    e.g. scenario_7_plot2_outlet-free_bottom-closed_spinup-on3c_pmin-3.0
+    ``ic_mode`` is included so runs that only differ by --ic-mode (wt vs
+    pressure) get distinct folders/tags instead of silently colliding —
+    previously two such runs shared the same tag (differing only by the
+    sim_index prefix), which also made them indistinguishable to any
+    "has this combination already run?" check based on the tag alone.
+
+    e.g. scenario_7_plot2_outlet-free_bottom-closed_spinup-on3c_pmin-3.0_ic-wt
     """
     outlet_label = "closed" if outlet_flux == 0 else "free"
     bottom_label = "closed" if bottom_flux == 0 else "free"
@@ -434,7 +721,8 @@ def build_scenario_dirname(sim_index: int, dem_plot: int,
            f"_outlet-{outlet_label}"
            f"_bottom-{bottom_label}"
            f"_spinup-{spinup_label}"
-           f"_pmin-{pmin_label}")
+           f"_pmin-{pmin_label}"
+           f"_ic-{ic_mode}")
     return f"scenario_{sim_index}_{tag}"
 
 
@@ -446,6 +734,60 @@ def initialise_project(path2prj: str, start_year: int, end_year: int,
     simu = cathy_tools.CATHY(dirName=str(sim_dir))
     print(f"  Working directory  : {sim_dir}")
     return simu
+
+
+def smooth_dem(raster_DEM_masked: np.ndarray, sigma: float) -> np.ndarray:
+    """
+    Gaussian-smooth DEM elevations while leaving array shape and the
+    NaN (masked/outside-catchment) footprint exactly unchanged.
+
+    Plain ``scipy.ndimage.gaussian_filter`` on an array containing NaNs
+    would leak NaN into every pixel within ~sigma of the mask edge (and
+    vice-versa smear elevation into masked cells), silently growing or
+    shrinking the effective valid-pixel footprint. That would change
+    what "the DEM" is even though .shape stays (N, M) — the grid dims
+    CATHY sees would still be right, but the terrain wouldn't be.
+
+    Standard fix: zero-fill NaNs, smooth both the filled field and a
+    0/1 validity mask with the same kernel, then divide the two
+    (Gaussian-weighted normalisation) so only valid neighbours
+    contribute to each valid pixel's new value. NaNs are then written
+    back at the original locations, so the mask is bit-for-bit
+    identical to the input — only masked-in elevations move.
+
+    Parameters
+    ----------
+    raster_DEM_masked : np.ndarray
+        DEM elevation grid, NaN outside the catchment/basin.
+    sigma : float
+        Gaussian sigma in pixels. <= 0 returns the input unchanged
+        (no-op — smoothing was requested but effectively disabled).
+
+    Returns
+    -------
+    np.ndarray
+        Smoothed DEM, same shape and same NaN mask as the input.
+    """
+    if sigma is None or sigma <= 0:
+        return raster_DEM_masked
+
+    dem = np.asarray(raster_DEM_masked, dtype=float)
+    nan_mask = ~np.isfinite(dem)
+
+    filled = np.where(nan_mask, 0.0, dem)
+    valid  = np.where(nan_mask, 0.0, 1.0)
+
+    filled_smooth = gaussian_filter(filled, sigma=sigma, mode="nearest")
+    valid_smooth  = gaussian_filter(valid,  sigma=sigma, mode="nearest")
+
+    with np.errstate(invalid="ignore", divide="ignore"):
+        dem_smooth = filled_smooth / valid_smooth
+
+    # Re-impose the exact original mask — shape and valid-pixel count
+    # (and therefore N, M and dem_valid_px used for area/logging) are
+    # unchanged; only elevations at already-valid pixels move.
+    dem_smooth[nan_mask] = np.nan
+    return dem_smooth.astype(raster_DEM_masked.dtype, copy=False)
 
 
 def setup_dem(simu, raster_DEM_masked: np.ndarray,
@@ -460,7 +802,7 @@ def setup_dem(simu, raster_DEM_masked: np.ndarray,
         delta_x=delta_x,
         delta_y=delta_y,
         ivert=1,
-        base=30,
+        #base=30,
     )
     if show:
         fig = plt.figure(figsize=(10, 6))
@@ -468,7 +810,6 @@ def setup_dem(simu, raster_DEM_masked: np.ndarray,
         simu.show_input(prop="dem", ax=ax)
         plt.tight_layout()
     simu.create_mesh_vtk(verbose=True)
-
 
 def configure_boundary_conditions(
     simu, t_atmbc: list, outlet_flux: float = -1e-6, outlet_side: str = None,
@@ -652,11 +993,17 @@ def lai_to_veg_map(simu, lai_2d: np.ndarray) -> tuple[np.ndarray, dict[int, int]
     for i, thresh in enumerate(LAI_THRESHOLDS, start=2):
         veg[lai_2d > thresh] = i
 
-    unique_classes = np.unique(veg)
-    remap: dict[int, int] = {
-        int(orig): new for new, orig in enumerate(unique_classes, start=1)
-    }
-    veg_remapped = np.vectorize(remap.get)(veg).astype(int)
+    # NOTE: remap is intentionally the IDENTITY mapping over the fixed set of
+    # semantic classes 1..N_VEG_CLASSES — NOT derived from np.unique(veg).
+    # Re-deriving it per month (as before) renumbered whichever classes were
+    # spatially present that month to consecutive 1..K, so the same veg-index
+    # meant a different semantic class from one month to the next, and the
+    # SOIL table size (and MAXVEG) mismatched whenever fewer than 5 classes
+    # were present. Keeping it fixed means the soil table always has
+    # N_VEG_CLASSES rows and row i always corresponds to semantic class i,
+    # whether or not that class actually appears in the DEM this month.
+    remap: dict[int, int] = {c: c for c in range(1, N_VEG_CLASSES + 1)}
+    veg_remapped = veg  # already using the fixed semantic classes 1..N_VEG_CLASSES
     return veg_remapped, remap
 
 
@@ -700,26 +1047,115 @@ def update_soil_for_active_zones(
     remap: dict[int, int],
     base_zroot: float,
     pmin: float,
+    zroot_factors: dict[int, float] | None = None,
+    permx: float | None = None,
+    permy_ratio: float = 1.0,
+    permz_ratio: float = 1.0,
+    vgncell: float | None = None,
+    vgrmccell: float | None = None,
+    vgpsatcell: float | None = None,
 ) -> None:
+    """
+    ``zroot_factors`` overrides the module-level ZROOT_FACTORS mapping
+    (semantic veg class 1-5 → root-depth multiplier) when given —
+    normally built from ``--zroot-factors`` — falling back to
+    ZROOT_FACTORS itself when None, so existing callers that don't pass
+    it keep the original hardcoded behaviour.
+
+    ``permx`` (m/s), when given — normally from ``--permx`` — overrides
+    PERMX uniformly across every row of the SPP_map returned by
+    ``simu.set_SOIL_defaults(SPP_map_default=True)``; PERMY/PERMZ follow
+    via ``permy_ratio``/``permz_ratio`` (anisotropy). Left untouched
+    (pyCATHY's own SPP default) when permx is None.
+
+    ``vgncell`` / ``vgrmccell`` / ``vgpsatcell``, when given, override the
+    van Genuchten retention-curve columns (VGNCELL = n, VGRMCCELL =
+    residual water content θr, VGPSATCELL = 1/alpha) uniformly across
+    every row of df_spp, same broadcast pattern as permx above. Each is
+    left at pyCATHY's own SPP default when None. Note VGRMCCELL must
+    stay below POROS — simu.update_soil() itself warns (doesn't raise)
+    if VGRMCCELL >= POROS for any row.
+    """
     inv_remap: dict[int, int] = {v: k for k, v in remap.items()}
-    n_zones = len(active_zones)
+    if zroot_factors is None:
+        zroot_factors = ZROOT_FACTORS
+
+    # Always build the SOIL vegetation table for the FULL fixed set of
+    # N_VEG_CLASSES zones — matching MAXVEG — regardless of how many of
+    # them are spatially present in the DEM this particular month. Zones
+    # not currently active still get a physically-meaningful ZROOT (their
+    # fixed zroot_factors value), they just aren't occupying any pixels
+    # this month; they must not be dropped from the table, or the row
+    # count stops matching MAXVEG and/or rows shift relative to the
+    # semantic class each veg-index in the raster refers to.
+    n_zones = N_VEG_CLASSES
 
     df_fp  = simu.set_SOIL_defaults(FP_map_default=True, nveg=n_zones)
     df_spp = simu.set_SOIL_defaults(SPP_map_default=True)
 
     template = df_fp.iloc[[0]]
     df_fp = pd.concat([template] * n_zones, ignore_index=True)
+    # pd.concat(..., ignore_index=True) resets the index to a plain 0-based
+    # RangeIndex(0, n_zones). But set_SOIL_defaults()/init_soil_FP_map_df()
+    # index this table 1..n_zones ("Veg nb"), and cathy_tools.py's
+    # _prepare_SOIL_vegetation_tb() reads it back with
+    # FP_map[sfp].loc[iveg] for iveg in range(1, MAXVEG + 1) — so losing
+    # the 1-based labels here means the last class (iveg == n_zones) is
+    # never found, raising KeyError: n_zones. Re-attach the expected
+    # labels; row order is already class 1..n_zones, so this is just
+    # restoring the index, not reordering anything.
+    df_fp.index = pd.RangeIndex(1, n_zones + 1)
+    df_fp.index.name = "Veg nb"
     for key in df_fp.columns:
         if key == "ZROOT":
             df_fp[key] = [
-                base_zroot * ZROOT_FACTORS.get(inv_remap.get(z, z), 1.0)
-                for z in sorted(active_zones)
+                base_zroot * zroot_factors.get(inv_remap.get(z, z), 1.0)
+                for z in range(1, n_zones + 1)
             ]
 
+    permx_label = "pyCATHY default"
+    if permx is not None:
+        overrides = {
+            "PERMX": permx,
+            "PERMY": permx * permy_ratio,
+            "PERMZ": permx * permz_ratio,
+        }
+        for col, val in overrides.items():
+            if col in df_spp.columns:
+                df_spp[col] = val
+            else:
+                print(f"    WARNING: SPP_map has no '{col}' column — "
+                      f"--permx/--permy-ratio/--permz-ratio ignored for it.")
+        permx_label = (f"PERMX={permx:.3e}, PERMY={overrides['PERMY']:.3e}, "
+                       f"PERMZ={overrides['PERMZ']:.3e} m/s")
+
+    # Retention curve (van Genuchten) overrides — VGNCELL/VGRMCCELL/
+    # VGPSATCELL — same broadcast-to-every-row pattern as permx above.
+    vg_overrides = {
+        "VGNCELL": vgncell,
+        "VGRMCCELL": vgrmccell,
+        "VGPSATCELL": vgpsatcell,
+    }
+    vg_label_parts = []
+    for col, val in vg_overrides.items():
+        if val is None:
+            continue
+        if col in df_spp.columns:
+            df_spp[col] = val
+            vg_label_parts.append(f"{col}={val:.4g}")
+        else:
+            print(f"    WARNING: SPP_map has no '{col}' column — override ignored for it.")
+    if (df_spp["VGRMCCELL"] >= df_spp["POROS"]).any():
+        print("    WARNING: VGRMCCELL >= POROS for at least one zone — "
+              "residual water content exceeds porosity, fix before running.")
+    vg_label = ", ".join(vg_label_parts) if vg_label_parts else "pyCATHY default"
+
     simu.update_soil(FP_map=df_fp, SPP_map=df_spp, PMIN=pmin)
-    semantic = sorted(inv_remap.get(z, z) for z in active_zones)
-    print(f"    → Soil updated | remapped zones: {sorted(active_zones)} "
-          f"(semantic: {semantic})")
+    semantic_active = sorted(inv_remap.get(z, z) for z in active_zones)
+    print(f"    → Soil updated | table rows: {n_zones} (all zones, fixed) "
+          f"| spatially active this month: {sorted(active_zones)} "
+          f"(semantic: {semantic_active}) | Ks: {permx_label} | "
+          f"retention curve: {vg_label}")
 
 
 def iter_monthly_lai(lai_ds: xr.Dataset):
@@ -1185,6 +1621,156 @@ def apply_eta_artefact_floor(
     return df_et, int(is_artefact.sum())
 
 
+def add_datetime_col(df: pd.DataFrame, base_dt) -> pd.DataFrame:
+    """
+    Add a 'datetime' column as base_dt + time_sec (returns df).
+
+    Guards against a pyCATHY output-reading quirk where 'time_sec' is
+    sometimes already a Timedelta dtype (instead of a plain float number
+    of seconds) — calling pd.to_timedelta(..., unit="s") on data that's
+    already Timedelta makes pandas try Timedelta+float arithmetic
+    internally and raises "unsupported operand type(s) for +: 'Timedelta'
+    and 'float'". When time_sec is already a Timedelta we use it as-is;
+    otherwise we coerce to float first and apply unit="s" as before.
+    """
+    ts = df["time_sec"]
+    if pd.api.types.is_timedelta64_dtype(ts):
+        df["datetime"] = base_dt + ts
+    else:
+        df["datetime"] = base_dt + pd.to_timedelta(ts.astype(float), unit="s")
+    return df
+
+
+def check_monthly_sanity(
+    dt,
+    month_stats: dict,
+    psi_month_df,
+    sw_month_df,
+    df_et,
+    df_rec,
+    t_month,
+    idx_month,
+    ETp_nodes,
+    rain_nodes,
+    sw_tol: float = SW_TOL,
+    psi_sanity_min: float = PSI_SANITY_MIN,
+    eta_tol: float = ETA_TOL,
+    wb_residual_frac: float = WB_RESIDUAL_FRAC,
+) -> list[str]:
+    """
+    Run cheap physical-bounds and (approximate) water-balance sanity
+    checks on one month's outputs. Fills diagnostic fields into
+    `month_stats` in place and returns a list of human-readable warning
+    strings (empty if nothing looked off). Never raises — a check that
+    can't be computed for this month (missing data, unexpected columns)
+    is silently skipped rather than aborting the run.
+
+    Water-balance note
+    -------------------
+    The residual is rain_in − ETa_out − recharge_out only: it does NOT
+    account for the change in subsurface storage (ΔS), because that
+    would require per-node porosity and control-volume information not
+    readily available here. So this is not a strict mass-balance
+    closure — treat a large residual as "worth checking the psi/sw
+    trend for this month", not as proof of a bug on its own. It also
+    assumes the 'recharge' output column(s) are in the same units
+    (m/s) as ETa/rain; if your CATHY build reports recharge in
+    different units, `recharge_out_mm` below will be wrong and should
+    be ignored.
+    """
+    warnings: list[str] = []
+
+    # ── Physical bounds: SW should stay within [0, 1] ──
+    if sw_month_df is not None and len(sw_month_df):
+        sw_vals = sw_month_df["sw"].to_numpy(dtype=float)
+        n_bad = int(((sw_vals < -sw_tol) | (sw_vals > 1 + sw_tol)).sum())
+        month_stats["sw_out_of_bounds_n"] = n_bad
+        if n_bad:
+            warnings.append(
+                f"{dt:%Y-%m}: {n_bad} SW value(s) outside [0,1] "
+                f"(range [{sw_vals.min():.3f}, {sw_vals.max():.3f}])."
+            )
+
+    # ── Physical bounds: PSI shouldn't be sitting at extreme drying values ──
+    if psi_month_df is not None and len(psi_month_df):
+        psi_vals = psi_month_df["psi"].to_numpy(dtype=float)
+        n_extreme = int((psi_vals < psi_sanity_min).sum())
+        month_stats["psi_extreme_n"] = n_extreme
+        if n_extreme:
+            warnings.append(
+                f"{dt:%Y-%m}: {n_extreme} PSI value(s) below sanity threshold "
+                f"{psi_sanity_min:.0f} m (min {psi_vals.min():.2f} m)."
+            )
+
+    # ── Physical bounds: ETa should not exceed ETp ──
+    if (df_et is not None and len(df_et) and t_month is not None and len(t_month)
+            and ETp_nodes is not None and idx_month is not None and len(idx_month)):
+        try:
+            t_month_arr = np.asarray(t_month, dtype=float)
+            tsec = df_et["time_sec"].to_numpy(dtype=float)
+            i_right  = np.clip(np.searchsorted(t_month_arr, tsec), 0, len(t_month_arr) - 1)
+            i_left   = np.clip(i_right - 1, 0, len(t_month_arr) - 1)
+            use_left = np.abs(t_month_arr[i_left] - tsec) < np.abs(t_month_arr[i_right] - tsec)
+            i_time   = np.where(use_left, i_left, i_right)
+
+            node_idx = df_et["SURFACE NODE"].to_numpy(dtype=int)
+            n_surf   = ETp_nodes.shape[1]
+            if node_idx.max() == n_surf:
+                node_idx = node_idx - 1
+
+            rows     = idx_month[i_time]
+            etp_vals = ETp_nodes[rows, node_idx]
+            eta_col  = "ACT. ETRA_patched" if "ACT. ETRA_patched" in df_et.columns else "ACT. ETRA"
+            eta_vals = df_et[eta_col].to_numpy(dtype=float)
+
+            n_exceed = int((eta_vals > etp_vals + eta_tol).sum())
+            month_stats["eta_exceeds_etp_n"] = n_exceed
+            if n_exceed:
+                max_excess = float((eta_vals - etp_vals).max())
+                warnings.append(
+                    f"{dt:%Y-%m}: {n_exceed} ETa value(s) exceed ETp "
+                    f"(max excess {max_excess:.3e} m/s)."
+                )
+        except Exception:
+            pass  # sanity check itself must never break the run
+
+    # ── Water balance: rain_in vs ETa_out vs recharge_out (flux-only) ──
+    rain_in_mm = eta_out_mm = recharge_out_mm = None
+
+    if rain_nodes is not None and idx_month is not None and len(idx_month):
+        rain_in_mm = float((rain_nodes[idx_month].mean(axis=1) * 86400 * 1000).sum())
+        month_stats["rain_in_mm"] = rain_in_mm
+
+    if df_et is not None and len(df_et):
+        eta_col = "ACT. ETRA_patched" if "ACT. ETRA_patched" in df_et.columns else "ACT. ETRA"
+        if eta_col in df_et.columns:
+            eta_by_time = df_et.groupby("time_sec")[eta_col].mean()
+            eta_out_mm = float((eta_by_time * 86400 * 1000).sum())
+            month_stats["eta_out_mm"] = eta_out_mm
+
+    if df_rec is not None and len(df_rec):
+        rec_value_cols = [c for c in df_rec.select_dtypes(include=[np.number]).columns
+                           if c not in ("X", "Y", "time_sec")]
+        if rec_value_cols:
+            rec_by_time = df_rec.groupby("time_sec")[rec_value_cols].mean().mean(axis=1)
+            recharge_out_mm = float((rec_by_time * 86400 * 1000).sum())
+            month_stats["recharge_out_mm"] = recharge_out_mm
+
+    if rain_in_mm is not None and eta_out_mm is not None and recharge_out_mm is not None:
+        residual_mm = rain_in_mm - eta_out_mm - recharge_out_mm
+        month_stats["water_balance_residual_mm"] = residual_mm
+        if rain_in_mm > 1e-6 and abs(residual_mm) > wb_residual_frac * rain_in_mm:
+            warnings.append(
+                f"{dt:%Y-%m}: water balance residual {residual_mm:.1f} mm "
+                f"(rain {rain_in_mm:.1f}, ETa {eta_out_mm:.1f}, "
+                f"recharge {recharge_out_mm:.1f}) — large relative to rain "
+                f"input. Excludes storage change (ΔS); also check the "
+                f"psi/sw trend for this month before assuming a bug."
+            )
+
+    return warnings
+
+
 # ── Spin-up (pre-2016 equilibration) ────────────────────────────────────────
 
 def pick_default_spinup_year(valid_times: np.ndarray) -> int:
@@ -1276,11 +1862,15 @@ def run_spinup(
     veg_map_remapped, remap = lai_to_veg_map(simu, lai0)
     veg_map = smooth_veg_map(veg_map_remapped)
     _, veg_valid = simu._check_outside_DEM(veg_map)
-    simu.update_veg_map(veg_map)
+    simu.update_veg_map(veg_map, maxveg=N_VEG_CLASSES)
     active_zones = set(int(z) for z in veg_valid)
     update_soil_for_active_zones(
         simu, active_zones, remap=remap,
         base_zroot=args.zroot, pmin=args.pmin,
+        zroot_factors=zroot_factors_from_args(args),
+        permx=args.permx,
+        permy_ratio=args.permy_ratio,
+        permz_ratio=args.permz_ratio,
     )
     if md_log is not None:
         md_log.bullet(f"Static spin-up vegetation from {dt0:%Y-%m}: "
@@ -1289,6 +1879,7 @@ def run_spinup(
                               "ψ outlet (m)", "Status"])
 
     spinup_ran = False
+    mesh_refreshed = False     # see note at the first update_ic below
     outlet_psi_by_cycle = []   # diagnostic: psi at outlet node, per cycle/month
     for cycle in range(1, args.spinup_cycles + 1):
         for month in range(1, 13):
@@ -1303,18 +1894,39 @@ def run_spinup(
             df_atmbc_month = simu.read_inputs("atmbc")
             simu.update_parm(TIMPRTi=list(df_atmbc_month.time), IPRT=4, VTKF=2)
 
-            if first_iteration:
-                simu.run_preprocessor(verbose=True)
-                first_iteration = False
+            #if first_iteration:
+                #simu.run_preprocessor(verbose=True)
+                #first_iteration = False
 
             if spinup_ran:
+                # FIX: same stale-mesh issue the main loop already handles
+                # (see "this preprocessor call can finalize a DIFFERENT
+                # (larger) mesh" note there). update_ic -> map_prop2mesh
+                # validates against the mesh cached by create_mesh_vtk()
+                # in setup_dem, which predates the processor finalizing the
+                # 3D grid. psi has one value per real 3D node, so without
+                # this refresh we get "'ic' has length N but the mesh has M
+                # points". Rebuild once, after the first spin-up run.
+                if not mesh_refreshed:
+                    try:
+                        simu.create_mesh_vtk(verbose=False)
+                        mesh_refreshed = True
+                    except Exception as exc:
+                        print(f"  WARNING: could not refresh mesh before "
+                              f"spin-up IC warm start ({exc}).")
+                        if md_log is not None:
+                            md_log.warn(f"Mesh refresh failed in spin-up: {exc}")
+
                 df_psi   = simu.read_outputs("psi").copy()
                 psi_ini  = df_psi.iloc[-1].values
                 simu.update_ic(INDP=1, pressure_head_ini=psi_ini)
 
             print(f"  [spin-up {cycle}/{args.spinup_cycles}] "
                   f"{spinup_year}-{month:02d} …")
-            simu.update_cathyH(MAXVEG=10)
+            # MAXVEG already fixed to N_VEG_CLASSES before the loop; no need
+            # to re-set it here every cycle (it was previously re-set to a
+            # mismatched value of 10 on every iteration).
+
             try:
                 simu.run_processor(
                     IPRT1=2,
@@ -1421,9 +2033,8 @@ def run_pipeline(args: argparse.Namespace) -> None:
 
     show_plots = not args.no_plots
 
-    # ── 1. Resolve DEM folder ─────────────────────────────────
-    adf_folder = (args.dem_folder if args.dem_folder
-                  else f"{MODULE_PATH}/DTMplots/dtmplot{args.dem_plot}/")
+    # ── 1. Resolve DEM source ─────────────────────────────────
+    dem_tif_path = Path(args.dem_tif)
 
     print("\n" + "=" * 60)
     print("  LT Subsurface Hydrology with LAI + ETp — pyCATHY")
@@ -1431,7 +2042,13 @@ def run_pipeline(args: argparse.Namespace) -> None:
     print(f"  Period         : {args.start_year} – {args.end_year - 1}")
     print(f"  Target CRS     : {TARGET_CRS}")
     print(f"  ZROOT          : {args.zroot} m  |  PMIN : {args.pmin} m")
-    print(f"  DEM folder     : {adf_folder}")
+    print(f"  ZROOT factors  : {args.zroot_factors} "
+          f"(bare/sparse/moderate/dense/very_dense)")
+    print(f"  PERMX (Ks)     : "
+          f"{'pyCATHY default' if args.permx is None else f'{args.permx:.3e} m/s'}"
+          f"{'' if args.permx is None else f'  |  PERMY ratio {args.permy_ratio}'
+                                            f'  |  PERMZ ratio {args.permz_ratio}'}")
+    print(f"  DEM source     : {dem_tif_path}")
     print(f"  Log file       : {args.log_file}")
     print(f"  Spin-up        : "
           f"{'disabled' if args.no_spinup else f'{args.spinup_cycles} cycle(s)'}")
@@ -1468,6 +2085,13 @@ def run_pipeline(args: argparse.Namespace) -> None:
         outlet_flux=args.outlet_flux,
         bottom_flux=args.bottom_flux,
         spinup=("off" if args.no_spinup else f"on_{args.spinup_cycles}cycles"),
+        ic_mode=args.ic_mode,
+        ic_wtposition=args.ic_wtposition,
+        ic_pressure_head=args.ic_pressure_head,
+        zroot_factors=args.zroot_factors,
+        permx=args.permx,
+        permy_ratio=args.permy_ratio,
+        permz_ratio=args.permz_ratio,
     )
 
     # Single source of truth for this run's folder name (project dir,
@@ -1476,7 +2100,7 @@ def run_pipeline(args: argparse.Namespace) -> None:
     # same, comparably-named place. See build_scenario_dirname() above.
     scenario_dirname = build_scenario_dirname(
         sim_index, args.dem_plot, args.outlet_flux, args.bottom_flux,
-        args.no_spinup, args.spinup_cycles, args.pmin,
+        args.no_spinup, args.spinup_cycles, args.pmin, args.ic_mode,
     )
 
     # ── Markdown run log ───────────────────────────────────────
@@ -1503,8 +2127,19 @@ def run_pipeline(args: argparse.Namespace) -> None:
         "Period": f"{args.start_year} – {args.end_year - 1}",
         "Target CRS": TARGET_CRS,
         "ZROOT / PMIN": f"{args.zroot} m / {args.pmin} m",
-        "DEM folder": adf_folder,
-        "DEM plot": args.dem_plot,
+        "ZROOT factors (bare/sparse/moderate/dense/very_dense)":
+            ",".join(f"{v:g}" for v in args.zroot_factors),
+        "PERMX / Ks override": (
+            "pyCATHY default" if args.permx is None
+            else f"PERMX={args.permx:.3e} m/s, PERMY ratio={args.permy_ratio}, "
+                 f"PERMZ ratio={args.permz_ratio}"
+        ),
+        "Initial condition": (f"WT depth {args.ic_wtposition} m (INDP=3)"
+                               if args.ic_mode == "wt"
+                               else f"uniform pressure head "
+                                    f"{args.ic_pressure_head} m (INDP=0)"),
+        "DEM source (tif)": str(dem_tif_path),
+        "DEM plot (fid_1 clip)": args.dem_plot,
         "Spin-up": ("disabled" if args.no_spinup
                      else f"{args.spinup_cycles} cycle(s)"),
         "Outlet flux": f"{args.outlet_flux:.1e} m/s",
@@ -1518,13 +2153,33 @@ def run_pipeline(args: argparse.Namespace) -> None:
 
     # ── 5. DEM ────────────────────────────────────────────────
     print("\n[4/9] Loading and masking DEM …")
-    raster_DEM, raster_DEM_masked, xllcorner, yllcorner, res_x, res_y = AgUtils.load_dem(
-        adf_folder, show=show_plots,
-        TARGET_CRS=TARGET_CRS,
+    raster_DEM, raster_DEM_masked, xllcorner, yllcorner, res_x, res_y = load_dem_from_tif(
+        dem_tif_path,
+        gdf_clip=gdf_Agramon,
+        fid=args.dem_plot,
+        resample_resolution=2
     )
+
+
     _check_crs_alignment("DEM",   raster_DEM.rio.crs,  "target", TARGET_CRS)
     _check_crs_alignment("LAI",   ds_LAI.rio.crs,       "target", TARGET_CRS)
     _check_crs_alignment("shape", gdf_Agramon.crs,       "target", TARGET_CRS)
+
+    # ── 5b. Optional DEM smoothing (shape/NaN mask preserved) ──
+    if args.dem_smooth_sigma > 0:
+        shape_before = raster_DEM_masked.shape
+        valid_before = int(np.isfinite(raster_DEM_masked).sum())
+        raster_DEM_masked = smooth_dem(raster_DEM_masked, args.dem_smooth_sigma)
+        assert raster_DEM_masked.shape == shape_before, (
+            "smooth_dem changed DEM shape — this must never happen "
+            f"({raster_DEM_masked.shape} != {shape_before})"
+        )
+        assert int(np.isfinite(raster_DEM_masked).sum()) == valid_before, (
+            "smooth_dem changed the valid-pixel (NaN mask) footprint — "
+            "this must never happen"
+        )
+        print(f"  DEM smoothed: gaussian sigma={args.dem_smooth_sigma} px "
+              f"(shape unchanged: {shape_before})")
 
     md_log.section("Setup")
     dem_valid_px  = int(np.isfinite(raster_DEM_masked).sum())
@@ -1536,6 +2191,9 @@ def run_pipeline(args: argparse.Namespace) -> None:
         "DEM origin (xllcorner, yllcorner)": f"({xllcorner:.1f}, {yllcorner:.1f})",
         "DEM valid area": f"{dem_valid_px} px  ≈  {dem_area_m2 / 1e4:.2f} ha "
                            f"({dem_area_m2:.0f} m²)",
+        "DEM smoothing (gaussian sigma, px)": (
+            args.dem_smooth_sigma if args.dem_smooth_sigma > 0 else "none"
+        ),
         "LAI CRS": str(ds_LAI.rio.crs),
         "Shapefile CRS": str(gdf_Agramon.crs),
     })
@@ -1575,7 +2233,11 @@ def run_pipeline(args: argparse.Namespace) -> None:
 
     if USE_ETP_FORCING:
         # ── Map ETp and rain to mesh surface nodes ────────────
-        n_surf = int(simu.grid3d["nnod"])
+        # FIX: `simu.grid3d` can be stale (only updated as a side effect of
+        # certain internal calls, not by read_outputs()). Use the `grid3d`
+        # dict we just freshly read a few lines above instead, so n_surf
+        # matches the mesh actually built for THIS run.
+        n_surf = int(grid3d["nnod"])
 
         ds_ETp_mapped  = mt.map_grid_to_mesh(ds_etp,  ds_mesh, variables=["ET_0-gf"])
         ds_rain_mapped = mt.map_grid_to_mesh(ds_rain, ds_mesh, variables=["TP-DD"])
@@ -1697,8 +2359,14 @@ def run_pipeline(args: argparse.Namespace) -> None:
 
     # ── 10. ICs, BCs ──────────────────────────────────────────
     # FIX: set ICs once here; BCs are built once, up front.
-    simu.update_ic(INDP=3, WTPOSITION=1)
-    #simu.update_ic(INDP=0, pressure_head_ini=-10)
+    if args.ic_mode == "pressure":
+        print(f"  IC             : uniform pressure head = "
+              f"{args.ic_pressure_head} m (INDP=0)")
+        simu.update_ic(INDP=0, pressure_head_ini=args.ic_pressure_head)
+    else:
+        print(f"  IC             : hydrostatic water table at "
+              f"{args.ic_wtposition} m depth (INDP=3)")
+        simu.update_ic(INDP=3, WTPOSITION=args.ic_wtposition)
     # FIX (sfbc EOF crash): configure_boundary_conditions used to be fed
     # list(simu.read_inputs("atmbc")["time"]) here - but at this point in
     # the pipeline simu.update_atmbc() has NEVER been called yet (it's
@@ -1776,11 +2444,113 @@ def run_pipeline(args: argparse.Namespace) -> None:
     all_recharge_recs = []
     veg_map_history   = {}
     lai_history       = {}
+    stats_records     = []
 
     active_zones_prev = None
 
     out_dir = Path(args.path2prj) / "outputs" / scenario_dirname
     out_dir.mkdir(parents=True, exist_ok=True)
+
+    # Persist the per-node ETp forcing actually used to drive ATMBC. This
+    # is a static (time, node) array built once above (step 9) and never
+    # touched again, so it's written straight away rather than accumulated
+    # through the monthly loop like psi/sw/et. Downstream analysis (e.g.
+    # ETa/ETp vs. shallow pressure head, Fig. 8 of Camporese et al. 2014)
+    # needs ETp per node and otherwise has no way to recover it without
+    # re-running the satellite-to-mesh mapping (mt.map_grid_to_mesh).
+    # Only meaningful in the ETp-forcing branch — ERA5-forced runs never
+    # build a per-node ETp array.
+    if USE_ETP_FORCING and ETp_nodes is not None:
+        etp_out_path = out_dir / "etp_output.nc"
+        xr.DataArray(
+            ETp_nodes,
+            dims=["datetime", "node"],
+            coords={"datetime": valid_times, "node": np.arange(ETp_nodes.shape[1])},
+            name="ETp",
+            attrs={
+                "units": "m/s",
+                "description": (
+                    "Potential ET forcing per surface node, as mapped from "
+                    "the satellite ET0 raster onto the mesh (node index "
+                    "matches the first n_surf rows of grid3d['mesh3d_nodes'])."
+                ),
+            },
+        ).to_netcdf(etp_out_path)
+        print(f"  ETp forcing saved -> {etp_out_path}")
+
+    # Per-month outputs are written here as soon as each month finishes,
+    # so a crash mid-run still leaves usable files on disk instead of
+    # losing everything unwritten (the combined *_output.nc files at the
+    # end of the loop are still produced too, for convenience).
+    # Per-month outputs are written here as soon as each month finishes,
+    # only when --save-monthly is passed (off by default). The single
+    # running combined files below are always refreshed every month
+    # regardless of this flag.
+    monthly_dir = out_dir / "monthly"
+    if args.save_monthly:
+        monthly_dir.mkdir(parents=True, exist_ok=True)
+
+    def save_combined_outputs() -> None:
+        """
+        (Re)write the single running output files in out_dir from whatever
+        has been accumulated in the *_records lists / veg_map_history so
+        far. Safe to call after every month: each call overwrites the
+        previous version of these files with the latest cumulative data,
+        so — unlike the per-month files in monthly_dir — there's always
+        exactly one psi_output.nc / sw_output.nc / et_output.nc /
+        recharge_output.nc / veg_map_history.nc reflecting all months
+        completed up to now, without waiting for the loop to finish.
+        """
+        if veg_map_history:
+            veg_history_path = out_dir / "veg_map_history.pkl"
+            with open(veg_history_path, "wb") as fh:
+                pickle.dump(veg_map_history, fh)
+
+            sorted_dates = sorted(veg_map_history)
+            veg_arr = np.stack([veg_map_history[d] for d in sorted_dates], axis=0)
+            veg_xr = xr.DataArray(
+                veg_arr,
+                dims=["time", "row", "col"],
+                coords={"time": sorted_dates, "row": np.arange(M), "col": np.arange(N)},
+                name="veg_map",
+                attrs={
+                    "description": "Vegetation zone map (1=bare, 2=sparse, 3=moderate, 4=dense, 5=very dense)",
+                    "crs": TARGET_CRS,
+                },
+            )
+            veg_xr.to_netcdf(out_dir / "veg_map_history.nc")
+
+        if et_records:
+            ET_xr_all = xr.concat(et_records, dim="datetime")
+            ET_xr_all.time.attrs.pop("dtype", None)
+            ET_xr_all.to_netcdf(out_dir / "et_output.nc",
+                                 encoding={"time": {"dtype": "float64"}})
+
+        if psi_records:
+            df_psi_all = pd.concat(psi_records, ignore_index=True)
+            df_psi_all = (
+                df_psi_all
+                .groupby(["datetime", "node"], as_index=False)
+                .last()
+            )
+            df_psi_all.set_index(["datetime", "node"]).to_xarray().to_netcdf(
+                out_dir / "psi_output.nc"
+            )
+
+        if sw_records:
+            df_sw_all = pd.concat(sw_records, ignore_index=True)
+            df_sw_all = (
+                df_sw_all
+                .groupby(["datetime", "node"], as_index=False)
+                .last()
+            )
+            df_sw_all.set_index(["datetime", "node"]).to_xarray().to_netcdf(
+                out_dir / "sw_output.nc"
+            )
+
+        if all_recharge_recs:
+            xr.concat(all_recharge_recs, dim="datetime").to_netcdf(
+                out_dir / "recharge_output.nc")
 
     # ── 12. Main LAI loop — one CATHY run per calendar month ──
     print("\n── Starting LAI → vegetation-map loop ──────────────────────────────")
@@ -1817,7 +2587,7 @@ def run_pipeline(args: argparse.Namespace) -> None:
         plt.close(fig)
 
         exclude_veg, veg_valid = simu._check_outside_DEM(veg_map)
-        simu.update_veg_map(veg_map)
+        simu.update_veg_map(veg_map, maxveg=N_VEG_CLASSES)
 
         inv_remap             = {v: k for k, v in remap.items()}
         veg_map_semantic      = np.vectorize(inv_remap.get)(veg_map).astype(int)
@@ -1832,7 +2602,11 @@ def run_pipeline(args: argparse.Namespace) -> None:
                                      active_zones,
                                      remap=remap,
                                      base_zroot=args.zroot,
-                                     pmin=args.pmin
+                                     pmin=args.pmin,
+                                     zroot_factors=zroot_factors_from_args(args),
+                                     permx=args.permx,
+                                     permy_ratio=args.permy_ratio,
+                                     permz_ratio=args.permz_ratio,
                                      )
         active_zones_prev = active_zones
 
@@ -1852,6 +2626,18 @@ def run_pipeline(args: argparse.Namespace) -> None:
                           time=t_month,
                           netValue=nv_month
                           )
+
+        # Indices into ETp_nodes/rain_nodes' time axis for this month —
+        # needed by both the ETa artefact floor (12.10) and the sanity
+        # checks (12.9b). Computed once here so both reuse the same mask.
+        idx_month = None
+        if USE_ETP_FORCING:
+            month_mask = np.array([
+                pd.Timestamp(t).year == dt.year and pd.Timestamp(t).month == dt.month
+                for t in valid_times
+            ])
+            idx_month = np.where(month_mask)[0]
+
 
         # Optional: plot the monthly forcing
         outdir_etp = Path("figures_ETp_temp")
@@ -1875,8 +2661,62 @@ def run_pipeline(args: argparse.Namespace) -> None:
         # once on first iteration; BCs were already configured above from
         # the full time axis, not re-built here.
         if first_iteration:
-            simu.run_preprocessor(verbose=True)
+            #simu.run_preprocessor(verbose=True)
             first_iteration = False
+
+            # FIX: this preprocessor call can finalize a DIFFERENT (larger)
+            # mesh than the one built earlier (setup_dem's create_mesh_vtk
+            # + the very first run_preprocessor() before this loop). Two
+            # things upstream were computed against that earlier, smaller
+            # mesh and go stale the moment the grid actually changes size:
+            #   1. `update_ic`'s internal map_prop2mesh() reuses the mesh
+            #      cached by create_mesh_vtk() — never rebuilt afterwards,
+            #      causing "'ic' has length N but the mesh has M points".
+            #   2. `n_surf` / ETp_nodes / rain_nodes were sliced using the
+            #      old grid3d["nnod"], causing the "SURFACE NODE out of
+            #      bounds" warnings later when reading real ETa/recharge
+            #      output (which is indexed on the true, larger grid).
+            # Refresh both against the grid this run is actually using.
+            simu.create_mesh_vtk(verbose=True)
+            grid3d = simu.read_outputs("grid3d")
+            n_surf_real = int(grid3d["nnod"])
+
+            if USE_ETP_FORCING and n_surf_real != n_surf:
+                print(f"  Refreshing ETp/rain node mapping: n_surf "
+                      f"{n_surf} → {n_surf_real} (grid finalized by "
+                      f"preprocessor)")
+                n_surf = n_surf_real
+
+                ds_mesh = mt.build_mesh_dataset(
+                    simu, raster_DEM_masked=raster_DEM_masked
+                )
+                ds_ETp_mapped  = mt.map_grid_to_mesh(
+                    ds_etp,  ds_mesh, variables=["ET_0-gf"]
+                )
+                ds_rain_mapped = mt.map_grid_to_mesh(
+                    ds_rain, ds_mesh, variables=["TP-DD"]
+                )
+
+                ds_ETp_surf  = ds_ETp_mapped.isel( node=slice(0, n_surf))
+                ds_rain_surf = ds_rain_mapped.isel(node=slice(0, n_surf))
+
+                common_time_refresh = np.intersect1d(
+                    ds_rain_mapped.time, ds_ETp_mapped.time
+                )
+                ds_ETp_surf  = ds_ETp_surf.sel(time=common_time_refresh)
+                ds_rain_surf = ds_rain_surf.sel(time=common_time_refresh)
+
+                ETp_nodes  = ds_ETp_surf["ET_0-gf"].values * 1e-3 / 86400
+                rain_nodes = ds_rain_surf["TP-DD"].values  * 1e-3 / 86400
+
+                # NOTE: t_atmbc / net_flux (the scalar, spatially-averaged
+                # forcing already applied via update_atmbc for THIS month,
+                # a few lines above) are not retroactively corrected here —
+                # HSPATM=1 means CATHY only ever saw their spatial mean, so
+                # this refresh mainly fixes the per-node ETp_nodes/
+                # rain_nodes arrays used by the ETa/recharge sanity checks
+                # from this month onward, plus (critically) the mesh used
+                # by update_ic below.
 
 
 
@@ -1892,7 +2732,8 @@ def run_pipeline(args: argparse.Namespace) -> None:
         print(f"\n  Running processor for {dt:%Y-%m} "
               f"(LAI updated: {lai_updated}) …")
 
-        simu.update_cathyH(MAXVEG=10)
+        # MAXVEG already fixed to N_VEG_CLASSES once before the loop; no
+        # need to re-set it (to a mismatched value of 10) every month.
 
         simu.run_processor(
             IPRT1=2,
@@ -1904,6 +2745,11 @@ def run_pipeline(args: argparse.Namespace) -> None:
         )
 
         # 12.8  PSI — check solver actually progressed; keep last known state if not
+        month_stats = {"month": f"{dt:%Y-%m}"}
+        psi_month_df = None
+        sw_month_df  = None
+        df_et        = None
+        df_rec       = None
         solver_status = "✓ OK"
         try:
             df_psi = simu.read_outputs("psi").copy()
@@ -1922,11 +2768,27 @@ def run_pipeline(args: argparse.Namespace) -> None:
             else:
                 print(f"  time index ic: {last_psi_t} ✓ (t_month[-1]: {last_month_t})")
                 df_psi["datetime"] = cathy_utils.change_x2date(df_psi.index, dt)
-                psi_records.append(
+                psi_month_df = (
                     df_psi.reset_index(drop=True)
                           .melt(id_vars="datetime", var_name="node", value_name="psi")
                           .assign(node=lambda d: d["node"].astype(int))
                 )
+                psi_records.append(psi_month_df)
+                month_stats["psi_mean"] = float(psi_month_df["psi"].mean())
+                month_stats["psi_min"]  = float(psi_month_df["psi"].min())
+                month_stats["psi_max"]  = float(psi_month_df["psi"].max())
+                if args.save_monthly:
+                    try:
+                        (
+                            psi_month_df
+                            .groupby(["datetime", "node"], as_index=False)
+                            .last()
+                            .set_index(["datetime", "node"])
+                            .to_xarray()
+                            .to_netcdf(monthly_dir / f"psi_{dt:%Y%m}.nc")
+                        )
+                    except Exception as exc:
+                        print(f"  Warning: could not save monthly PSI for {dt:%Y-%m} ({exc})")
         except Exception as exc:
             print(f"  WARNING: could not read PSI for {dt:%Y-%m} ({exc}) — "
                   f"keeping last known state and continuing.")
@@ -1965,27 +2827,36 @@ def run_pipeline(args: argparse.Namespace) -> None:
             df_sw, _ = simu.read_outputs("sw")
             df_sw = df_sw.copy()
             df_sw["datetime"] = cathy_utils.change_x2date(df_sw.index, dt)
-            sw_records.append(
+            sw_month_df = (
                 df_sw.reset_index(drop=True)
                      .melt(id_vars="datetime", var_name="node", value_name="sw")
                      .assign(node=lambda d: d["node"].astype(int))
             )
+            sw_records.append(sw_month_df)
+            month_stats["sw_mean"] = float(sw_month_df["sw"].mean())
+            if args.save_monthly:
+                try:
+                    (
+                        sw_month_df
+                        .groupby(["datetime", "node"], as_index=False)
+                        .last()
+                        .set_index(["datetime", "node"])
+                        .to_xarray()
+                        .to_netcdf(monthly_dir / f"sw_{dt:%Y%m}.nc")
+                    )
+                except Exception as exc:
+                    print(f"  Warning: could not save monthly SW for {dt:%Y-%m} ({exc})")
         except Exception as exc:
             print(f"  Warning: could not read SW for {dt:%Y-%m} ({exc})")
 
         # 12.10  ET
         try:
             df_et = simu.read_outputs("ET").copy()
-            df_et["datetime"] = dt + pd.to_timedelta(df_et["time_sec"], unit="s")
+            df_et = add_datetime_col(df_et, dt)
 
             # FIX: floor the net-forcing ETa artefact at ETp for this month
             # (adds 'ACT. ETRA_patched'; 'ACT. ETRA' stays unmodified).
             if USE_ETP_FORCING:
-                month_mask = np.array([
-                    pd.Timestamp(t).year == dt.year and pd.Timestamp(t).month == dt.month
-                    for t in valid_times
-                ])
-                idx_month = np.where(month_mask)[0]
                 df_et, n_eta_patched = apply_eta_artefact_floor(
                     df_et, t_month, ETp_nodes, rain_nodes, idx_month,
                 )
@@ -1999,19 +2870,58 @@ def run_pipeline(args: argparse.Namespace) -> None:
             et_xr = et_xr.rio.set_spatial_dims(x_dim="X", y_dim="Y")
             et_xr = et_xr.rio.write_crs(TARGET_CRS)
             et_records.append(et_xr)
+            if "ACT. ETRA" in df_et.columns:
+                month_stats["eta_mean"] = float(df_et["ACT. ETRA"].mean())
+            if "ACT. ETRA_patched" in df_et.columns:
+                month_stats["eta_patched_mean"] = float(df_et["ACT. ETRA_patched"].mean())
+            if args.save_monthly:
+                try:
+                    et_xr.to_netcdf(monthly_dir / f"et_{dt:%Y%m}.nc")
+                except Exception as exc:
+                    print(f"  Warning: could not save monthly ET for {dt:%Y-%m} ({exc})")
         except Exception as exc:
             print(f"  Warning: could not read ET for {dt:%Y-%m} ({exc})")
 
         # 12.11  Recharge
         try:
             df_rec = simu.read_outputs("recharge").copy()
-            df_rec["datetime"] = dt + pd.to_timedelta(df_rec["time_sec"], unit="s")
+            df_rec = add_datetime_col(df_rec, dt)
             xr_rec = df_rec.set_index(["X", "Y", "datetime"]).to_xarray()
             xr_rec = xr_rec.rio.set_spatial_dims(x_dim="X", y_dim="Y")
             xr_rec = xr_rec.rio.write_crs(TARGET_CRS)
             all_recharge_recs.append(xr_rec)
+            rec_value_cols = [c for c in df_rec.select_dtypes(include=[np.number]).columns
+                               if c not in ("X", "Y", "time_sec")]
+            if rec_value_cols:
+                month_stats["recharge_mean"] = float(df_rec[rec_value_cols].mean().mean())
+            if args.save_monthly:
+                try:
+                    xr_rec.to_netcdf(monthly_dir / f"recharge_{dt:%Y%m}.nc")
+                except Exception as exc:
+                    print(f"  Warning: could not save monthly recharge for {dt:%Y-%m} ({exc})")
         except Exception as exc:
             print(f"  Warning: could not read recharge for {dt:%Y-%m} ({exc})")
+
+        # 12.11b  Sanity checks (physical bounds + approximate water balance)
+        try:
+            sanity_warnings = check_monthly_sanity(
+                dt, month_stats,
+                psi_month_df=psi_month_df,
+                sw_month_df=sw_month_df,
+                df_et=df_et,
+                df_rec=df_rec,
+                t_month=t_month,
+                idx_month=idx_month,
+                ETp_nodes=ETp_nodes if USE_ETP_FORCING else None,
+                rain_nodes=rain_nodes if USE_ETP_FORCING else None,
+            )
+        except Exception as exc:
+            sanity_warnings = []
+            print(f"  Warning: sanity checks failed for {dt:%Y-%m} ({exc})")
+
+        for w in sanity_warnings:
+            print(f"  ⚠ sanity: {w}")
+            md_log.warn(w)
 
         # 12.12  Progress summary
         semantic_zones = sorted(inv_remap.get(z, z) for z in active_zones)
@@ -2019,68 +2929,66 @@ def run_pipeline(args: argparse.Namespace) -> None:
         print(f"  {dt:%Y-%m-%d} | zones (semantic): {semantic_zones} | "
               f"vegetated px: {n_veg}/{N*M} ({100*n_veg/(N*M):.1f} %) | "
               f"LAI updated: {lai_updated}")
+
+        # 12.12b  Monthly info stats (psi/sw/ETa/recharge means) — printed,
+        # logged to the markdown run log, and appended to a single running
+        # monthly_stats.csv in out_dir that's rewritten after every month.
+        def _fmt(key: str, unit: str = "", sci: bool = False) -> str:
+            v = month_stats.get(key)
+            if v is None:
+                return "n/a"
+            return f"{v:.3e}{unit}" if sci else f"{v:.3f}{unit}"
+
+        print(f"  stats     | psi mean: {_fmt('psi_mean', ' m')} "
+              f"(min {_fmt('psi_min', ' m')}, max {_fmt('psi_max', ' m')}) | "
+              f"sw mean: {_fmt('sw_mean')} | "
+              f"ETa mean: {_fmt('eta_mean', ' m/s', sci=True)} | "
+              f"recharge mean: {_fmt('recharge_mean', ' m/s', sci=True)}")
+        print(f"  sanity    | SW out-of-bounds: {month_stats.get('sw_out_of_bounds_n', 'n/a')} | "
+              f"PSI extreme: {month_stats.get('psi_extreme_n', 'n/a')} | "
+              f"ETa>ETp: {month_stats.get('eta_exceeds_etp_n', 'n/a')} | "
+              f"water balance residual: {_fmt('water_balance_residual_mm', ' mm')}")
+        md_log.bullet(
+            f"{dt:%Y-%m} stats — psi mean: {_fmt('psi_mean', ' m')}, "
+            f"sw mean: {_fmt('sw_mean')}, "
+            f"ETa mean: {_fmt('eta_mean', ' m/s', sci=True)}, "
+            f"recharge mean: {_fmt('recharge_mean', ' m/s', sci=True)}"
+        )
+        month_stats["solver_status"] = solver_status
+        stats_records.append(month_stats)
+        try:
+            pd.DataFrame(stats_records).to_csv(out_dir / "monthly_stats.csv", index=False)
+        except Exception as exc:
+            print(f"  Warning: could not refresh monthly_stats.csv after {dt:%Y-%m} ({exc})")
+
         # FIX: this counter was declared but never incremented before —
         # completed months now register in the run summary written by
         # md_log.close().
         n_months_run += 1
 
+        # 12.13  Refresh the single running combined-output files with
+        # everything completed so far (in addition to this month's
+        # standalone files already saved above).
+        try:
+            save_combined_outputs()
+        except Exception as exc:
+            print(f"  Warning: could not refresh combined outputs after {dt:%Y-%m} ({exc})")
+
     print("\n── Loop complete (partial runs saved if any months were skipped) ────────")
 
-    # ── 13. Save veg_map_history ──────────────────────────────
-    veg_history_path = out_dir / "veg_map_history.pkl"
-    with open(veg_history_path, "wb") as fh:
-        pickle.dump(veg_map_history, fh)
-    print(f"veg_map_history saved → {veg_history_path}")
-
-    sorted_dates = sorted(veg_map_history)
-    veg_arr = np.stack([veg_map_history[d] for d in sorted_dates], axis=0)
-    veg_xr  = xr.DataArray(
-        veg_arr,
-        dims=["time", "row", "col"],
-        coords={"time": sorted_dates, "row": np.arange(M), "col": np.arange(N)},
-        name="veg_map",
-        attrs={
-            "description": "Vegetation zone map (1=bare, 2=sparse, 3=moderate, 4=dense, 5=very dense)",
-            "crs": TARGET_CRS,
-        },
-    )
-    veg_xr.to_netcdf(out_dir / "veg_map_history.nc")
-
-    # ── 14. Aggregate outputs → NetCDF ────────────────────────
+    # ── 13/14. Final refresh of the combined outputs (veg history, PSI,
+    # SW, ET, recharge) — same helper called after every month in the
+    # loop above, so this call just guarantees the very last month is
+    # reflected too.
+    save_combined_outputs()
+    print(f"veg_map_history saved → {out_dir / 'veg_map_history.pkl'}")
     if et_records:
-        ET_xr_all = xr.concat(et_records, dim="datetime")
-        ET_xr_all.time.attrs.pop("dtype", None)
-        ET_xr_all.to_netcdf(out_dir / "et_output.nc",
-                             encoding={"time": {"dtype": "float64"}})
         print(f"ET saved → {out_dir / 'et_output.nc'}")
-
     if psi_records:
-        df_psi_all = pd.concat(psi_records, ignore_index=True)
-        df_psi_all = (
-            df_psi_all
-            .groupby(["datetime", "node"], as_index=False)
-            .last()
-        )
-        df_psi_all.set_index(["datetime", "node"]).to_xarray().to_netcdf(
-            out_dir / "psi_output.nc"
-        )
         print(f"PSI saved → {out_dir / 'psi_output.nc'}")
-
     if sw_records:
-        df_sw_all = pd.concat(sw_records, ignore_index=True)
-        df_sw_all = (
-            df_sw_all
-            .groupby(["datetime", "node"], as_index=False)
-            .last()
-        )
-        df_sw_all.set_index(["datetime", "node"]).to_xarray().to_netcdf(
-            out_dir / "sw_output.nc"
-        )
         print(f"SW saved → {out_dir / 'sw_output.nc'}")
-
     if all_recharge_recs:
-        xr.concat(all_recharge_recs, dim="datetime").to_netcdf(
-            out_dir / "recharge_output.nc")
         print(f"Recharge saved → {out_dir / 'recharge_output.nc'}")
 
     print("\n" + "=" * 60)
