@@ -69,14 +69,11 @@ LAI-loop xarray-based hydro figures (test_withLAI_results — Fig 6 / 7)
     plot_et_sw_lai_xr_fire_year(...)    # Fig 7bc — fire year + following year
     plot_et_sw_lai_xr_fire_month(...)   # Fig 7bd — fire month only
     plot_et_sw_lai_xr_weekly(...)       # Fig 7be — weekly-resampled
-<<<<<<< HEAD
 
 LAI + ET + sw + psi + ETa/ETp ratio, at reference nodes (new)
     plot_lai_et_sw_psi_ratio_xr(lai_ds, ET_xr_all, et_var, et_scale,
                   ETp_xr, etp_var, etp_scale, sw_xr, psi_xr,
                   nodes_dict, grid3d, fig_path, ...)   # Fig 8 — 5-panel stack
-=======
->>>>>>> 1d78c26b5b57db0ec851d536dacab6ca80d61ed4
 """
 
 from __future__ import annotations
@@ -110,10 +107,7 @@ COLORS_HYDRO: dict[str, str] = {
     "downhill_1m":      "#E69F00",
     "ET_mean":          "#009E73",
     "LAI":              "#4daf4a",
-<<<<<<< HEAD
     "ETp":              "#999999",
-=======
->>>>>>> 1d78c26b5b57db0ec851d536dacab6ca80d61ed4
 }
 
 # ── Fire event marker ──────────────────────────────────────────────────────
@@ -439,19 +433,12 @@ def plot_veg_map_year(
         used.append(ax)
         ax.imshow(veg_map_history[d], origin="upper", cmap=cmap_veg,
                   vmin=0.5, vmax=3.5, aspect="equal")
-<<<<<<< HEAD
         ax.set_title(f"{d:%B}", fontsize=10, pad=3)
         ax.tick_params(labelsize=7, length=2.5, pad=1.5,
                        labelleft=(k % ncols == 0),
                        labelbottom=(k + ncols >= n))
     for k in range(n, nrows * ncols):
         axes[k // ncols][k % ncols].set_visible(False)
-=======
-        veg_colorbar(ax, cmap_veg)
-        ax.set_title(f"{d:%B %Y}", fontsize=10)
-        ax.set_xlabel("Column")
-        ax.set_ylabel("Row")
->>>>>>> 1d78c26b5b57db0ec851d536dacab6ca80d61ed4
 
     bounds = [0.5, 1.5, 2.5, 3.5]
     sm = cm.ScalarMappable(cmap=cmap_veg, norm=mcolors.BoundaryNorm(bounds, cmap_veg.N))
@@ -2773,7 +2760,6 @@ def plot_et_sw_xr_weekly(
 
 
 # =============================================================================
-<<<<<<< HEAD
 # Fig 7g -- psi + ETa (Fig 7, but the top panel is pressure head, not sw)
 # =============================================================================
 
@@ -2954,8 +2940,6 @@ def plot_et_psi_xr_fire_year(
 
 
 # =============================================================================
-=======
->>>>>>> 1d78c26b5b57db0ec851d536dacab6ca80d61ed4
 # Fig 7b -- sw + ETa + LAI trend (Fig 7 with an added LAI panel)
 # =============================================================================
 
@@ -3245,7 +3229,6 @@ def plot_et_sw_lai_xr_weekly(
         et_unit="mm/week", et_as_line=True,
     )
 
-<<<<<<< HEAD
 
 def plot_et_psi_lai_xr(
     psi_xr:     xr.Dataset,
@@ -3467,8 +3450,6 @@ def plot_et_psi_lai_xr_weekly(
         et_unit="mm/week", et_as_line=True,
     )
 
-=======
->>>>>>> 1d78c26b5b57db0ec851d536dacab6ca80d61ed4
 
 # =============================================================================
 # Colour / label constants
@@ -3875,7 +3856,6 @@ def plot_eta_total(
 
     print(f"  Computing annual domain {product_name} …")
     _plot_eta_total_freq(ds_et, "YE", fig_path, label=label, dpi=dpi, show=show, product_name=product_name)
-<<<<<<< HEAD
 
 
 # =============================================================================
@@ -4421,5 +4401,3 @@ def plot_catchment_eta_etp_ratio_monthly(
         date_start=date_start, date_end=date_end, scenario_id=scenario_id,
         dpi=dpi, show=show, fname=fname, freq=MONTHLY_RULE,
     )
-=======
->>>>>>> 1d78c26b5b57db0ec851d536dacab6ca80d61ed4
