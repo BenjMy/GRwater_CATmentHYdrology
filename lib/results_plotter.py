@@ -21,7 +21,7 @@ Shared helpers
     veg_colorbar(ax, cmap, labels)
     date_window(date_start, date_end, df_dates)
     add_fire_vline(ax, d0, d1, label, color)   # marks FIRE_DATE = 2020-07-01
-    plot_catchment_et_freq(ET_xr, ET_xr_mean, time_dates, freq, fig_path, dpi, show)
+    plot_catchment_et_freq(ET_xr, ET_xr_mean, time_dates, freq, fig_path, dpi, show, et_var)
 
 LAI-loop figures (test_withLAI_results)
     plot_recharge_bar(recharge_monthly, fig_path, dpi, show)
@@ -42,10 +42,11 @@ LAI diagnostic figures (analyse_LAI / withLAI_results)
 
 SSHydro figures (LT_SShydro_results)
     plot_hydro(data, nodes_dict, args, fig_path)
-    plot_et_sw(data, nodes_dict, args, fig_path, colors)
+    plot_et_sw(data, nodes_dict, args, fig_path, colors, et_var)
     plot_era5(data, args, fig_path)
-    plot_catchment_et(data, fig_path, dpi, show)
+    plot_catchment_et(data, fig_path, dpi, show, et_var)
     plot_hgraph(data, fig_path, dpi, show, hgraph_fname)
+    plot_hgraph_csv(df_hgraph, fig_path, dpi, show, scenario_id, date_start, date_end, hgraph_fname)
     plot_node_locations(grid3d, nodes_dict, fig_path, dem_da, colors_dict, scenario_id, dpi, show)
     plot_recharge(data, fig_path, dpi, show, scenario_id)
     plot_recharge_xr(xr_recharge, fig_path, dpi, show, scenario_id)
@@ -55,6 +56,24 @@ LAI-loop xarray-based hydro figures (test_withLAI_results — Fig 6 / 7)
                   fig_path, date_start, date_end, ...)
     plot_et_sw_xr(sw_xr, ET_xr_all, et_var, et_scale, nodes_dict,
                   fig_path, date_start, date_end, ...)
+    plot_et_sw_lai_xr(sw_xr, ET_xr_all, et_var, et_scale, lai_ds, nodes_dict,
+                  fig_path, lai_var, date_start, date_end, ...)   # Fig 7 + LAI panel
+
+    # Fire-window / weekly variants (thin wrappers, same node/colour kwargs)
+    plot_hydro_xr_fire_year(...)    # Fig 6c — fire year + following year
+    plot_hydro_xr_fire_month(...)   # Fig 6d — fire month only
+    plot_hydro_xr_weekly(...)       # Fig 6e — weekly-resampled
+    plot_et_sw_xr_fire_year(...)    # Fig 7c — fire year + following year
+    plot_et_sw_xr_fire_month(...)   # Fig 7d — fire month only
+    plot_et_sw_xr_weekly(...)       # Fig 7e — weekly-resampled
+    plot_et_sw_lai_xr_fire_year(...)    # Fig 7bc — fire year + following year
+    plot_et_sw_lai_xr_fire_month(...)   # Fig 7bd — fire month only
+    plot_et_sw_lai_xr_weekly(...)       # Fig 7be — weekly-resampled
+
+LAI + ET + sw + psi + ETa/ETp ratio, at reference nodes (new)
+    plot_lai_et_sw_psi_ratio_xr(lai_ds, ET_xr_all, et_var, et_scale,
+                  ETp_xr, etp_var, etp_scale, sw_xr, psi_xr,
+                  nodes_dict, grid3d, fig_path, ...)   # Fig 8 — 5-panel stack
 """
 
 from __future__ import annotations
@@ -87,11 +106,23 @@ COLORS_HYDRO: dict[str, str] = {
     "downhill_surface": "#D55E00",
     "downhill_1m":      "#E69F00",
     "ET_mean":          "#009E73",
+    "LAI":              "#4daf4a",
+    "ETp":              "#999999",
 }
 
 # ── Fire event marker ──────────────────────────────────────────────────────
 
 FIRE_DATE = pd.Timestamp("2020-07-01")
+
+# ── ET variable choice ─────────────────────────────────────────────────────
+# The upstream pipeline writes two candidate ET variables into ET_xr_all /
+# ET_xr_mean: the raw solver output ("ACT. ETRA") and the artefact-floored
+# version ("ACT. ETRA_patched", see apply_eta_artefact_floor in
+# Agramon_withLAI_withETp.py). Which one is "the" ET series is a per-run
+# choice made upstream (see ET_VAR / WB_ET_VAR in the calling scripts) — this
+# module must not hardcode either name; it only falls back to this default
+# when a caller doesn't pass et_var explicitly.
+DEFAULT_ET_VAR = "ACT. ETRA_patched"
 
 
 def add_fire_vline(
@@ -315,8 +346,8 @@ def plot_et_by_veg_type(
 
     veg_et_series[2]
     veg_et_series[1]
-     
-     
+
+
 def plot_veg_map_samples(
     veg_map_history: dict,
     cmap_veg: mcolors.Colormap,
@@ -352,7 +383,7 @@ def plot_veg_map_samples(
     for d in sample_dates:
         ax = axes[str(d.year)]
         ax.imshow(veg_map_history[d], origin="upper", cmap=cmap_veg,
-                  vmin=0.5, vmax=3.5, aspect="auto")
+                  vmin=0.5, vmax=3.5, aspect="equal")
         veg_colorbar(ax, cmap_veg)
         ax.set_title(f"{d:%Y-%m}", fontsize=10)
         ax.set_xlabel("Column")
@@ -379,28 +410,44 @@ def plot_veg_map_year(
         print(f"  plot_veg_map_year: skipped — no entries for {selected_year}.")
         return
 
-    ncols = 4
-    nrows = (len(monthly_dates) + ncols - 1) // ncols
-    mosaic = [
-        [f"{monthly_dates[r * ncols + c]:%Y-%m}"
-         if r * ncols + c < len(monthly_dates) else "."
-         for c in range(ncols)]
-        for r in range(nrows)
-    ]
+    n     = len(monthly_dates)
+    ncols = min(4, n)
+    nrows = (n + ncols - 1) // ncols
 
-    fig, axes = plt.subplot_mosaic(mosaic, figsize=(5 * ncols, 4 * nrows), empty_sentinel=".")
-    for d in monthly_dates:
-        ax  = axes[f"{d:%Y-%m}"]
+    _h, _w = np.asarray(veg_map_history[monthly_dates[0]]).shape[:2]
+    _map_aspect = float(np.clip(_h / max(_w, 1), 0.4, 2.5))   # height / width
+
+    # constrained_layout + one shared discrete colourbar (a colourbar per
+    # panel used to shrink every map and leave uneven gaps).
+    fig, axes = plt.subplots(
+        nrows, ncols,
+        figsize=(3.4 * ncols + 1.4, (3.4 * _map_aspect + 0.30) * nrows + 0.6),
+        squeeze=False,
+        constrained_layout=True,
+    )
+    fig.get_layout_engine().set(w_pad=0.04, h_pad=0.05, wspace=0.03, hspace=0.06)
+
+    used = []
+    for k, d in enumerate(monthly_dates):
+        ax = axes[k // ncols][k % ncols]
+        used.append(ax)
         ax.imshow(veg_map_history[d], origin="upper", cmap=cmap_veg,
-                  vmin=0.5, vmax=3.5, aspect="auto")
-        veg_colorbar(ax, cmap_veg)
-        ax.set_title(f"{d:%B %Y}", fontsize=10)
-        ax.set_xlabel("Column")
-        ax.set_ylabel("Row")
+                  vmin=0.5, vmax=3.5, aspect="equal")
+        ax.set_title(f"{d:%B}", fontsize=10, pad=3)
+        ax.tick_params(labelsize=7, length=2.5, pad=1.5,
+                       labelleft=(k % ncols == 0),
+                       labelbottom=(k + ncols >= n))
+    for k in range(n, nrows * ncols):
+        axes[k // ncols][k % ncols].set_visible(False)
 
-    plt.suptitle(f"Vegetation zone maps — {selected_year} (monthly)",
+    bounds = [0.5, 1.5, 2.5, 3.5]
+    sm = cm.ScalarMappable(cmap=cmap_veg, norm=mcolors.BoundaryNorm(bounds, cmap_veg.N))
+    cb = fig.colorbar(sm, ax=used, ticks=[1, 2, 3], shrink=0.7, aspect=25, pad=0.015)
+    cb.ax.set_yticklabels(("Bare", "Moderate veg.", "Dense veg."))
+    fig.supxlabel("Column", fontsize=9)
+    fig.supylabel("Row", fontsize=9)
+    fig.suptitle(f"Vegetation zone maps — {selected_year} (monthly)",
                  fontsize=13, fontweight="bold")
-    plt.tight_layout()
     save_fig(fig, fig_path, f"veg_map_{selected_year}_monthly.png", dpi)
     maybe_show(fig, show)
 
@@ -447,7 +494,7 @@ def plot_lai_map_year(
         frame = da_year.sel({time_coord: t})
 
         im = ax.imshow(frame.values, origin="upper", cmap=cmap,
-                       vmin=vmin, vmax=vmax, aspect="auto")
+                       vmin=vmin, vmax=vmax, aspect="equal")
         divider = make_axes_locatable(ax)
         cax = divider.append_axes("right", size="4%", pad=0.05)
         plt.colorbar(im, cax=cax)
@@ -610,7 +657,7 @@ def plot_lai_spatial_maps_year(
         ax    = axes[r][c]
         frame = da_year.sel({time_dim: t}).values
         im    = ax.imshow(frame, origin="upper", cmap=cmap,
-                          vmin=vmin, vmax=vmax, aspect="auto")
+                          vmin=vmin, vmax=vmax, aspect="equal")
         plt.colorbar(im, ax=ax, label=LAI_UNITS, fraction=0.046, pad=0.04)
         ax.set_title(t.strftime("%B %Y"), fontsize=10)
         ax.set_xlabel("Column")
@@ -854,7 +901,7 @@ def make_veg_gif(
     for i, d in enumerate(dates):
         fig, ax = plt.subplots(figsize=(6, 5))
         ax.imshow(veg_history[d], origin="upper", cmap=cmap_veg,
-                  vmin=0.5, vmax=3.5, aspect="auto")
+                  vmin=0.5, vmax=3.5, aspect="equal")
         veg_colorbar(ax, cmap_veg)
         ax.set_title(f"Vegetation map — {d:%Y-%m}", fontsize=11)
         ax.set_xlabel("Column")
@@ -993,15 +1040,29 @@ def plot_et_sw(
     dpi:         int  = 300,
     show:        bool = False,
     fname:       str  = "et_timeseries.png",
+    et_var:      str  = DEFAULT_ET_VAR,
 ) -> None:
-    """Plot soil water content + actual ET time series."""
+    """Plot soil water content + actual ET time series.
+
+    et_var : name of the ET variable inside data["ET_xr_mean"] — e.g.
+        "ACT. ETRA" (raw) or "ACT. ETRA_patched" (artefact-floored).
+        Defaults to DEFAULT_ET_VAR; pass explicitly to match whichever
+        ET_VAR the caller used upstream.
+    """
     colors_dict = colors_dict or COLORS_HYDRO
     d0, d1 = date_window(date_start, date_end, data["df_dates_sw"])
     print(f"  Plotting ET+sw time-series ({d0.date()} → {d1.date()}) …")
 
+    ET_xr_mean = data["ET_xr_mean"]
+    if et_var not in ET_xr_mean:
+        raise KeyError(
+            f"plot_et_sw: '{et_var}' not found in ET_xr_mean. "
+            f"Available: {list(ET_xr_mean.data_vars)}"
+        )
+
     df_sw       = data["df_sw"]
     df_dates_sw = data["df_dates_sw"]
-    ET_data     = data["ET_xr_mean"]["ACT. ETRA"].values
+    ET_data     = ET_xr_mean[et_var].values
     time_dates  = data["time_dates"]
     scenario_id = data["scenario"]
     depth_label = nodes_dict.get("depth_label", 1)
@@ -1075,11 +1136,12 @@ def plot_era5(
     d0, d1 = date_window(date_start, date_end, pev_series.index.to_series())
     print(f"  Plotting ERA5 forcing ({d0.date()} → {d1.date()}) …")
 
-    mask = (pev_series.index >= d0) & (pev_series.index <= d1)
+    mask_pev = (pev_series.index >= d0) & (pev_series.index <= d1)
+    mask_tp  = (tp_series.index  >= d0) & (tp_series.index  <= d1)
     fig, ax = plt.subplots(figsize=(14, 3))
-    ax.bar(pev_series[mask].index, pev_series[mask].values,
+    ax.bar(pev_series[mask_pev].index, pev_series[mask_pev].values,
            width=1.0, color="grey", label="ETp", alpha=0.5)
-    ax.bar(tp_series[mask].index, tp_series[mask].values,
+    ax.bar(tp_series[mask_tp].index, tp_series[mask_tp].values,
            width=1.0, color="skyblue", label="Rain")
     ax.invert_yaxis()
     ax.set_ylabel("mm/day")
@@ -1104,10 +1166,23 @@ def plot_catchment_et_freq(
     freq:       str,
     fig_path:   Path,
     *,
-    dpi:  int  = 300,
-    show: bool = False,
+    dpi:    int  = 300,
+    show:   bool = False,
+    et_var: str  = DEFAULT_ET_VAR,
 ) -> None:
-    """Catchment ETa aggregated at *freq* frequency ('ME' = monthly, 'YE' = annual)."""
+    """Catchment ETa aggregated at *freq* frequency ('ME' = monthly, 'YE' = annual).
+
+    et_var : name of the ET variable inside ET_xr_mean — e.g. "ACT. ETRA"
+        (raw) or "ACT. ETRA_patched" (artefact-floored). Defaults to
+        DEFAULT_ET_VAR; pass explicitly to match whichever ET_VAR the
+        caller used upstream.
+    """
+    if et_var not in ET_xr_mean:
+        raise KeyError(
+            f"plot_catchment_et_freq: '{et_var}' not found in ET_xr_mean. "
+            f"Available: {list(ET_xr_mean.data_vars)}"
+        )
+
     # 1. Catchment area
     res_x, res_y    = ET_xr.rio.resolution()
     pixel_area       = abs(float(res_x) * float(res_y))
@@ -1118,7 +1193,7 @@ def plot_catchment_et_freq(
 
     # 2. Resample
     df_et = pd.DataFrame(
-        {"ETa_mm": ET_xr_mean["ACT. ETRA"].values},
+        {"ETa_mm": ET_xr_mean[et_var].values},
         index=pd.to_datetime(time_dates),
     )
     df_resampled = df_et.resample(freq).sum()
@@ -1181,34 +1256,273 @@ def plot_catchment_et(
     data:     dict,
     fig_path: Path,
     *,
-    dpi:  int  = 300,
-    show: bool = False,
+    dpi:    int  = 300,
+    show:   bool = False,
+    et_var: str  = DEFAULT_ET_VAR,
 ) -> None:
-    """Monthly + annual catchment ET summaries (wrapper)."""
+    """Monthly + annual catchment ET summaries (wrapper).
+
+    et_var : forwarded to plot_catchment_et_freq — name of the ET
+        variable inside data["ET_xr_mean"] (e.g. "ACT. ETRA" or
+        "ACT. ETRA_patched").
+    """
     print("  Computing monthly catchment ET …")
     plot_catchment_et_freq(
         data["ET_xr"], data["ET_xr_mean"], data["time_dates"],
-        freq="ME", fig_path=fig_path, dpi=dpi, show=show,
+        freq="ME", fig_path=fig_path, dpi=dpi, show=show, et_var=et_var,
     )
     print("  Computing annual catchment ET …")
     plot_catchment_et_freq(
         data["ET_xr"], data["ET_xr_mean"], data["time_dates"],
-        freq="YE", fig_path=fig_path, dpi=dpi, show=show,
+        freq="YE", fig_path=fig_path, dpi=dpi, show=show, et_var=et_var,
     )
 
 
 def plot_hgraph(
-    data:     dict,
+    data: dict,
     fig_path: Path,
     *,
-    dpi:   int  = 300,
-    show:  bool = False,
-    fname: str  = "hgraph.png",
+    dpi: int = 300,
+    show: bool = False,
+    fname: str = "hgraph.png",
 ) -> None:
-    """Hydraulic graph from pyCATHY simu.show()."""
+    """Hydraulic graph from pyCATHY simu.show() — single-run only.
+
+    Limited to whatever one CATHY run ``data["simu"]`` currently holds in
+    memory (one calendar month, in the LAI-loop pipeline). Prefer
+    ``plot_hgraph_csv`` when a multi-month ``hgraph_output.csv`` backup is
+    available — this function remains for callers with only a live
+    ``simu`` object and no such backup (e.g. LT_SShydro_results.py).
+    """
     print("  Plotting hydraulic graph …")
     fig, ax = plt.subplots()
+
     data["simu"].show(prop="hgraph", ax=ax)
+
+    # Extract y-data from all lines rendered by simu.show()
+    y_values = np.concatenate([line.get_ydata() for line in ax.get_lines()])
+
+    # Calculate 5th and 95th percentiles of the data
+    y_min, y_max = np.percentile(y_values, [5, 95])
+
+    # Apply percentile bounds to y-axis limits
+    ax.set_ylim(y_min, y_max)
+
+    save_fig(fig, fig_path, fname, dpi)
+    maybe_show(fig, show)
+
+
+def plot_hgraph_csv(
+    df_hgraph:   pd.DataFrame,
+    fig_path:    Path,
+    *,
+    dpi:         int  = 300,
+    show:        bool = False,
+    scenario_id: int | str | None = None,
+    date_start:  str | pd.Timestamp | None = None,
+    date_end:    str | pd.Timestamp | None = None,
+    fname:       str  = "hgraph.png",
+) -> None:
+    """Full-record streamflow hydrograph from a pre-saved hgraph_output.csv.
+
+    This is the multi-month counterpart of ``plot_hgraph``: instead of
+    ``simu.show(prop="hgraph")`` — which only ever has access to whichever
+    single month's run is currently loaded into ``simu`` — this reads the
+    ``all_hgraph_recs`` backup written every month by
+    ``Agramon_withLAI_withETp.py`` (``hgraph_output.csv``), so the plotted
+    hydrograph spans the *entire* simulation instead of one month.
+
+    Parameters
+    ----------
+    df_hgraph : pd.DataFrame
+        Loaded from ``hgraph_output.csv`` — one row per output step, with
+        at least ``datetime`` and ``streamflow`` columns (as written by
+        ``read_hgraph`` + ``add_datetime_col`` in the LAI-loop pipeline;
+        the ``Unnamed0/1/2`` columns from the raw CATHY hgraph file are
+        ignored here).
+    fig_path    : Path to the output figure directory.
+    dpi         : Figure resolution.
+    show        : If True, call ``plt.show()`` after saving.
+    scenario_id : Label for the figure suptitle.
+    date_start / date_end : optional window (see ``date_window``); by
+        default the full backed-up record is plotted.
+    """
+    print("  Plotting hydrograph from hgraph_output.csv …")
+    scenario_id = scenario_id if scenario_id is not None else "?"
+
+    if df_hgraph.empty:
+        print("  WARNING: hgraph_output.csv is empty — nothing to plot.")
+        return
+
+    # ── Clean up: consecutive monthly runs can each re-emit a step at
+    # their shared boundary (this month's last write-out timestep vs.
+    # next month's first) — keep the later month's value and sort by
+    # absolute time so the concatenated record reads as one continuous
+    # series instead of a sawtooth at every month edge.
+    df = (
+        df_hgraph
+        .dropna(subset=["datetime", "streamflow"])
+        .sort_values("datetime")
+        .drop_duplicates(subset="datetime", keep="last")
+        .reset_index(drop=True)
+    )
+    if df.empty:
+        print("  WARNING: hgraph_output.csv has no valid datetime/streamflow rows — skipping.")
+        return
+
+    d0, d1 = date_window(date_start, date_end, df["datetime"])
+    df = df[(df["datetime"] >= d0) & (df["datetime"] <= d1)]
+    if df.empty:
+        print(f"  WARNING: no hgraph data in window {d0.date()} – {d1.date()} — skipping.")
+        return
+
+    q = pd.Series(df["streamflow"].values, index=pd.DatetimeIndex(df["datetime"]))
+
+    # Robust y-limits: a handful of solver-transient spikes shouldn't
+    # flatten the rest of the record, but don't clip so hard that real
+    # peak-flow events (the whole point of a hydrograph) disappear.
+    y_min, y_max = np.nanpercentile(q.values, [0.5, 99.5])
+    pad = 0.05 * (y_max - y_min) if y_max > y_min else 1.0
+
+    # ── Full-record hydrograph + cumulative discharge ─────────────────────
+    fig, axes = plt.subplots(2, 1, figsize=(12, 6), sharex=False)
+
+    axes[0].plot(q.index, q.values, color="#0072B2", linewidth=0.8)
+    axes[0].set_ylim(y_min - pad, y_max + pad)
+    axes[0].set_title("Streamflow at the outlet — full record")
+    axes[0].set_ylabel("Streamflow")
+    axes[0].xaxis.set_major_formatter(mdates.DateFormatter("%Y-%m"))
+    add_fire_vline(axes[0], d0, d1)
+    axes[0].legend(fontsize=8)
+    axes[0].grid(True, linestyle="--", alpha=0.4)
+
+    axes[1].plot(q.index, q.cumsum().values, color="#0072B2")
+    axes[1].set_title("Cumulative discharge")
+    axes[1].set_ylabel("Cumulative streamflow")
+    axes[1].xaxis.set_major_formatter(mdates.DateFormatter("%Y-%m"))
+    add_fire_vline(axes[1], d0, d1)
+    axes[1].legend(fontsize=8)
+    axes[1].grid(True, linestyle="--", alpha=0.4)
+
+    fig.suptitle(f"Scenario: {scenario_id} — Streamflow hydrograph "
+                 f"({d0.date()} – {d1.date()})", fontweight="bold")
+    fig.tight_layout()
+    save_fig(fig, fig_path, fname, dpi)
+    maybe_show(fig, show)
+
+
+def plot_node_locations(
+    grid3d:      dict,
+    nodes_dict:  dict,
+    fig_path:    Path,
+    *,
+    dem_da:      xr.DataArray | None = None,
+    colors_dict: dict | None = None,
+    scenario_id: int | str = "?",
+    dpi:         int  = 150,
+    show:        bool = False,
+    fname:       str  = "fig_node_locations.png",
+) -> None:
+    """
+    Fig 6b — 2-D map of the reference-node locations where the psi and sw
+    time-series (Fig 6 / Fig 7) are extracted.
+
+    Nodes sharing the same site (e.g. every depth resolved at "outlet" or
+    "mid") sit at the same (X, Y) and are plotted together, annotated with
+    their depth tag and node index.
+
+    Parameters
+    ----------
+    grid3d      : dict returned by ``simu.read_outputs("grid3d")``; must
+                  contain "mesh3d_nodes" (array of X, Y, Z per node index).
+    nodes_dict  : dict returned by ``resolve_nodes()``, i.e.
+                  {"outlet_z-0m": <node id>, "mid_z-1m": <node id>, …}.
+    fig_path    : output directory.
+    dem_da      : optional xr.DataArray (dims "x"/"y" or "X"/"Y") used as a
+                  DEM basemap. Skipped silently if it can't be plotted.
+    colors_dict : override COLORS_HYDRO; "uphill_surface" colours "mid"
+                  sites, "downhill_surface" colours "outlet" sites.
+    scenario_id : label for the figure title.
+    """
+    colors_dict = colors_dict or COLORS_HYDRO
+    nodes = grid3d["mesh3d_nodes"]
+
+    # Work on a local copy — this function only needs a single point per
+    # site to draw a marker, but nodes_dict is shared with (and consumed
+    # by) other plotting calls, so we must never mutate the caller's dict.
+    # If "mid_z-0m" already holds a band (list of ids, from
+    # find_representative_mid_node(..., return_band=True) in
+    # resolve_nodes()), collapse it to one representative point here for
+    # display purposes only — the original band is left untouched in the
+    # caller's nodes_dict for downstream median-across-band extraction.
+    nodes_dict = dict(nodes_dict)
+    if "mid_z-0m" in nodes_dict:
+        nodes_dict["mid_z-0m"] = find_representative_mid_node(nodes)
+
+    # ── Group node labels by site (everything before "_z-") ───────────────────
+    sites: dict[str, list[tuple[str, int]]] = defaultdict(list)
+    for label in nodes_dict:
+        if "_z-" not in label:
+            continue
+        site = label.split("_z-")[0]
+        sites[site].append((label, _node_id(nodes_dict, label)))
+
+    if not sites:
+        print("  plot_node_locations: skipped — no depth-tagged nodes in nodes_dict.")
+        return
+
+    site_color_map = {
+        "mid":    colors_dict.get("uphill_surface",   "#0072B2"),
+        "outlet": colors_dict.get("downhill_surface", "#D55E00"),
+    }
+    fallback_cmap = plt.get_cmap("tab10")
+
+    fig, ax = plt.subplots(figsize=(7, 7))
+
+    # ── Optional DEM basemap ────────────────────────────────────────────────
+    if dem_da is not None:
+        try:
+            xdim = "x" if "x" in dem_da.dims else "X"
+            ydim = "y" if "y" in dem_da.dims else "Y"
+            dem_da.plot.imshow(
+                ax=ax, x=xdim, y=ydim, cmap="terrain", alpha=0.85,
+                add_colorbar=True,
+                cbar_kwargs={"label": "Elevation (m)", "shrink": 0.75},
+            )
+            ax.set_title("")
+        except Exception as exc:
+            print(f"  plot_node_locations: DEM basemap skipped ({exc}).")
+
+    # ── Reference-node markers ──────────────────────────────────────────────
+    for i, (site, entries) in enumerate(sites.items()):
+        color = site_color_map.get(site, fallback_cmap(i % 10))
+        xs, ys = [], []
+        for label, node_id in entries:
+            x, y, _z = nodes[node_id]
+            xs.append(x)
+            ys.append(y)
+            depth_tag = label.split("_z-")[1]
+            ax.annotate(
+                f"{depth_tag}\n(n={node_id})",
+                (x, y), textcoords="offset points", xytext=(6, 6),
+                fontsize=7, color=color,
+            )
+        ax.scatter(
+            xs, ys, s=70, color=color, edgecolor="black",
+            linewidth=0.6, zorder=3, label=site.capitalize(),
+        )
+
+    ax.set_xlabel("X (m)")
+    ax.set_ylabel("Y (m)")
+    ax.set_aspect("equal")
+    ax.set_title(
+        f"Sc.{scenario_id} | Reference node locations (psi / sw extraction)",
+        fontsize=11, fontweight="bold",
+    )
+    ax.legend(loc="best", fontsize=9)
+    ax.grid(True, linestyle="--", alpha=0.3)
+
+    plt.tight_layout()
     save_fig(fig, fig_path, fname, dpi)
     maybe_show(fig, show)
 
@@ -1572,15 +1886,188 @@ def _infer_time_dim(ds: xr.Dataset | xr.DataArray) -> str:
     return list(dims)[0]
 
 
-def _node_id(nodes_dict: dict, key: str) -> int:
-    """Extract a scalar node index from the nodes_dict regardless of nesting."""
-    val = nodes_dict[key]
-    # Support int, (int,), ((int,),), np.ndarray …
+def unwrap_node_id(val) -> int:
+    """Extract a single scalar node index from an arbitrarily-nested value
+    (int, (int,), ((int,),), np.ndarray, …) — e.g. whatever
+    ``simu.find_nearest_node(...)`` happens to hand back."""
     while hasattr(val, "__iter__") and not isinstance(val, (str, np.integer)):
         val = next(iter(val))
     return int(val)
 
 
+def _node_id(nodes_dict: dict, key: str) -> int:
+    """Extract a scalar node index from the nodes_dict regardless of nesting."""
+    return unwrap_node_id(nodes_dict[key])
+
+
+def _node_ids(nodes_dict: dict, key: str) -> int | list[int]:
+    """Like ``_node_id``, but preserves a mid-elevation *band* instead of
+    always collapsing to a single scalar.
+
+    ``resolve_nodes()`` stores a single reference node (e.g. the outlet) as
+    a possibly-nested scalar (``5``, ``(5,)``, ``((5,),)``, …), and a
+    mid-elevation band (see ``find_representative_mid_node(...,
+    return_band=True)``) as a flat list/array of plain ints. We tell the
+    two apart by checking whether the first element is itself iterable:
+    a flat band's first element is a bare int, a nested single-id
+    container's first element is another container.
+
+    Returns
+    -------
+    int for a single reference node, or list[int] for a band of nodes.
+    """
+    val = nodes_dict[key]
+    if isinstance(val, (list, tuple, np.ndarray)) and len(val) > 0 \
+            and not hasattr(val[0], "__iter__"):
+        return [int(v) for v in val]
+    return unwrap_node_id(val)
+
+
+def _fmt_node_id(ids: int | list[int]) -> str:
+    """Human-readable label for a reference node or a mid-elevation band."""
+    if isinstance(ids, (list, tuple, np.ndarray)):
+        ids = list(ids)
+        if len(ids) > 1:
+            return f"median of {len(ids)} nodes"
+        return str(int(ids[0]))
+    return str(ids)
+
+
+def _values_at_nodes(
+    da: "xr.DataArray",
+    time_dim: str,
+    time_mask: np.ndarray,
+    ids: int | list[int],
+) -> np.ndarray:
+    """Extract a (masked-time,) series from an xarray DataArray at one or
+    more node ids.
+
+    A scalar id returns that single node's series, unchanged. A band
+    (list/array of several ids — e.g. all pixels within ±dz_pct of the
+    target mid-elevation) returns the per-timestep *median* across those
+    nodes, so "mid elevation" reflects the whole band rather than one
+    arbitrarily-chosen point.
+    """
+    sub = da.isel({time_dim: time_mask})
+    if isinstance(ids, (list, tuple, np.ndarray)):
+        ids = np.atleast_1d(np.asarray(ids, dtype=int))
+        if ids.size > 1:
+            return sub.sel(node=ids).median(dim="node").values
+        ids = int(ids[0])
+    return sub.sel(node=int(ids)).values
+
+def find_representative_mid_node(
+    nodes: np.ndarray,
+    margin: float = 0.05,
+    dz_pct: float = 0.02,
+    return_band: bool = False,
+) -> int | np.ndarray:
+    """
+    Pick a representative node (or node band) from the middle elevation range.
+
+    Instead of picking the single node closest to the median elevation —
+    which can easily land right on the mesh edge — this function:
+    1. Filters out boundary nodes (using ``margin``)
+    2. Finds the median elevation of non-boundary nodes
+    3. Identifies all non-boundary nodes within ±``dz_pct`` of that median
+       elevation (a *tiny* band around mid-elevation, not a single point)
+    4. Either:
+       - ``return_band=False`` (default): computes the median (X, Y, Z)
+         position of that band and returns the single node closest to it
+         — i.e. a *recentred* mid-elevation node, guaranteed off the
+         boundary and not just whichever node happens to be nearest in Z.
+       - ``return_band=True``: returns the indices of every node in the
+         band, so the caller can take the per-timestep *median* across the
+         whole band (see ``_values_at_nodes`` / ``_node_ids``) rather than
+         relying on any single node.
+
+    Parameters
+    ----------
+    nodes : np.ndarray
+        Array of shape (N, 3) with X, Y, Z coordinates for each node
+    margin : float
+        Fraction of X/Y extent to exclude as boundary (default: 0.05)
+    dz_pct : float
+        Elevation-band half-width, as a fraction of the median elevation
+        (default: 0.02, i.e. ±2% — a tiny range around mid-elevation)
+    return_band : bool
+        If True, return all node indices within the band instead of
+        collapsing to the single closest-to-median-position node.
+
+    Returns
+    -------
+    int or np.ndarray
+        Index of the representative mid-elevation node, or (if
+        ``return_band``) an array of node indices making up the band.
+    """
+    # Extract coordinates
+    x_coords = nodes[:, 0]
+    y_coords = nodes[:, 1]
+    z_coords = nodes[:, 2]
+
+    # Filter out boundary nodes
+    x_min, x_max = np.nanmin(x_coords), np.nanmax(x_coords)
+    y_min, y_max = np.nanmin(y_coords), np.nanmax(y_coords)
+    x_range = x_max - x_min
+    y_range = y_max - y_min
+
+    non_boundary = (
+        (x_coords >= x_min + margin * x_range) &
+        (x_coords <= x_max - margin * x_range) &
+        (y_coords >= y_min + margin * y_range) &
+        (y_coords <= y_max - margin * y_range)
+    )
+
+    # Work with non-boundary nodes only
+    elevations_nb = z_coords[non_boundary]
+    median_elev = np.nanmedian(elevations_nb)
+
+    # Define elevation band: ±dz_pct of median elevation
+    elev_tolerance = dz_pct * median_elev
+    elev_min = median_elev - elev_tolerance
+    elev_max = median_elev + elev_tolerance
+
+    # Find nodes within this elevation band AND not on boundary
+    elev_mask = (
+        (z_coords >= elev_min) &
+        (z_coords <= elev_max) &
+        non_boundary
+    )
+
+    cluster_nodes = nodes[elev_mask]
+
+    if len(cluster_nodes) == 0:
+        # Fallback: use original method (closest to median elevation)
+        print(f"  WARNING: No nodes found in ±{dz_pct:.1%} elevation band, "
+              "falling back to median elevation node")
+        all_elevations = z_coords[non_boundary]
+        median_elev_all = np.nanmedian(all_elevations)
+        distances = np.abs(all_elevations - median_elev_all)
+        closest_idx_local = np.argmin(distances)
+        non_boundary_indices = np.where(non_boundary)[0]
+        fallback_idx = non_boundary_indices[closest_idx_local]
+        return np.array([fallback_idx]) if return_band else int(fallback_idx)
+
+    if return_band:
+        return np.where(elev_mask)[0]
+
+    # Compute median position of the cluster
+    median_x = np.nanmedian(cluster_nodes[:, 0])
+    median_y = np.nanmedian(cluster_nodes[:, 1])
+    median_z = np.nanmedian(cluster_nodes[:, 2])
+    median_pos = np.array([median_x, median_y, median_z])
+
+    # Find node closest to this median position (from non-boundary nodes)
+    non_boundary_nodes = nodes[non_boundary]
+    distances = np.linalg.norm(non_boundary_nodes - median_pos, axis=1)
+    closest_idx_local = np.argmin(distances)
+
+    # Map back to original index
+    non_boundary_indices = np.where(non_boundary)[0]
+    return int(non_boundary_indices[closest_idx_local])
+
+
+    
 def plot_hydro_xr(
     psi_xr:     xr.Dataset,
     sw_xr:      xr.Dataset,
@@ -1603,6 +2090,8 @@ def plot_hydro_xr(
     dpi:         int  = 150,
     show:        bool = False,
     fname:       str  = "fig6_hydro_timeseries.png",
+    bar_width:   float = 1.0,
+    rain_unit:   str   = "mm/day",
 ) -> None:
     """Fig 6 — Rain/ETp + ψ + sw time-series built entirely from xarray Datasets.
 
@@ -1613,13 +2102,18 @@ def plot_hydro_xr(
     sw_xr       : xr.Dataset with the same structure for soil-water content (−).
     nodes_dict  : dict returned by ``resolve_nodes()``.
     fig_path    : output directory.
-    pev_series  : optional ERA5 potential ET series (mm/day, DatetimeIndex).
-    tp_series   : optional ERA5 precipitation series (mm/day, DatetimeIndex).
+    pev_series  : optional potential ET series (mm/day, DatetimeIndex) —
+                  satellite ETp (ET0) by default; ERA5 also accepted.
+    tp_series   : optional precipitation series (mm/day, DatetimeIndex) —
+                  satellite rain (TP) by default; ERA5 also accepted.
     date_start/end : ISO-date strings for the x-axis window.
     show_rain/psi/sw : toggle the three main panels.
     show_uh_s/uh_1/dh_s/dh_1 : toggle individual node series within psi/sw.
     colors_dict : override COLORS_HYDRO.
     scenario_id : label for the figure title.
+    bar_width   : width (in day units) of the rain/ETp bars — widen this for
+                  coarser (e.g. weekly) resampled data so bars stay visible.
+    rain_unit   : y-axis unit label for the rain/ETp panel (e.g. "mm/week").
     """
     colors_dict = colors_dict or COLORS_HYDRO
 
@@ -1636,10 +2130,13 @@ def plot_hydro_xr(
     print(f"  Plotting hydro_xr time-series ({d0.date()} → {d1.date()}) …")
 
     # ── Node indices ──────────────────────────────────────────────────────────
-    uh_s_id = _node_id(nodes_dict, "mid_z-0m")
-    uh_1_id = _node_id(nodes_dict, "mid_z-1m")
-    dh_s_id = _node_id(nodes_dict, "outlet_z-0m")
-    dh_1_id = _node_id(nodes_dict, "outlet_z-1m")
+    # "mid_z-*" may be a single node or a whole mid-elevation band (a list of
+    # node ids within ±dz_pct of the target elevation) — see
+    # find_representative_mid_node(..., return_band=True) in resolve_nodes().
+    uh_s_id = _node_ids(nodes_dict, "mid_z-0m")
+    uh_1_id = _node_ids(nodes_dict, "mid_z-1m")
+    dh_s_id = _node_ids(nodes_dict, "outlet_z-0m")
+    dh_1_id = _node_ids(nodes_dict, "outlet_z-1m")
 
     psi_mask = (psi_dates >= d0) & (psi_dates <= d1)
     sw_mask  = (sw_dates  >= d0) & (sw_dates  <= d1)
@@ -1648,11 +2145,11 @@ def plot_hydro_xr(
     psi_da = psi_xr[psi_var]   # (datetime, node)
     sw_da  = sw_xr[sw_var]
 
-    def _psi_at(node_id: int) -> np.ndarray:
-        return psi_da.isel({psi_time_dim: psi_mask}).sel(node=node_id).values
+    def _psi_at(node_id: int | list[int]) -> np.ndarray:
+        return _values_at_nodes(psi_da, psi_time_dim, psi_mask, node_id)
 
-    def _sw_at(node_id: int) -> np.ndarray:
-        return sw_da.isel({sw_time_dim: sw_mask}).sel(node=node_id).values
+    def _sw_at(node_id: int | list[int]) -> np.ndarray:
+        return _values_at_nodes(sw_da, sw_time_dim, sw_mask, node_id)
 
     # ── Count active panels ───────────────────────────────────────────────────
     n_panels = sum([show_rain, show_psi, show_sw])
@@ -1674,18 +2171,19 @@ def plot_hydro_xr(
     if show_rain:
         ax = next(ax_iter)
         if pev_series is not None and tp_series is not None and len(pev_series):
-            rain_m = (pev_series.index >= d0) & (pev_series.index <= d1)
-            ax.bar(pev_series[rain_m].index, pev_series[rain_m].values,
-                   width=1.0, color="grey",   label="ETp", alpha=0.5)
-            ax.bar(tp_series[rain_m].index,  tp_series[rain_m].values,
-                   width=1.0, color="skyblue", label="Rain")
+            pev_m = (pev_series.index >= d0) & (pev_series.index <= d1)
+            tp_m  = (tp_series.index  >= d0) & (tp_series.index  <= d1)
+            ax.bar(pev_series[pev_m].index, pev_series[pev_m].values,
+                   width=bar_width, color="grey",   label="ETp", alpha=0.5)
+            ax.bar(tp_series[tp_m].index,  tp_series[tp_m].values,
+                   width=bar_width, color="skyblue", label="Rain")
             ax.invert_yaxis()
         else:
-            ax.text(0.5, 0.5, "ERA5 forcing not available",
+            ax.text(0.5, 0.5, "Rain/ETp forcing not available",
                     ha="center", va="center", transform=ax.transAxes,
                     fontsize=9, color="#888888")
-        ax.set_ylabel("mm/day")
-        ax.set_title("Rain / ETp (ERA5)", fontsize=10, fontweight="bold")
+        ax.set_ylabel(rain_unit)
+        ax.set_title("Rain / ETp (satellite)", fontsize=10, fontweight="bold")
         add_fire_vline(ax, d0, d1)
         ax.legend(loc="upper right", fontsize=8)
         ax.grid(True, linestyle="--", alpha=0.3)
@@ -1696,19 +2194,19 @@ def plot_hydro_xr(
         psi_dates_w = psi_dates[psi_mask]
         if show_uh_s:
             ax.plot(psi_dates_w, _psi_at(uh_s_id),
-                    label=f"Mid surf n={uh_s_id}",
+                    label=f"Mid surf n={_fmt_node_id(uh_s_id)}",
                     color=colors_dict["uphill_surface"], marker="+", linestyle="-", ms=3)
         if show_uh_1:
             ax.plot(psi_dates_w, _psi_at(uh_1_id),
-                    label=f"Mid −1m n={uh_1_id}",
+                    label=f"Mid −1m n={_fmt_node_id(uh_1_id)}",
                     color=colors_dict["uphill_1m"], linestyle="--")
         if show_dh_s:
             ax.plot(psi_dates_w, _psi_at(dh_s_id),
-                    label=f"Outlet surf n={dh_s_id}",
+                    label=f"Outlet surf n={_fmt_node_id(dh_s_id)}",
                     color=colors_dict["downhill_surface"], marker="o", linestyle="-", ms=3)
         if show_dh_1:
             ax.plot(psi_dates_w, _psi_at(dh_1_id),
-                    label=f"Outlet −1m n={dh_1_id}",
+                    label=f"Outlet −1m n={_fmt_node_id(dh_1_id)}",
                     color=colors_dict["downhill_1m"], linestyle="--")
         ax.set_ylabel("ψ (m)")
         ax.set_title("Pressure Head ψ at reference nodes", fontsize=10, fontweight="bold")
@@ -1723,19 +2221,19 @@ def plot_hydro_xr(
         sw_dates_w = sw_dates[sw_mask]
         if show_uh_s:
             ax.plot(sw_dates_w, _sw_at(uh_s_id),
-                    label=f"Mid surf n={uh_s_id}",
+                    label=f"Mid surf n={_fmt_node_id(uh_s_id)}",
                     color=colors_dict["uphill_surface"], marker="+", linestyle="-", ms=3)
         if show_uh_1:
             ax.plot(sw_dates_w, _sw_at(uh_1_id),
-                    label=f"Mid −1m n={uh_1_id}",
+                    label=f"Mid −1m n={_fmt_node_id(uh_1_id)}",
                     color=colors_dict["uphill_1m"], linestyle="--")
         if show_dh_s:
             ax.plot(sw_dates_w, _sw_at(dh_s_id),
-                    label=f"Outlet surf n={dh_s_id}",
+                    label=f"Outlet surf n={_fmt_node_id(dh_s_id)}",
                     color=colors_dict["downhill_surface"], marker="o", linestyle="-", ms=3)
         if show_dh_1:
             ax.plot(sw_dates_w, _sw_at(dh_1_id),
-                    label=f"Outlet −1m n={dh_1_id}",
+                    label=f"Outlet −1m n={_fmt_node_id(dh_1_id)}",
                     color=colors_dict["downhill_1m"], linestyle="--")
         ax.set_ylabel("sw (−)")
         ax.set_title("Soil Water Content at reference nodes", fontsize=10, fontweight="bold")
@@ -1775,6 +2273,8 @@ def plot_et_sw_xr(
     dpi:         int  = 150,
     show:        bool = False,
     fname:       str  = "fig7_et_sw_timeseries.png",
+    et_unit:     str  = "mm/day",
+    et_as_line:  bool = False,
 ) -> None:
     """Fig 7 — Soil water content + spatial-mean actual ETa, from xarray Datasets.
 
@@ -1791,6 +2291,10 @@ def plot_et_sw_xr(
     show_uh_s/uh_1/dh_s/dh_1 : toggle individual sw node series.
     colors_dict : override COLORS_HYDRO.
     scenario_id : label for the figure title.
+    et_unit    : y-axis unit label for the ETa panel (e.g. "mm/week" for
+                 resampled data).
+    et_as_line : draw the ETa panel as a connected line+marker instead of a
+                 bare scatter — clearer for coarser (e.g. weekly) series.
     """
     colors_dict = colors_dict or COLORS_HYDRO
 
@@ -1816,16 +2320,19 @@ def plot_et_sw_xr(
     et_vals = et_mean.values[et_mask]
     et_dates_w = et_dates[et_mask]
 
-    # Node IDs
-    uh_s_id = _node_id(nodes_dict, "mid_z-0m")
-    uh_1_id = _node_id(nodes_dict, "mid_z-1m")
-    dh_s_id = _node_id(nodes_dict, "outlet_z-0m")
-    dh_1_id = _node_id(nodes_dict, "outlet_z-1m")
+    # Node IDs — band-preserving: "mid_z-*" may be a single node or a whole
+    # mid-elevation band (see find_representative_mid_node(..., return_band=True)
+    # in resolve_nodes()); _node_ids keeps that band intact instead of
+    # collapsing it to a single id.
+    uh_s_id = _node_ids(nodes_dict, "mid_z-0m")
+    uh_1_id = _node_ids(nodes_dict, "mid_z-1m")
+    dh_s_id = _node_ids(nodes_dict, "outlet_z-0m")
+    dh_1_id = _node_ids(nodes_dict, "outlet_z-1m")
 
     sw_dates_w = sw_dates[sw_mask]
 
-    def _sw_at(node_id: int) -> np.ndarray:
-        return sw_da.isel({sw_time_dim: sw_mask}).sel(node=node_id).values
+    def _sw_at(node_id: int | list[int]) -> np.ndarray:
+        return _values_at_nodes(sw_da, sw_time_dim, sw_mask, node_id)
 
     fig, (ax0, ax1) = plt.subplots(
         2, 1, figsize=(14, 6), sharex=True, constrained_layout=True
@@ -1834,19 +2341,19 @@ def plot_et_sw_xr(
     # ── Top: sw at reference nodes ────────────────────────────────────────────
     if show_uh_s:
         ax0.plot(sw_dates_w, _sw_at(uh_s_id),
-                 label=f"Mid surf n={uh_s_id}",
+                 label=f"Mid surf n={_fmt_node_id(uh_s_id)}",
                  color=colors_dict["uphill_surface"], marker="+", linestyle="-", ms=3)
     if show_uh_1:
         ax0.plot(sw_dates_w, _sw_at(uh_1_id),
-                 label=f"Mid −1m n={uh_1_id}",
+                 label=f"Mid −1m n={_fmt_node_id(uh_1_id)}",
                  color=colors_dict["uphill_1m"], linestyle="--")
     if show_dh_s:
         ax0.plot(sw_dates_w, _sw_at(dh_s_id),
-                 label=f"Outlet surf n={dh_s_id}",
+                 label=f"Outlet surf n={_fmt_node_id(dh_s_id)}",
                  color=colors_dict["downhill_surface"], marker="o", linestyle="-", ms=3)
     if show_dh_1:
         ax0.plot(sw_dates_w, _sw_at(dh_1_id),
-                 label=f"Outlet −1m n={dh_1_id}",
+                 label=f"Outlet −1m n={_fmt_node_id(dh_1_id)}",
                  color=colors_dict["downhill_1m"], linestyle="--")
 
     ax0.set_ylabel("sw (−)")
@@ -1857,14 +2364,18 @@ def plot_et_sw_xr(
 
     # ── Bottom: spatial-mean ETa ──────────────────────────────────────────────
     if et_var in ET_xr_all and len(et_vals):
-        ax1.scatter(et_dates_w, et_vals,
-                    c=colors_dict["ET_mean"], s=14, label="ETa spatial mean")
+        if et_as_line:
+            ax1.plot(et_dates_w, et_vals, color=colors_dict["ET_mean"],
+                     marker="o", ms=4, linewidth=1.3, label="ETa spatial mean")
+        else:
+            ax1.scatter(et_dates_w, et_vals,
+                        c=colors_dict["ET_mean"], s=14, label="ETa spatial mean")
     else:
         ax1.text(0.5, 0.5, f"'{et_var}' not found in ET dataset",
                  ha="center", va="center", transform=ax1.transAxes,
                  fontsize=9, color="#888888")
 
-    ax1.set_ylabel("ETa (mm/day)")
+    ax1.set_ylabel(f"ETa ({et_unit})")
     ax1.set_xlabel("Date")
     ax1.set_title(
         f"Actual Evapotranspiration — spatial mean ({et_var})",
@@ -1883,8 +2394,947 @@ def plot_et_sw_xr(
     )
     save_fig(fig, fig_path, fname, dpi)
     maybe_show(fig, show)
-    
-    
+
+
+# =============================================================================
+# Fig 6 / 7 -- fire-window & weekly variants
+# =============================================================================
+# Thin wrappers around plot_hydro_xr / plot_et_sw_xr that pin the date window
+# (or resample the underlying data) so callers don't have to duplicate the
+# FIRE_DATE bookkeeping. All of them accept the same node/colour/scenario
+# kwargs as their parent function.
+
+def _fire_year_window() -> tuple[pd.Timestamp, pd.Timestamp]:
+    """(d0, d1) spanning the fire year and the following year, e.g. 2020-2021."""
+    d0 = pd.Timestamp(year=FIRE_DATE.year, month=1, day=1)
+    d1 = pd.Timestamp(year=FIRE_DATE.year + 1, month=12, day=31)
+    return d0, d1
+
+
+def _fire_month_window() -> tuple[pd.Timestamp, pd.Timestamp]:
+    """(d0, d1) spanning only the calendar month the fire occurred in."""
+    d0 = FIRE_DATE.replace(day=1)
+    d1 = d0 + pd.offsets.MonthEnd(0)
+    return d0, d1
+
+
+def plot_hydro_xr_fire_year(
+    psi_xr:     xr.Dataset,
+    sw_xr:      xr.Dataset,
+    nodes_dict: dict,
+    fig_path:   Path,
+    *,
+    pev_series:  pd.Series | None = None,
+    tp_series:   pd.Series | None = None,
+    show_rain:   bool = True,
+    show_psi:    bool = True,
+    show_sw:     bool = True,
+    show_uh_s:   bool = True,
+    show_uh_1:   bool = True,
+    show_dh_s:   bool = True,
+    show_dh_1:   bool = True,
+    colors_dict: dict | None = None,
+    scenario_id: int | str = "?",
+    dpi:         int  = 150,
+    show:        bool = False,
+    fname:       str  = "fig6c_hydro_timeseries_fire_years.png",
+) -> None:
+    """Fig 6c -- Fig 6 zoomed to the fire year + the following year
+    (e.g. 2020-01-01 -> 2021-12-31 for ``FIRE_DATE = 2020-07-01``)."""
+    d0, d1 = _fire_year_window()
+    plot_hydro_xr(
+        psi_xr, sw_xr, nodes_dict, fig_path,
+        pev_series=pev_series, tp_series=tp_series,
+        date_start=str(d0.date()), date_end=str(d1.date()),
+        show_rain=show_rain, show_psi=show_psi, show_sw=show_sw,
+        show_uh_s=show_uh_s, show_uh_1=show_uh_1,
+        show_dh_s=show_dh_s, show_dh_1=show_dh_1,
+        colors_dict=colors_dict, scenario_id=scenario_id,
+        dpi=dpi, show=show, fname=fname,
+    )
+
+
+def plot_hydro_xr_fire_month(
+    psi_xr:     xr.Dataset,
+    sw_xr:      xr.Dataset,
+    nodes_dict: dict,
+    fig_path:   Path,
+    *,
+    pev_series:  pd.Series | None = None,
+    tp_series:   pd.Series | None = None,
+    show_rain:   bool = True,
+    show_psi:    bool = True,
+    show_sw:     bool = True,
+    show_uh_s:   bool = True,
+    show_uh_1:   bool = True,
+    show_dh_s:   bool = True,
+    show_dh_1:   bool = True,
+    colors_dict: dict | None = None,
+    scenario_id: int | str = "?",
+    dpi:         int  = 150,
+    show:        bool = False,
+    fname:       str  = "fig6d_hydro_timeseries_fire_month.png",
+) -> None:
+    """Fig 6d -- Fig 6 zoomed to just the calendar month of the fire
+    (e.g. July 2020 for ``FIRE_DATE = 2020-07-01``)."""
+    d0, d1 = _fire_month_window()
+    plot_hydro_xr(
+        psi_xr, sw_xr, nodes_dict, fig_path,
+        pev_series=pev_series, tp_series=tp_series,
+        date_start=str(d0.date()), date_end=str(d1.date()),
+        show_rain=show_rain, show_psi=show_psi, show_sw=show_sw,
+        show_uh_s=show_uh_s, show_uh_1=show_uh_1,
+        show_dh_s=show_dh_s, show_dh_1=show_dh_1,
+        colors_dict=colors_dict, scenario_id=scenario_id,
+        dpi=dpi, show=show, fname=fname,
+    )
+
+
+def plot_hydro_xr_weekly(
+    psi_xr:     xr.Dataset,
+    sw_xr:      xr.Dataset,
+    nodes_dict: dict,
+    fig_path:   Path,
+    *,
+    pev_series:  pd.Series | None = None,
+    tp_series:   pd.Series | None = None,
+    date_start:  str | None = None,
+    date_end:    str | None = None,
+    show_rain:   bool = True,
+    show_psi:    bool = True,
+    show_sw:     bool = True,
+    show_uh_s:   bool = True,
+    show_uh_1:   bool = True,
+    show_dh_s:   bool = True,
+    show_dh_1:   bool = True,
+    colors_dict: dict | None = None,
+    scenario_id: int | str = "?",
+    dpi:         int  = 150,
+    show:        bool = False,
+    fname:       str  = "fig6e_hydro_timeseries_weekly.png",
+) -> None:
+    """Fig 6e -- Weekly-resampled version of Fig 6.
+
+    psi and sw (state variables) are resampled with a weekly *mean*; rain and
+    ETp (fluxes) are resampled with a weekly *sum*, so the bars read as
+    "mm accumulated that week". Falls back to the full record if
+    *date_start*/*date_end* are not given.
+    """
+    psi_time_dim = _infer_time_dim(psi_xr)
+    sw_time_dim  = _infer_time_dim(sw_xr)
+    psi_weekly = psi_xr.resample({psi_time_dim: "W"}).mean()
+    sw_weekly  = sw_xr.resample({sw_time_dim: "W"}).mean()
+
+    pev_weekly = pev_series.resample("W").sum() if pev_series is not None and len(pev_series) else pev_series
+    tp_weekly  = tp_series.resample("W").sum()  if tp_series  is not None and len(tp_series)  else tp_series
+
+    plot_hydro_xr(
+        psi_weekly, sw_weekly, nodes_dict, fig_path,
+        pev_series=pev_weekly, tp_series=tp_weekly,
+        date_start=date_start, date_end=date_end,
+        show_rain=show_rain, show_psi=show_psi, show_sw=show_sw,
+        show_uh_s=show_uh_s, show_uh_1=show_uh_1,
+        show_dh_s=show_dh_s, show_dh_1=show_dh_1,
+        colors_dict=colors_dict, scenario_id=scenario_id,
+        dpi=dpi, show=show, fname=fname,
+        bar_width=6.0, rain_unit="mm/week",
+    )
+
+
+def plot_et_sw_xr_fire_year(
+    sw_xr:      xr.Dataset,
+    ET_xr_all:  xr.Dataset,
+    et_var:     str,
+    et_scale:   float,
+    nodes_dict: dict,
+    fig_path:   Path,
+    *,
+    show_uh_s:   bool = True,
+    show_uh_1:   bool = True,
+    show_dh_s:   bool = True,
+    show_dh_1:   bool = True,
+    colors_dict: dict | None = None,
+    scenario_id: int | str = "?",
+    dpi:         int  = 150,
+    show:        bool = False,
+    fname:       str  = "fig7c_et_sw_timeseries_fire_years.png",
+) -> None:
+    """Fig 7c -- Fig 7 zoomed to the fire year + the following year."""
+    d0, d1 = _fire_year_window()
+    plot_et_sw_xr(
+        sw_xr, ET_xr_all, et_var, et_scale, nodes_dict, fig_path,
+        date_start=str(d0.date()), date_end=str(d1.date()),
+        show_uh_s=show_uh_s, show_uh_1=show_uh_1,
+        show_dh_s=show_dh_s, show_dh_1=show_dh_1,
+        colors_dict=colors_dict, scenario_id=scenario_id,
+        dpi=dpi, show=show, fname=fname,
+    )
+
+
+def plot_et_sw_xr_fire_month(
+    sw_xr:      xr.Dataset,
+    ET_xr_all:  xr.Dataset,
+    et_var:     str,
+    et_scale:   float,
+    nodes_dict: dict,
+    fig_path:   Path,
+    *,
+    show_uh_s:   bool = True,
+    show_uh_1:   bool = True,
+    show_dh_s:   bool = True,
+    show_dh_1:   bool = True,
+    colors_dict: dict | None = None,
+    scenario_id: int | str = "?",
+    dpi:         int  = 150,
+    show:        bool = False,
+    fname:       str  = "fig7d_et_sw_timeseries_fire_month.png",
+) -> None:
+    """Fig 7d -- Fig 7 zoomed to just the calendar month of the fire."""
+    d0, d1 = _fire_month_window()
+    plot_et_sw_xr(
+        sw_xr, ET_xr_all, et_var, et_scale, nodes_dict, fig_path,
+        date_start=str(d0.date()), date_end=str(d1.date()),
+        show_uh_s=show_uh_s, show_uh_1=show_uh_1,
+        show_dh_s=show_dh_s, show_dh_1=show_dh_1,
+        colors_dict=colors_dict, scenario_id=scenario_id,
+        dpi=dpi, show=show, fname=fname,
+    )
+
+
+def plot_et_sw_xr_weekly(
+    sw_xr:      xr.Dataset,
+    ET_xr_all:  xr.Dataset,
+    et_var:     str,
+    et_scale:   float,
+    nodes_dict: dict,
+    fig_path:   Path,
+    *,
+    date_start:  str | None = None,
+    date_end:    str | None = None,
+    show_uh_s:   bool = True,
+    show_uh_1:   bool = True,
+    show_dh_s:   bool = True,
+    show_dh_1:   bool = True,
+    colors_dict: dict | None = None,
+    scenario_id: int | str = "?",
+    dpi:         int  = 150,
+    show:        bool = False,
+    fname:       str  = "fig7e_et_sw_timeseries_weekly.png",
+) -> None:
+    """Fig 7e -- Weekly-resampled version of Fig 7.
+
+    sw (state variable) is resampled with a weekly *mean*; ETa (a flux) is
+    resampled with a weekly *sum*, so the panel reads as "mm accumulated
+    that week". Falls back to the full record if *date_start*/*date_end*
+    are not given.
+    """
+    sw_time_dim = _infer_time_dim(sw_xr)
+    et_time_dim = _infer_time_dim(ET_xr_all)
+    sw_weekly = sw_xr.resample({sw_time_dim: "W"}).mean()
+    et_weekly = ET_xr_all.resample({et_time_dim: "W"}).sum()
+
+    plot_et_sw_xr(
+        sw_weekly, et_weekly, et_var, et_scale, nodes_dict, fig_path,
+        date_start=date_start, date_end=date_end,
+        show_uh_s=show_uh_s, show_uh_1=show_uh_1,
+        show_dh_s=show_dh_s, show_dh_1=show_dh_1,
+        colors_dict=colors_dict, scenario_id=scenario_id,
+        dpi=dpi, show=show, fname=fname,
+        et_unit="mm/week", et_as_line=True,
+    )
+
+
+# =============================================================================
+# Fig 7g -- psi + ETa (Fig 7, but the top panel is pressure head, not sw)
+# =============================================================================
+
+def plot_et_psi_xr(
+    psi_xr:     xr.Dataset,
+    ET_xr_all:  xr.Dataset,
+    et_var:     str,
+    et_scale:   float,
+    nodes_dict: dict,
+    fig_path:   Path,
+    *,
+    date_start:  str | None = None,
+    date_end:    str | None = None,
+    show_uh_s:   bool = True,
+    show_uh_1:   bool = True,
+    show_dh_s:   bool = True,
+    show_dh_1:   bool = True,
+    colors_dict: dict | None = None,
+    scenario_id: int | str = "?",
+    dpi:         int  = 150,
+    show:        bool = False,
+    fname:       str  = "fig7g_et_psi_timeseries.png",
+    et_unit:     str  = "mm/day",
+    et_as_line:  bool = False,
+) -> None:
+    """Fig 7g -- same as ``plot_et_sw_xr`` (Fig 7), but the top panel plots
+    pressure head (psi) at the reference nodes instead of soil water
+    content (sw).
+
+    Parameters
+    ----------
+    psi_xr     : xr.Dataset with dimension ``(datetime|time, node)`` for psi.
+    ET_xr_all  : xr.Dataset with spatial ET (X, Y, datetime|time), variable
+                 name given by *et_var*.
+    et_var     : name of the ET variable inside *ET_xr_all*.
+    et_scale   : multiplicative factor (e.g. 1e3*86400 for m/s → mm/day).
+    nodes_dict : dict returned by ``resolve_nodes()``.
+    fig_path   : output directory.
+    date_start/end : ISO-date strings for the x-axis window.
+    show_uh_s/uh_1/dh_s/dh_1 : toggle individual psi node series.
+    colors_dict : override COLORS_HYDRO.
+    scenario_id : label for the figure title.
+    et_unit    : y-axis unit label for the ETa panel (e.g. "mm/week" for
+                 resampled data).
+    et_as_line : draw the ETa panel as a connected line+marker instead of a
+                 bare scatter — clearer for coarser (e.g. weekly) series.
+    """
+    colors_dict = colors_dict or COLORS_HYDRO
+
+    psi_time_dim = _infer_time_dim(psi_xr)
+    et_time_dim  = _infer_time_dim(ET_xr_all)
+    psi_var      = list(psi_xr.data_vars)[0]
+
+    psi_dates = _xr_time_to_dates(psi_xr[psi_var], psi_time_dim)
+    et_dates  = _xr_time_to_dates(ET_xr_all[et_var], et_time_dim)
+
+    d0, d1 = date_window(date_start, date_end, psi_dates.to_series())
+    print(f"  Plotting et_psi_xr time-series ({d0.date()} → {d1.date()}) …")
+
+    psi_mask = (psi_dates >= d0) & (psi_dates <= d1)
+    et_mask  = (et_dates  >= d0) & (et_dates  <= d1)
+
+    psi_da = psi_xr[psi_var]
+
+    # Spatial-mean ET (all non-time dims averaged)
+    spatial_dims = [d for d in ET_xr_all[et_var].dims
+                    if d.lower() not in ("datetime", "time", "t")]
+    et_mean = ET_xr_all[et_var].mean(dim=spatial_dims) * et_scale  # (time,)
+    et_vals = et_mean.values[et_mask]
+    et_dates_w = et_dates[et_mask]
+
+    # Node IDs — band-preserving: "mid_z-*" may be a single node or a whole
+    # mid-elevation band (see find_representative_mid_node(..., return_band=True)
+    # in resolve_nodes()); _node_ids keeps that band intact instead of
+    # collapsing it to a single id.
+    uh_s_id = _node_ids(nodes_dict, "mid_z-0m")
+    uh_1_id = _node_ids(nodes_dict, "mid_z-1m")
+    dh_s_id = _node_ids(nodes_dict, "outlet_z-0m")
+    dh_1_id = _node_ids(nodes_dict, "outlet_z-1m")
+
+    psi_dates_w = psi_dates[psi_mask]
+
+    def _psi_at(node_id: int | list[int]) -> np.ndarray:
+        return _values_at_nodes(psi_da, psi_time_dim, psi_mask, node_id)
+
+    fig, (ax0, ax1) = plt.subplots(
+        2, 1, figsize=(14, 6), sharex=True, constrained_layout=True
+    )
+
+    # ── Top: psi at reference nodes ───────────────────────────────────────────
+    if show_uh_s:
+        ax0.plot(psi_dates_w, _psi_at(uh_s_id),
+                 label=f"Mid surf n={_fmt_node_id(uh_s_id)}",
+                 color=colors_dict["uphill_surface"], marker="+", linestyle="-", ms=3)
+    if show_uh_1:
+        ax0.plot(psi_dates_w, _psi_at(uh_1_id),
+                 label=f"Mid −1m n={_fmt_node_id(uh_1_id)}",
+                 color=colors_dict["uphill_1m"], linestyle="--")
+    if show_dh_s:
+        ax0.plot(psi_dates_w, _psi_at(dh_s_id),
+                 label=f"Outlet surf n={_fmt_node_id(dh_s_id)}",
+                 color=colors_dict["downhill_surface"], marker="o", linestyle="-", ms=3)
+    if show_dh_1:
+        ax0.plot(psi_dates_w, _psi_at(dh_1_id),
+                 label=f"Outlet −1m n={_fmt_node_id(dh_1_id)}",
+                 color=colors_dict["downhill_1m"], linestyle="--")
+
+    ax0.set_ylabel("ψ (m)")
+    ax0.set_title("Pressure Head ψ at reference nodes", fontsize=10, fontweight="bold")
+    add_fire_vline(ax0, d0, d1)
+    ax0.legend(loc="upper right", fontsize=8)
+    ax0.grid(True, linestyle="--", alpha=0.3)
+    ax0.axhline(0, color="black", linewidth=0.8, linestyle=":")
+
+    # ── Bottom: spatial-mean ETa ──────────────────────────────────────────────
+    if et_var in ET_xr_all and len(et_vals):
+        if et_as_line:
+            ax1.plot(et_dates_w, et_vals, color=colors_dict["ET_mean"],
+                     marker="o", ms=4, linewidth=1.3, label="ETa spatial mean")
+        else:
+            ax1.scatter(et_dates_w, et_vals,
+                        c=colors_dict["ET_mean"], s=14, label="ETa spatial mean")
+    else:
+        ax1.text(0.5, 0.5, f"'{et_var}' not found in ET dataset",
+                 ha="center", va="center", transform=ax1.transAxes,
+                 fontsize=9, color="#888888")
+
+    ax1.set_ylabel(f"ETa ({et_unit})")
+    ax1.set_xlabel("Date")
+    ax1.set_title(
+        f"Actual Evapotranspiration — spatial mean ({et_var})",
+        fontsize=10, fontweight="bold",
+    )
+    add_fire_vline(ax1, d0, d1)
+    ax1.legend(loc="upper right", fontsize=8)
+    ax1.grid(True, linestyle="--", alpha=0.3)
+    ax1.xaxis.set_major_formatter(
+        mdates.ConciseDateFormatter(mdates.AutoDateLocator())
+    )
+
+    fig.suptitle(
+        f"Sc.{scenario_id} | psi & ETa | {d0.date()} → {d1.date()}",
+        fontsize=11, fontweight="bold",
+    )
+    save_fig(fig, fig_path, fname, dpi)
+    maybe_show(fig, show)
+
+
+def plot_et_psi_xr_fire_year(
+    psi_xr:     xr.Dataset,
+    ET_xr_all:  xr.Dataset,
+    et_var:     str,
+    et_scale:   float,
+    nodes_dict: dict,
+    fig_path:   Path,
+    *,
+    show_uh_s:   bool = True,
+    show_uh_1:   bool = True,
+    show_dh_s:   bool = True,
+    show_dh_1:   bool = True,
+    colors_dict: dict | None = None,
+    scenario_id: int | str = "?",
+    dpi:         int  = 150,
+    show:        bool = False,
+    fname:       str  = "fig7gc_et_psi_timeseries_fire_years.png",
+) -> None:
+    """Fig 7gc -- Fig 7g (psi + ETa) zoomed to the fire year + the following
+    year — the psi counterpart of ``plot_et_sw_xr_fire_year`` (Fig 7c)."""
+    d0, d1 = _fire_year_window()
+    plot_et_psi_xr(
+        psi_xr, ET_xr_all, et_var, et_scale, nodes_dict, fig_path,
+        date_start=str(d0.date()), date_end=str(d1.date()),
+        show_uh_s=show_uh_s, show_uh_1=show_uh_1,
+        show_dh_s=show_dh_s, show_dh_1=show_dh_1,
+        colors_dict=colors_dict, scenario_id=scenario_id,
+        dpi=dpi, show=show, fname=fname,
+    )
+
+
+# =============================================================================
+# Fig 7b -- sw + ETa + LAI trend (Fig 7 with an added LAI panel)
+# =============================================================================
+
+def plot_et_sw_lai_xr(
+    sw_xr:      xr.Dataset,
+    ET_xr_all:  xr.Dataset,
+    et_var:     str,
+    et_scale:   float,
+    lai_ds:     xr.Dataset | None,
+    nodes_dict: dict,
+    fig_path:   Path,
+    *,
+    lai_var:     str = "LAI",
+    date_start:  str | None = None,
+    date_end:    str | None = None,
+    show_uh_s:   bool = True,
+    show_uh_1:   bool = True,
+    show_dh_s:   bool = True,
+    show_dh_1:   bool = True,
+    colors_dict: dict | None = None,
+    scenario_id: int | str = "?",
+    dpi:         int  = 150,
+    show:        bool = False,
+    fname:       str  = "fig7b_et_sw_lai_timeseries.png",
+    et_unit:     str  = "mm/day",
+    et_as_line:  bool = False,
+) -> None:
+    """Fig 7b -- Fig 7 (sw + spatial-mean ETa) with a third panel for the
+    domain-mean LAI trend, so vegetation state and the water-balance
+    response can be read off the same time axis.
+
+    Parameters
+    ----------
+    sw_xr, ET_xr_all, et_var, et_scale, nodes_dict, fig_path : same as
+        ``plot_et_sw_xr``.
+    lai_ds   : xr.Dataset with a time dimension and variable *lai_var*
+               (e.g. from ``lai_history_to_dataset(art["lai_history"])``).
+               May be ``None`` or empty — the LAI panel then shows a
+               "not available" placeholder instead of failing the whole
+               figure.
+    lai_var  : name of the LAI variable inside *lai_ds* (default 'LAI').
+    et_unit / et_as_line : same as ``plot_et_sw_xr`` (used by the weekly
+               variant to switch the ETa panel to mm/week + line style).
+    """
+    colors_dict = colors_dict or COLORS_HYDRO
+
+    sw_time_dim = _infer_time_dim(sw_xr)
+    et_time_dim = _infer_time_dim(ET_xr_all)
+    sw_var      = list(sw_xr.data_vars)[0]
+
+    sw_dates = _xr_time_to_dates(sw_xr[sw_var], sw_time_dim)
+    et_dates = _xr_time_to_dates(ET_xr_all[et_var], et_time_dim)
+
+    d0, d1 = date_window(date_start, date_end, sw_dates.to_series())
+    print(f"  Plotting et_sw_lai_xr time-series ({d0.date()} → {d1.date()}) …")
+
+    sw_mask = (sw_dates >= d0) & (sw_dates <= d1)
+    et_mask = (et_dates >= d0) & (et_dates <= d1)
+
+    sw_da = sw_xr[sw_var]
+
+    # Spatial-mean ET (all non-time dims averaged)
+    spatial_dims = [d for d in ET_xr_all[et_var].dims
+                    if d.lower() not in ("datetime", "time", "t")]
+    et_mean = ET_xr_all[et_var].mean(dim=spatial_dims) * et_scale  # (time,)
+    et_vals = et_mean.values[et_mask]
+    et_dates_w = et_dates[et_mask]
+
+    # Node IDs — band-preserving: "mid_z-*" may be a single node or a whole
+    # mid-elevation band (see find_representative_mid_node(..., return_band=True)
+    # in resolve_nodes()); _node_ids keeps that band intact instead of
+    # collapsing it to a single id.
+    uh_s_id = _node_ids(nodes_dict, "mid_z-0m")
+    uh_1_id = _node_ids(nodes_dict, "mid_z-1m")
+    dh_s_id = _node_ids(nodes_dict, "outlet_z-0m")
+    dh_1_id = _node_ids(nodes_dict, "outlet_z-1m")
+
+    sw_dates_w = sw_dates[sw_mask]
+
+    def _sw_at(node_id: int | list[int]) -> np.ndarray:
+        return _values_at_nodes(sw_da, sw_time_dim, sw_mask, node_id)
+
+    # Domain-mean LAI trend (guarded — lai_ds is optional / may be empty)
+    lai_available = (
+        lai_ds is not None and len(lai_ds.dims) > 0 and lai_var in lai_ds
+    )
+    lai_vals: np.ndarray = np.array([])
+    lai_dates_w = None
+    if lai_available:
+        lai_time_dim = _infer_time_dim(lai_ds)
+        lai_dates = _xr_time_to_dates(lai_ds[lai_var], lai_time_dim)
+        lai_mask  = (lai_dates >= d0) & (lai_dates <= d1)
+        lai_spatial_dims = [d for d in lai_ds[lai_var].dims if d != lai_time_dim]
+        lai_mean = lai_ds[lai_var].mean(dim=lai_spatial_dims)
+        lai_vals = lai_mean.values[lai_mask]
+        lai_dates_w = lai_dates[lai_mask]
+
+    fig, (ax0, ax1, ax2) = plt.subplots(
+        3, 1, figsize=(14, 8.5), sharex=True, constrained_layout=True
+    )
+
+    # ── Top: sw at reference nodes ────────────────────────────────────────────
+    if show_uh_s:
+        ax0.plot(sw_dates_w, _sw_at(uh_s_id),
+                 label=f"Mid surf n={_fmt_node_id(uh_s_id)}",
+                 color=colors_dict["uphill_surface"], marker="+", linestyle="-", ms=3)
+    if show_uh_1:
+        ax0.plot(sw_dates_w, _sw_at(uh_1_id),
+                 label=f"Mid −1m n={_fmt_node_id(uh_1_id)}",
+                 color=colors_dict["uphill_1m"], linestyle="--")
+    if show_dh_s:
+        ax0.plot(sw_dates_w, _sw_at(dh_s_id),
+                 label=f"Outlet surf n={_fmt_node_id(dh_s_id)}",
+                 color=colors_dict["downhill_surface"], marker="o", linestyle="-", ms=3)
+    if show_dh_1:
+        ax0.plot(sw_dates_w, _sw_at(dh_1_id),
+                 label=f"Outlet −1m n={_fmt_node_id(dh_1_id)}",
+                 color=colors_dict["downhill_1m"], linestyle="--")
+
+    ax0.set_ylabel("sw (−)")
+    ax0.set_title("Soil Water Content at reference nodes", fontsize=10, fontweight="bold")
+    add_fire_vline(ax0, d0, d1)
+    ax0.legend(loc="upper right", fontsize=8)
+    ax0.grid(True, linestyle="--", alpha=0.3)
+
+    # ── Middle: spatial-mean ETa ──────────────────────────────────────────────
+    if et_var in ET_xr_all and len(et_vals):
+        if et_as_line:
+            ax1.plot(et_dates_w, et_vals, color=colors_dict["ET_mean"],
+                     marker="o", ms=4, linewidth=1.3, label="ETa spatial mean")
+        else:
+            ax1.scatter(et_dates_w, et_vals,
+                        c=colors_dict["ET_mean"], s=14, label="ETa spatial mean")
+    else:
+        ax1.text(0.5, 0.5, f"'{et_var}' not found in ET dataset",
+                 ha="center", va="center", transform=ax1.transAxes,
+                 fontsize=9, color="#888888")
+
+    ax1.set_ylabel(f"ETa ({et_unit})")
+    ax1.set_title(
+        f"Actual Evapotranspiration — spatial mean ({et_var})",
+        fontsize=10, fontweight="bold",
+    )
+    add_fire_vline(ax1, d0, d1)
+    ax1.legend(loc="upper right", fontsize=8)
+    ax1.grid(True, linestyle="--", alpha=0.3)
+
+    # ── Bottom: domain-mean LAI trend ─────────────────────────────────────────
+    if lai_available and len(lai_vals):
+        ax2.plot(lai_dates_w, lai_vals,
+                 color=colors_dict.get("LAI", "#4daf4a"),
+                 marker="s", ms=4, linewidth=1.3, label="LAI domain mean")
+    else:
+        ax2.text(0.5, 0.5, f"'{lai_var}' not available", ha="center", va="center",
+                 transform=ax2.transAxes, fontsize=9, color="#888888")
+
+    ax2.set_ylabel("LAI (m² m⁻²)")
+    ax2.set_xlabel("Date")
+    ax2.set_title("Leaf Area Index — domain mean", fontsize=10, fontweight="bold")
+    add_fire_vline(ax2, d0, d1)
+    ax2.legend(loc="upper right", fontsize=8)
+    ax2.grid(True, linestyle="--", alpha=0.3)
+    ax2.xaxis.set_major_formatter(
+        mdates.ConciseDateFormatter(mdates.AutoDateLocator())
+    )
+
+    fig.suptitle(
+        f"Sc.{scenario_id} | sw, ETa & LAI | {d0.date()} → {d1.date()}",
+        fontsize=11, fontweight="bold",
+    )
+    save_fig(fig, fig_path, fname, dpi)
+    maybe_show(fig, show)
+
+
+def plot_et_sw_lai_xr_fire_year(
+    sw_xr:      xr.Dataset,
+    ET_xr_all:  xr.Dataset,
+    et_var:     str,
+    et_scale:   float,
+    lai_ds:     xr.Dataset | None,
+    nodes_dict: dict,
+    fig_path:   Path,
+    *,
+    lai_var:     str = "LAI",
+    show_uh_s:   bool = True,
+    show_uh_1:   bool = True,
+    show_dh_s:   bool = True,
+    show_dh_1:   bool = True,
+    colors_dict: dict | None = None,
+    scenario_id: int | str = "?",
+    dpi:         int  = 150,
+    show:        bool = False,
+    fname:       str  = "fig7bc_et_sw_lai_timeseries_fire_years.png",
+) -> None:
+    """Fig 7bc -- Fig 7b zoomed to the fire year + the following year."""
+    d0, d1 = _fire_year_window()
+    plot_et_sw_lai_xr(
+        sw_xr, ET_xr_all, et_var, et_scale, lai_ds, nodes_dict, fig_path,
+        lai_var=lai_var,
+        date_start=str(d0.date()), date_end=str(d1.date()),
+        show_uh_s=show_uh_s, show_uh_1=show_uh_1,
+        show_dh_s=show_dh_s, show_dh_1=show_dh_1,
+        colors_dict=colors_dict, scenario_id=scenario_id,
+        dpi=dpi, show=show, fname=fname,
+    )
+
+
+def plot_et_sw_lai_xr_fire_month(
+    sw_xr:      xr.Dataset,
+    ET_xr_all:  xr.Dataset,
+    et_var:     str,
+    et_scale:   float,
+    lai_ds:     xr.Dataset | None,
+    nodes_dict: dict,
+    fig_path:   Path,
+    *,
+    lai_var:     str = "LAI",
+    show_uh_s:   bool = True,
+    show_uh_1:   bool = True,
+    show_dh_s:   bool = True,
+    show_dh_1:   bool = True,
+    colors_dict: dict | None = None,
+    scenario_id: int | str = "?",
+    dpi:         int  = 150,
+    show:        bool = False,
+    fname:       str  = "fig7bd_et_sw_lai_timeseries_fire_month.png",
+) -> None:
+    """Fig 7bd -- Fig 7b zoomed to just the calendar month of the fire."""
+    d0, d1 = _fire_month_window()
+    plot_et_sw_lai_xr(
+        sw_xr, ET_xr_all, et_var, et_scale, lai_ds, nodes_dict, fig_path,
+        lai_var=lai_var,
+        date_start=str(d0.date()), date_end=str(d1.date()),
+        show_uh_s=show_uh_s, show_uh_1=show_uh_1,
+        show_dh_s=show_dh_s, show_dh_1=show_dh_1,
+        colors_dict=colors_dict, scenario_id=scenario_id,
+        dpi=dpi, show=show, fname=fname,
+    )
+
+
+def plot_et_sw_lai_xr_weekly(
+    sw_xr:      xr.Dataset,
+    ET_xr_all:  xr.Dataset,
+    et_var:     str,
+    et_scale:   float,
+    lai_ds:     xr.Dataset | None,
+    nodes_dict: dict,
+    fig_path:   Path,
+    *,
+    lai_var:     str = "LAI",
+    date_start:  str | None = None,
+    date_end:    str | None = None,
+    show_uh_s:   bool = True,
+    show_uh_1:   bool = True,
+    show_dh_s:   bool = True,
+    show_dh_1:   bool = True,
+    colors_dict: dict | None = None,
+    scenario_id: int | str = "?",
+    dpi:         int  = 150,
+    show:        bool = False,
+    fname:       str  = "fig7be_et_sw_lai_timeseries_weekly.png",
+) -> None:
+    """Fig 7be -- Weekly-resampled version of Fig 7b.
+
+    sw and LAI (state variables) are resampled with a weekly *mean*; ETa
+    (a flux) is resampled with a weekly *sum* — same convention as
+    ``plot_et_sw_xr_weekly``.
+    """
+    sw_time_dim = _infer_time_dim(sw_xr)
+    et_time_dim = _infer_time_dim(ET_xr_all)
+    sw_weekly = sw_xr.resample({sw_time_dim: "W"}).mean()
+    et_weekly = ET_xr_all.resample({et_time_dim: "W"}).sum()
+
+    lai_weekly = lai_ds
+    if lai_ds is not None and len(lai_ds.dims) > 0:
+        lai_time_dim = _infer_time_dim(lai_ds)
+        lai_weekly = lai_ds.resample({lai_time_dim: "W"}).mean()
+
+    plot_et_sw_lai_xr(
+        sw_weekly, et_weekly, et_var, et_scale, lai_weekly, nodes_dict, fig_path,
+        lai_var=lai_var,
+        date_start=date_start, date_end=date_end,
+        show_uh_s=show_uh_s, show_uh_1=show_uh_1,
+        show_dh_s=show_dh_s, show_dh_1=show_dh_1,
+        colors_dict=colors_dict, scenario_id=scenario_id,
+        dpi=dpi, show=show, fname=fname,
+        et_unit="mm/week", et_as_line=True,
+    )
+
+
+def plot_et_psi_lai_xr(
+    psi_xr:     xr.Dataset,
+    ET_xr_all:  xr.Dataset,
+    et_var:     str,
+    et_scale:   float,
+    lai_ds:     xr.Dataset | None,
+    nodes_dict: dict,
+    fig_path:   Path,
+    *,
+    lai_var:     str = "LAI",
+    date_start:  str | None = None,
+    date_end:    str | None = None,
+    show_uh_s:   bool = True,
+    show_uh_1:   bool = True,
+    show_dh_s:   bool = True,
+    show_dh_1:   bool = True,
+    colors_dict: dict | None = None,
+    scenario_id: int | str = "?",
+    dpi:         int  = 150,
+    show:        bool = False,
+    fname:       str  = "fig7f_et_psi_lai_timeseries.png",
+    et_unit:     str  = "mm/day",
+    et_as_line:  bool = False,
+) -> None:
+    """Fig 7f -- same as ``plot_et_sw_lai_xr`` (Fig 7b), but the top panel
+    plots pressure head (psi) at the reference nodes instead of soil water
+    content (sw).
+
+    Parameters
+    ----------
+    psi_xr, ET_xr_all, et_var, et_scale, nodes_dict, fig_path : same as
+        ``plot_hydro_xr``/``plot_et_sw_xr``, but for the psi dataset.
+    lai_ds   : xr.Dataset with a time dimension and variable *lai_var*
+               (e.g. from ``lai_history_to_dataset(art["lai_history"])``).
+               May be ``None`` or empty — the LAI panel then shows a
+               "not available" placeholder instead of failing the whole
+               figure.
+    lai_var  : name of the LAI variable inside *lai_ds* (default 'LAI').
+    et_unit / et_as_line : same as ``plot_et_sw_xr`` (used by the weekly
+               variant to switch the ETa panel to mm/week + line style).
+    """
+    colors_dict = colors_dict or COLORS_HYDRO
+
+    psi_time_dim = _infer_time_dim(psi_xr)
+    et_time_dim  = _infer_time_dim(ET_xr_all)
+    psi_var      = list(psi_xr.data_vars)[0]
+
+    psi_dates = _xr_time_to_dates(psi_xr[psi_var], psi_time_dim)
+    et_dates  = _xr_time_to_dates(ET_xr_all[et_var], et_time_dim)
+
+    d0, d1 = date_window(date_start, date_end, psi_dates.to_series())
+    print(f"  Plotting et_psi_lai_xr time-series ({d0.date()} → {d1.date()}) …")
+
+    psi_mask = (psi_dates >= d0) & (psi_dates <= d1)
+    et_mask  = (et_dates >= d0) & (et_dates <= d1)
+
+    psi_da = psi_xr[psi_var]
+
+    # Spatial-mean ET (all non-time dims averaged)
+    spatial_dims = [d for d in ET_xr_all[et_var].dims
+                    if d.lower() not in ("datetime", "time", "t")]
+    et_mean = ET_xr_all[et_var].mean(dim=spatial_dims) * et_scale  # (time,)
+    et_vals = et_mean.values[et_mask]
+    et_dates_w = et_dates[et_mask]
+
+    # Node IDs — band-preserving: "mid_z-*" may be a single node or a whole
+    # mid-elevation band (see find_representative_mid_node(..., return_band=True)
+    # in resolve_nodes()); _node_ids keeps that band intact instead of
+    # collapsing it to a single id.
+    uh_s_id = _node_ids(nodes_dict, "mid_z-0m")
+    uh_1_id = _node_ids(nodes_dict, "mid_z-1m")
+    dh_s_id = _node_ids(nodes_dict, "outlet_z-0m")
+    dh_1_id = _node_ids(nodes_dict, "outlet_z-1m")
+
+    psi_dates_w = psi_dates[psi_mask]
+
+    def _psi_at(node_id: int | list[int]) -> np.ndarray:
+        return _values_at_nodes(psi_da, psi_time_dim, psi_mask, node_id)
+
+    # Domain-mean LAI trend (guarded — lai_ds is optional / may be empty)
+    lai_available = (
+        lai_ds is not None and len(lai_ds.dims) > 0 and lai_var in lai_ds
+    )
+    lai_vals: np.ndarray = np.array([])
+    lai_dates_w = None
+    if lai_available:
+        lai_time_dim = _infer_time_dim(lai_ds)
+        lai_dates = _xr_time_to_dates(lai_ds[lai_var], lai_time_dim)
+        lai_mask  = (lai_dates >= d0) & (lai_dates <= d1)
+        lai_spatial_dims = [d for d in lai_ds[lai_var].dims if d != lai_time_dim]
+        lai_mean = lai_ds[lai_var].mean(dim=lai_spatial_dims)
+        lai_vals = lai_mean.values[lai_mask]
+        lai_dates_w = lai_dates[lai_mask]
+
+    fig, (ax0, ax1, ax2) = plt.subplots(
+        3, 1, figsize=(14, 8.5), sharex=True, constrained_layout=True
+    )
+
+    # ── Top: psi at reference nodes ───────────────────────────────────────────
+    if show_uh_s:
+        ax0.plot(psi_dates_w, _psi_at(uh_s_id),
+                 label=f"Mid surf n={_fmt_node_id(uh_s_id)}",
+                 color=colors_dict["uphill_surface"], marker="+", linestyle="-", ms=3)
+    if show_uh_1:
+        ax0.plot(psi_dates_w, _psi_at(uh_1_id),
+                 label=f"Mid −1m n={_fmt_node_id(uh_1_id)}",
+                 color=colors_dict["uphill_1m"], linestyle="--")
+    if show_dh_s:
+        ax0.plot(psi_dates_w, _psi_at(dh_s_id),
+                 label=f"Outlet surf n={_fmt_node_id(dh_s_id)}",
+                 color=colors_dict["downhill_surface"], marker="o", linestyle="-", ms=3)
+    if show_dh_1:
+        ax0.plot(psi_dates_w, _psi_at(dh_1_id),
+                 label=f"Outlet −1m n={_fmt_node_id(dh_1_id)}",
+                 color=colors_dict["downhill_1m"], linestyle="--")
+
+    ax0.set_ylabel("ψ (m)")
+    ax0.set_title("Pressure Head at reference nodes", fontsize=10, fontweight="bold")
+    add_fire_vline(ax0, d0, d1)
+    ax0.legend(loc="upper right", fontsize=8)
+    ax0.grid(True, linestyle="--", alpha=0.3)
+
+    # ── Middle: spatial-mean ETa ──────────────────────────────────────────────
+    if et_var in ET_xr_all and len(et_vals):
+        if et_as_line:
+            ax1.plot(et_dates_w, et_vals, color=colors_dict["ET_mean"],
+                     marker="o", ms=4, linewidth=1.3, label="ETa spatial mean")
+        else:
+            ax1.scatter(et_dates_w, et_vals,
+                        c=colors_dict["ET_mean"], s=14, label="ETa spatial mean")
+    else:
+        ax1.text(0.5, 0.5, f"'{et_var}' not found in ET dataset",
+                 ha="center", va="center", transform=ax1.transAxes,
+                 fontsize=9, color="#888888")
+
+    ax1.set_ylabel(f"ETa ({et_unit})")
+    ax1.set_title(
+        f"Actual Evapotranspiration — spatial mean ({et_var})",
+        fontsize=10, fontweight="bold",
+    )
+    add_fire_vline(ax1, d0, d1)
+    ax1.legend(loc="upper right", fontsize=8)
+    ax1.grid(True, linestyle="--", alpha=0.3)
+
+    # ── Bottom: domain-mean LAI trend ─────────────────────────────────────────
+    if lai_available and len(lai_vals):
+        ax2.plot(lai_dates_w, lai_vals,
+                 color=colors_dict.get("LAI", "#4daf4a"),
+                 marker="s", ms=4, linewidth=1.3, label="LAI domain mean")
+    else:
+        ax2.text(0.5, 0.5, f"'{lai_var}' not available", ha="center", va="center",
+                 transform=ax2.transAxes, fontsize=9, color="#888888")
+
+    ax2.set_ylabel("LAI (m² m⁻²)")
+    ax2.set_xlabel("Date")
+    ax2.set_title("Leaf Area Index — domain mean", fontsize=10, fontweight="bold")
+    add_fire_vline(ax2, d0, d1)
+    ax2.legend(loc="upper right", fontsize=8)
+    ax2.grid(True, linestyle="--", alpha=0.3)
+    ax2.xaxis.set_major_formatter(
+        mdates.ConciseDateFormatter(mdates.AutoDateLocator())
+    )
+
+    fig.suptitle(
+        f"Sc.{scenario_id} | psi, ETa & LAI | {d0.date()} → {d1.date()}",
+        fontsize=11, fontweight="bold",
+    )
+    save_fig(fig, fig_path, fname, dpi)
+    maybe_show(fig, show)
+
+
+def plot_et_psi_lai_xr_weekly(
+    psi_xr:     xr.Dataset,
+    ET_xr_all:  xr.Dataset,
+    et_var:     str,
+    et_scale:   float,
+    lai_ds:     xr.Dataset | None,
+    nodes_dict: dict,
+    fig_path:   Path,
+    *,
+    lai_var:     str = "LAI",
+    date_start:  str | None = None,
+    date_end:    str | None = None,
+    show_uh_s:   bool = True,
+    show_uh_1:   bool = True,
+    show_dh_s:   bool = True,
+    show_dh_1:   bool = True,
+    colors_dict: dict | None = None,
+    scenario_id: int | str = "?",
+    dpi:         int  = 150,
+    show:        bool = False,
+    fname:       str  = "fig7fe_et_psi_lai_timeseries_weekly.png",
+) -> None:
+    """Fig 7fe -- Weekly-resampled version of Fig 7f.
+
+    psi and LAI (state variables) are resampled with a weekly *mean*; ETa
+    (a flux) is resampled with a weekly *sum* — same convention as
+    ``plot_et_sw_lai_xr_weekly``/``plot_et_sw_xr_weekly``.
+    """
+    psi_time_dim = _infer_time_dim(psi_xr)
+    et_time_dim  = _infer_time_dim(ET_xr_all)
+    psi_weekly = psi_xr.resample({psi_time_dim: "W"}).mean()
+    et_weekly  = ET_xr_all.resample({et_time_dim: "W"}).sum()
+
+    lai_weekly = lai_ds
+    if lai_ds is not None and len(lai_ds.dims) > 0:
+        lai_time_dim = _infer_time_dim(lai_ds)
+        lai_weekly = lai_ds.resample({lai_time_dim: "W"}).mean()
+
+    plot_et_psi_lai_xr(
+        psi_weekly, et_weekly, et_var, et_scale, lai_weekly, nodes_dict, fig_path,
+        lai_var=lai_var,
+        date_start=date_start, date_end=date_end,
+        show_uh_s=show_uh_s, show_uh_1=show_uh_1,
+        show_dh_s=show_dh_s, show_dh_1=show_dh_1,
+        colors_dict=colors_dict, scenario_id=scenario_id,
+        dpi=dpi, show=show, fname=fname,
+        et_unit="mm/week", et_as_line=True,
+    )
+
 
 # =============================================================================
 # Colour / label constants
@@ -2161,7 +3611,7 @@ def plot_eta_annual_hist(
 # =============================================================================
 # Private core  (Fig D helper)
 # =============================================================================
- 
+
 def _plot_eta_total_freq(
     ds_et:        xr.Dataset,
     freq:         str,          # "ME" or "YE"
@@ -2174,10 +3624,10 @@ def _plot_eta_total_freq(
 ) -> None:
     """
     Bar chart of domain-total ETa aggregated at *freq* frequency.
- 
+
     Bar colour encodes ETa intensity (value-normalised colourmap YlGnBu),
     so drier periods are yellow and wetter periods are blue-green.
- 
+
     Parameters
     ----------
     ds_et    : clipped xr.Dataset with one ET variable
@@ -2192,42 +3642,42 @@ def _plot_eta_total_freq(
     da      = ds_et[et_var]
     sp_dims = [d for d in da.dims if d != "time"]
     et_mean = da.mean(dim=sp_dims, skipna=True)
- 
+
     df = pd.DataFrame(
         {f"{product_name}_mm": et_mean.values},
         index=pd.DatetimeIndex(da["time"].values),
     ).resample(freq).sum()
- 
+
     # ── 2. Labels ─────────────────────────────────────────────────────────────
     p_str = "monthly" if freq == "ME" else "annual"
     time_labels = (
         df.index.strftime("%Y-%m") if freq == "ME"
         else df.index.strftime("%Y")
     )
- 
+
     # ── 3. Colour by ETa intensity (value-normalised) ─────────────────────────
     values   = df[f"{product_name}_mm"].values
     norm     = mcolors.Normalize(vmin=np.nanmin(values), vmax=np.nanmax(values))
     cmap     = cm.get_cmap("YlGnBu")
     colors   = [cmap(norm(v)) for v in values]
     mean_val = float(np.nanmean(values))
- 
+
     # ── 4. Figure ─────────────────────────────────────────────────────────────
     fig, ax = plt.subplots(figsize=(max(10, len(values) * 0.65), 5))
- 
+
     bars = ax.bar(time_labels, values, color=colors,
                   edgecolor="white", linewidth=0.5, zorder=2)
- 
+
     # colourbar (ETa intensity scale)
     sm = cm.ScalarMappable(cmap=cmap, norm=norm)
     sm.set_array([])
     cb = fig.colorbar(sm, ax=ax, pad=0.01, shrink=0.85)
     cb.set_label(f"{product_name} intensity (mm)", fontsize=9)
- 
+
     # mean line
     ax.axhline(mean_val, color="#C44E52", linewidth=1.5, linestyle="--",
                label=f"mean  {mean_val:,.1f} mm", zorder=3)
- 
+
     # value labels on bars
     for bar, v in zip(bars, values):
         ax.text(
@@ -2235,7 +3685,7 @@ def _plot_eta_total_freq(
             bar.get_height() + max(values) * 0.01,
             f"{v:,.1f}", ha="center", va="bottom", fontsize=7, color="#222222",
         )
- 
+
     ax.set_ylabel(f"{product_name} accumulated (mm)", fontsize=10)
     ax.set_title(
         f"Domain {product_name} — {p_str.capitalize()}  [{et_var}]",
@@ -2245,23 +3695,23 @@ def _plot_eta_total_freq(
     ax.grid(axis="y", linestyle="--", alpha=0.3, zorder=1)
     ax.legend(fontsize=9)
     ax.set_ylim(0, max(values) * 1.14)
- 
+
     plt.tight_layout()
- 
+
     suffix = f"_{label}" if label else ""
     out = fig_path / f"{product_name}_total_{p_str}{suffix}.png"
     fig.savefig(out, dpi=dpi, bbox_inches="tight")
     print(f"  Saved → {out}")
- 
+
     if show:
         plt.show()
     plt.close(fig)
- 
- 
+
+
 # =============================================================================
 # Public wrapper
 # =============================================================================
- 
+
 def plot_eta_total(
     ds_et:        xr.Dataset,
     fig_path:     Path,
@@ -2273,11 +3723,11 @@ def plot_eta_total(
 ) -> None:
     """
     Monthly and annual domain ETa bar charts.
- 
+
     Produces two figures:
         ETa_total_monthly_<label>.png
         ETa_total_annual_<label>.png
- 
+
     Parameters
     ----------
     ds_et    : clipped xr.Dataset (one ET variable, 'time' dimension)
@@ -2288,6 +3738,551 @@ def plot_eta_total(
     """
     print(f"  Computing monthly domain {product_name} …")
     _plot_eta_total_freq(ds_et, "ME", fig_path, label=label, dpi=dpi, show=show, product_name=product_name)
- 
+
     print(f"  Computing annual domain {product_name} …")
     _plot_eta_total_freq(ds_et, "YE", fig_path, label=label, dpi=dpi, show=show, product_name=product_name)
+
+
+# =============================================================================
+# Fig 8 — LAI, ETa, sw, psi & ETa/ETp ratio at reference nodes
+# =============================================================================
+
+def plot_lai_et_sw_psi_ratio_xr(
+    lai_ds:     xr.Dataset,
+    ET_xr_all:  xr.Dataset,
+    et_var:     str,
+    et_scale:   float,
+    ETp_xr:     xr.Dataset,
+    etp_var:    str,
+    etp_scale:  float,
+    sw_xr:      xr.Dataset,
+    psi_xr:     xr.Dataset,
+    nodes_dict: dict,
+    grid3d:     dict,
+    fig_path:   Path,
+    *,
+    lai_var:     str  = "LAI",
+    date_start:  str | None = None,
+    date_end:    str | None = None,
+    show_uh:     bool = True,
+    show_dh:     bool = True,
+    show_uh_1:   bool = True,
+    show_dh_1:   bool = True,
+    colors_dict: dict | None = None,
+    scenario_id: int | str = "?",
+    dpi:         int  = 150,
+    show:        bool = False,
+    fname:       str  = "fig8_lai_et_sw_psi_ratio_timeseries.png",
+    et_unit:     str  = "mm/day",
+) -> None:
+    """Fig 8 -- LAI, ETa, sw, psi and the ETa/ETp ratio, stacked on one
+    shared time axis, all read off the same reference nodes used by
+    Fig 6/7 (``resolve_nodes()`` -> ``nodes_dict``).
+
+    Five panels, top to bottom: LAI, ETa, sw, psi, ETa/ETp.
+
+    Parameters
+    ----------
+    lai_ds   : xr.Dataset with a time dimension and variable *lai_var*,
+               carrying real ``x``/``y`` coordinates (e.g. ``ds_LAI_raster``
+               before it is stacked into ``lai_history``, or the
+               ``lai_history_to_dataset()`` output with DEM x/y coordinates
+               assigned onto its row/col dims). LAI lives on the satellite
+               raster grid, not on the CATHY mesh, so reference-node LAI is
+               a nearest-pixel lookup at each node's (x, y) rather than a
+               ``.sel(node=...)`` like the other panels.
+    ET_xr_all, et_var, et_scale : actual-ET dataset, same (time, node)
+               convention as *sw_xr* / *psi_xr* (i.e. already CATHY
+               surface-node output, not the gridded satellite product).
+    ETp_xr, etp_var, etp_scale : potential-ET dataset mapped onto the same
+               mesh nodes as *ET_xr_all* (e.g. via
+               ``pyCATHY.meshtools.map_grid_to_mesh(ds_etp, ds_mesh, ...)``
+               in ``Agramon_withLAI_withETp.py``) -- needed so the ETa/ETp
+               ratio panel is computed node-by-node on a common time axis.
+    sw_xr, psi_xr : same (time, node) Datasets as in ``plot_hydro_xr``.
+    nodes_dict : dict from ``resolve_nodes()`` (mid_z-*m / outlet_z-*m).
+    grid3d     : dict from ``simu.read_outputs("grid3d")`` -- used to look
+               up each reference node's (x, y) for the LAI pixel lookup.
+    fig_path   : output directory.
+    show_uh/show_dh : toggle the mid-uphill / outlet reference nodes.
+    show_uh_1/show_dh_1 : toggle the -1 m depth variants (sw & psi panels
+               only -- LAI, ETa and the ratio have no vertical structure,
+               so only the surface position of each site is plotted there).
+    colors_dict : override COLORS_HYDRO.
+    scenario_id : label for the figure title.
+    et_unit    : y-axis unit label for the ETa panel.
+
+    Notes
+    -----
+    - LAI and the ETa/ETp ratio are only meaningful at the *surface*
+      reference nodes (mid_z-0m / outlet_z-0m): depth variants share the
+      same (x, y), so plotting them again would just duplicate the line.
+    - If *ET_xr_all* and *ETp_xr* turn out not to share the same time
+      axis (different native time steps), the ratio panel shows a
+      placeholder instead of silently misaligning the two series --
+      resample one onto the other before calling this function.
+    """
+    colors_dict = colors_dict or COLORS_HYDRO
+
+    # ── Time dims / dates for every input ─────────────────────────────────────
+    psi_time_dim = _infer_time_dim(psi_xr)
+    sw_time_dim  = _infer_time_dim(sw_xr)
+    et_time_dim  = _infer_time_dim(ET_xr_all)
+    etp_time_dim = _infer_time_dim(ETp_xr)
+    lai_time_dim = _infer_time_dim(lai_ds)
+
+    psi_var = list(psi_xr.data_vars)[0]
+    sw_var  = list(sw_xr.data_vars)[0]
+
+    psi_dates = _xr_time_to_dates(psi_xr[psi_var],   psi_time_dim)
+    sw_dates  = _xr_time_to_dates(sw_xr[sw_var],     sw_time_dim)
+    et_dates  = _xr_time_to_dates(ET_xr_all[et_var], et_time_dim)
+    etp_dates = _xr_time_to_dates(ETp_xr[etp_var],   etp_time_dim)
+    lai_dates = _xr_time_to_dates(lai_ds[lai_var],   lai_time_dim)
+
+    d0, d1 = date_window(date_start, date_end, sw_dates.to_series())
+    print(f"  Plotting lai_et_sw_psi_ratio_xr time-series ({d0.date()} -> {d1.date()}) ...")
+
+    psi_mask = (psi_dates >= d0) & (psi_dates <= d1)
+    sw_mask  = (sw_dates  >= d0) & (sw_dates  <= d1)
+    et_mask  = (et_dates  >= d0) & (et_dates  <= d1)
+    etp_mask = (etp_dates >= d0) & (etp_dates <= d1)
+    lai_mask = (lai_dates >= d0) & (lai_dates <= d1)
+
+    psi_da = psi_xr[psi_var]
+    sw_da  = sw_xr[sw_var]
+    et_da  = ET_xr_all[et_var] * et_scale
+    etp_da = ETp_xr[etp_var]   * etp_scale
+
+    # ── Reference node ids (band-preserving, see _node_ids) ───────────────────
+    uh_s_id = _node_ids(nodes_dict, "mid_z-0m")
+    uh_1_id = _node_ids(nodes_dict, "mid_z-1m")
+    dh_s_id = _node_ids(nodes_dict, "outlet_z-0m")
+    dh_1_id = _node_ids(nodes_dict, "outlet_z-1m")
+
+    def _psi_at(ids):
+        return _values_at_nodes(psi_da, psi_time_dim, psi_mask, ids)
+
+    def _sw_at(ids):
+        return _values_at_nodes(sw_da, sw_time_dim, sw_mask, ids)
+
+    def _et_at(ids):
+        """Nearest-pixel ETa series at the (x, y) of a reference node/band.
+        ET_xr_all lives on the (X, Y) raster grid (et_output.nc's own
+        convention — see the module docstring and plot_et_sw_xr, which
+        takes a spatial mean rather than a node .sel() for the same
+        reason), not on CATHY mesh nodes. This mirrors _lai_at below
+        rather than routing through _values_at_nodes()."""
+        x, y = _xy_of(ids)
+        da_pt = et_da.sel(X=x, Y=y, method="nearest")
+        return da_pt.isel({et_time_dim: et_mask}).values
+
+    def _etp_at(ids):
+        return _values_at_nodes(etp_da, etp_time_dim, etp_mask, ids)
+
+    # ── (x, y) of a reference node/band, for the LAI pixel lookup ─────────────
+    mesh_nodes = grid3d["mesh3d_nodes"]
+
+    def _xy_of(ids) -> tuple[float, float]:
+        """Mean (x, y) of a scalar node id or a band of ids. Depth doesn't
+        change (x, y), so this is exact for a single id and a sensible
+        summary for a band."""
+        if isinstance(ids, (list, tuple, np.ndarray)):
+            idx = np.asarray(ids, dtype=int)
+            return float(mesh_nodes[idx, 0].mean()), float(mesh_nodes[idx, 1].mean())
+        x, y, _z = mesh_nodes[int(ids)]
+        return float(x), float(y)
+
+    def _lai_at(ids) -> np.ndarray:
+        """Nearest-pixel LAI series at the (x, y) of a reference node/band."""
+        x, y = _xy_of(ids)
+        da_pt = lai_ds[lai_var].sel(x=x, y=y, method="nearest")
+        return da_pt.isel({lai_time_dim: lai_mask}).values
+
+    lai_dates_w = lai_dates[lai_mask]
+    psi_dates_w = psi_dates[psi_mask]
+    sw_dates_w  = sw_dates[sw_mask]
+    et_dates_w  = et_dates[et_mask]
+    etp_dates_w = etp_dates[etp_mask]
+
+    # ── Figure: LAI / ETa / sw / psi / ETa÷ETp ────────────────────────────────
+    fig, (ax_lai, ax_et, ax_sw, ax_psi, ax_ratio) = plt.subplots(
+        5, 1, figsize=(14, 13.5), sharex=True, constrained_layout=True
+    )
+
+    def _panel(ax, get_fn, dates_w, ylabel, title, *, with_depth=True):
+        if show_uh:
+            ax.plot(dates_w, get_fn(uh_s_id),
+                    label=f"Mid surf n={_fmt_node_id(uh_s_id)}",
+                    color=colors_dict["uphill_surface"], marker="+", linestyle="-", ms=3)
+        if with_depth and show_uh_1:
+            ax.plot(dates_w, get_fn(uh_1_id),
+                    label=f"Mid -1m n={_fmt_node_id(uh_1_id)}",
+                    color=colors_dict["uphill_1m"], linestyle="--")
+        if show_dh:
+            ax.plot(dates_w, get_fn(dh_s_id),
+                    label=f"Outlet surf n={_fmt_node_id(dh_s_id)}",
+                    color=colors_dict["downhill_surface"], marker="o", linestyle="-", ms=3)
+        if with_depth and show_dh_1:
+            ax.plot(dates_w, get_fn(dh_1_id),
+                    label=f"Outlet -1m n={_fmt_node_id(dh_1_id)}",
+                    color=colors_dict["downhill_1m"], linestyle="--")
+        ax.set_ylabel(ylabel)
+        ax.set_title(title, fontsize=10, fontweight="bold")
+        add_fire_vline(ax, d0, d1)
+        ax.legend(loc="upper right", fontsize=8)
+        ax.grid(True, linestyle="--", alpha=0.3)
+
+    # Panel 1 — LAI (surface positions only — no vertical structure)
+    _panel(ax_lai, _lai_at, lai_dates_w, "LAI (m² m⁻²)",
+           "Leaf Area Index at reference nodes", with_depth=False)
+
+    # Panel 2 — ETa
+    _panel(ax_et, _et_at, et_dates_w, f"ETa ({et_unit})",
+           f"Actual Evapotranspiration at reference nodes ({et_var})", with_depth=False)
+
+    # Panel 3 — sw
+    _panel(ax_sw, _sw_at, sw_dates_w, "sw (−)",
+           "Soil Water Content at reference nodes")
+
+    # Panel 4 — psi
+    _panel(ax_psi, _psi_at, psi_dates_w, "ψ (m)",
+           "Pressure Head ψ at reference nodes")
+    ax_psi.axhline(0, color="black", linewidth=0.8, linestyle=":")
+
+    # Panel 5 — ETa / ETp ratio (surface only)
+    # ETa (CATHY model output, et_dates_w) and ETp (satellite ET0 mapped
+    # onto mesh nodes, etp_dates_w) don't share native time steps or
+    # coverage, so resample ETa onto ETp's time axis (nearest within 1
+    # day) before dividing, rather than requiring the two masks to
+    # already line up.
+    def _ratio_at(ids):
+        eta_vals = np.asarray(_et_at(ids), dtype=float)
+        etp_vals = np.asarray(_etp_at(ids), dtype=float)
+        eta_series = (
+            pd.Series(eta_vals, index=pd.DatetimeIndex(et_dates_w))
+              .groupby(level=0).mean()
+              .sort_index()
+        )
+        eta_on_etp = eta_series.reindex(
+            pd.DatetimeIndex(etp_dates_w),
+            method="nearest",
+            tolerance=pd.Timedelta("1D"),
+        ).to_numpy()
+        with np.errstate(divide="ignore", invalid="ignore"):
+            return np.where(etp_vals > 0, eta_on_etp / etp_vals, np.nan)
+
+    _panel(ax_ratio, _ratio_at, etp_dates_w, "ETa / ETp (−)",
+           "ETa \u00f7 ETp ratio at reference nodes", with_depth=False)
+    ax_ratio.axhline(1.0, color="black", linewidth=0.8, linestyle=":")
+    ylim_top = ax_ratio.get_ylim()[1]
+    ax_ratio.set_ylim(0, max(1.2, ylim_top))
+
+    ax_ratio.set_xlabel("Date")
+    ax_ratio.xaxis.set_major_formatter(
+        mdates.ConciseDateFormatter(mdates.AutoDateLocator())
+    )
+
+    fig.suptitle(
+        f"Sc.{scenario_id} | LAI, ETa, sw, \u03c8 & ETa\u00f7ETp | {d0.date()} \u2192 {d1.date()}",
+        fontsize=11, fontweight="bold",
+    )
+    save_fig(fig, fig_path, fname, dpi)
+    maybe_show(fig, show)
+
+
+# =============================================================================
+# Catchment-scale ETa/ETp ratio (domain mean & median)
+# =============================================================================
+def plot_catchment_eta_etp_ratio(
+    ET_xr_all:  xr.Dataset,
+    et_var:     str,
+    et_scale:   float,
+    etp_mean_series:   pd.Series,
+    etp_median_series: pd.Series,
+    fig_path:   Path,
+    *,
+    date_start:  str | None = None,
+    date_end:    str | None = None,
+    scenario_id: int | str = "?",
+    dpi:         int  = 150,
+    show:        bool = False,
+    fname:       str  = "fig_catchment_eta_etp_ratio.png",
+    freq:        str | None = None,
+) -> None:
+    """Catchment-scale ETa/ETp ratio time series — domain **mean** and
+    domain **median**, both computed over the whole spatial extent,
+    unlike ``plot_lai_et_sw_psi_ratio_xr``'s ratio panel which is per
+    reference node.
+
+    Parameters
+    ----------
+    ET_xr_all, et_var, et_scale : the same raw spatial ET dataset used
+        everywhere else (e.g. Fig 7/7h) — dims (X, Y, datetime|time).
+        Domain mean/median are taken directly across the (X, Y) extent,
+        the same convention ``plot_et_sw_xr`` uses for its spatial-mean
+        ETa line.
+    etp_mean_series, etp_median_series : pd.Series (DatetimeIndex) —
+        domain-mean / domain-median satellite ETp already reduced to the
+        catchment polygon (``_domain_mean_daily_series(..., stat=...)``
+        in withLAI_results.py).
+    fig_path : output directory.
+    date_start/end : ISO-date strings for the x-axis window; defaults to
+        the mean-ETp series' own coverage.
+    scenario_id : label for the figure title.
+
+    Notes
+    -----
+    ETa (CATHY model output) and ETp (satellite-derived) don't share
+    native time steps, so each ETa series (mean, median) is resampled
+    onto its matching ETp series' own dates (nearest within 1 day)
+    before the ratio is taken — the same approach used for the
+    node-level ratio panel in ``plot_lai_et_sw_psi_ratio_xr``.
+    """
+    et_time_dim = _infer_time_dim(ET_xr_all[et_var])
+    et_dates    = _xr_time_to_dates(ET_xr_all[et_var], et_time_dim)
+
+    spatial_dims = [d for d in ET_xr_all[et_var].dims
+                    if d.lower() not in ("datetime", "time", "t")]
+    eta_mean_da   = ET_xr_all[et_var].mean(dim=spatial_dims)   * et_scale
+    eta_median_da = ET_xr_all[et_var].median(dim=spatial_dims) * et_scale
+
+    d0, d1 = date_window(date_start, date_end, etp_mean_series.index)
+    print(f"  Plotting catchment_eta_etp_ratio time-series "
+          f"({d0.date()} → {d1.date()}) …")
+
+    et_mask         = (et_dates >= d0) & (et_dates <= d1)
+    etp_mean_mask   = (etp_mean_series.index   >= d0) & (etp_mean_series.index   <= d1)
+    etp_median_mask = (etp_median_series.index >= d0) & (etp_median_series.index <= d1)
+
+    def _to_clean_series(vals: np.ndarray, dates: pd.DatetimeIndex) -> pd.Series:
+        """DataArray values → sorted, de-duplicated pd.Series, ready for
+        a nearest-tolerance reindex (duplicate timestamps averaged)."""
+        return (
+            pd.Series(np.asarray(vals, dtype=float), index=pd.DatetimeIndex(dates))
+              .groupby(level=0).mean()
+              .sort_index()
+        )
+
+    eta_mean_series   = _to_clean_series(eta_mean_da.values[et_mask],   et_dates[et_mask])
+    eta_median_series = _to_clean_series(eta_median_da.values[et_mask], et_dates[et_mask])
+
+    etp_mean_w   = etp_mean_series.loc[etp_mean_mask]
+    etp_median_w = etp_median_series.loc[etp_median_mask]
+
+    eta_mean_on_etp = eta_mean_series.reindex(
+        etp_mean_w.index, method="nearest", tolerance=pd.Timedelta("1D")
+    )
+    eta_median_on_etp = eta_median_series.reindex(
+        etp_median_w.index, method="nearest", tolerance=pd.Timedelta("1D")
+    )
+
+    # Optional temporal aggregation (e.g. freq="MS" -> monthly). ETa and ETp
+    # are first paired day by day (so both sums cover exactly the same days),
+    # then each is summed per period and the ratio of the sums is taken —
+    # the correct way to aggregate a flux ratio (not a mean of daily ratios).
+    def _agg(eta_on_etp: pd.Series, etp_w: pd.Series):
+        if not freq:
+            return etp_w.index, eta_on_etp.values, etp_w.values
+        d = pd.concat([eta_on_etp.rename("eta"), etp_w.rename("etp")],
+                      axis=1).dropna()
+        m = d.resample(freq).sum()
+        return m.index, m["eta"].to_numpy(), m["etp"].to_numpy()
+
+    idx_mean,   eta_mean_v,   etp_mean_v   = _agg(eta_mean_on_etp,   etp_mean_w)
+    idx_median, eta_median_v, etp_median_v = _agg(eta_median_on_etp, etp_median_w)
+
+    with np.errstate(divide="ignore", invalid="ignore"):
+        ratio_mean = np.where(etp_mean_v > 0, eta_mean_v / etp_mean_v, np.nan)
+        ratio_median = np.where(etp_median_v > 0, eta_median_v / etp_median_v, np.nan)
+
+    fig, ax = plt.subplots(figsize=(14, 4.5), constrained_layout=True)
+    _mk = "o" if freq else None
+    ax.plot(idx_mean, ratio_mean,
+            label="Mean (domain-mean ETa ÷ domain-mean ETp)",
+            color="#1b7837", linewidth=1.2, marker=_mk, ms=3)
+    ax.plot(idx_median, ratio_median,
+            label="Median (domain-median ETa ÷ domain-median ETp)",
+            color="#762a83", linewidth=1.2, linestyle="--", marker=_mk, ms=3)
+    ax.axhline(1.0, color="black", linewidth=0.8, linestyle=":")
+    ax.set_ylabel("ETa / ETp (−)")
+    ax.set_xlabel("Date")
+    ax.set_title(
+        f"Sc.{scenario_id} | Catchment-scale ETa ÷ ETp"
+        f"{' (monthly)' if freq in ('MS', 'ME', 'M') else ''} | {d0.date()} → {d1.date()}",
+        fontsize=11, fontweight="bold",
+    )
+    add_fire_vline(ax, d0, d1)
+    ax.legend(loc="upper right", fontsize=8)
+    ax.grid(True, linestyle="--", alpha=0.3)
+    ax.xaxis.set_major_formatter(mdates.ConciseDateFormatter(mdates.AutoDateLocator()))
+    ylim_top = ax.get_ylim()[1]
+    ax.set_ylim(0, max(1.2, ylim_top))
+
+    save_fig(fig, fig_path, fname, dpi)
+    maybe_show(fig, show)
+
+
+
+# =============================================================================
+# Monthly-resampled versions of the node / catchment time-series figures
+# =============================================================================
+# Same convention as the *_weekly wrappers: state variables (psi, sw, LAI) are
+# resampled with a monthly *mean*; fluxes (ETa, ETp, rain) with a monthly
+# *sum*, so flux panels read "mm accumulated that month". "MS" (month-start
+# label) is used because it is valid on every pandas/xarray version.
+
+MONTHLY_RULE = "MS"
+MONTHLY_BAR_WIDTH = 25.0   # days — keeps rain/ETp bars visible on a monthly axis
+
+
+def _resample_monthly(obj, how: str = "mean"):
+    """Monthly resample of a Dataset / DataArray / Series (None-safe)."""
+    if obj is None:
+        return None
+    if isinstance(obj, pd.Series):
+        return getattr(obj.resample(MONTHLY_RULE), how)() if len(obj) else obj
+    if len(obj.dims) == 0:
+        return obj
+    td = _infer_time_dim(obj)
+    return getattr(obj.resample({td: MONTHLY_RULE}), how)()
+
+
+def plot_hydro_xr_monthly(
+    psi_xr, sw_xr, nodes_dict, fig_path, *,
+    pev_series=None, tp_series=None, date_start=None, date_end=None,
+    show_rain=True, show_psi=True, show_sw=True,
+    show_uh_s=True, show_uh_1=True, show_dh_s=True, show_dh_1=True,
+    colors_dict=None, scenario_id="?", dpi=150, show=False,
+    fname="fig6f_hydro_timeseries_monthly.png",
+) -> None:
+    """Fig 6f -- monthly version of Fig 6 (psi/sw mean; rain/ETp monthly sum)."""
+    plot_hydro_xr(
+        _resample_monthly(psi_xr), _resample_monthly(sw_xr), nodes_dict, fig_path,
+        pev_series=_resample_monthly(pev_series, "sum"),
+        tp_series=_resample_monthly(tp_series, "sum"),
+        date_start=date_start, date_end=date_end,
+        show_rain=show_rain, show_psi=show_psi, show_sw=show_sw,
+        show_uh_s=show_uh_s, show_uh_1=show_uh_1,
+        show_dh_s=show_dh_s, show_dh_1=show_dh_1,
+        colors_dict=colors_dict, scenario_id=scenario_id,
+        dpi=dpi, show=show, fname=fname,
+        bar_width=MONTHLY_BAR_WIDTH, rain_unit="mm/month",
+    )
+
+
+def plot_et_sw_xr_monthly(
+    sw_xr, ET_xr_all, et_var, et_scale, nodes_dict, fig_path, *,
+    date_start=None, date_end=None,
+    show_uh_s=True, show_uh_1=True, show_dh_s=True, show_dh_1=True,
+    colors_dict=None, scenario_id="?", dpi=150, show=False,
+    fname="fig7j_et_sw_timeseries_monthly.png",
+) -> None:
+    """Fig 7j -- monthly version of Fig 7 (sw mean; ETa monthly sum)."""
+    plot_et_sw_xr(
+        _resample_monthly(sw_xr), _resample_monthly(ET_xr_all, "sum"),
+        et_var, et_scale, nodes_dict, fig_path,
+        date_start=date_start, date_end=date_end,
+        show_uh_s=show_uh_s, show_uh_1=show_uh_1,
+        show_dh_s=show_dh_s, show_dh_1=show_dh_1,
+        colors_dict=colors_dict, scenario_id=scenario_id,
+        dpi=dpi, show=show, fname=fname,
+        et_unit="mm/month", et_as_line=True,
+    )
+
+
+def plot_et_psi_xr_monthly(
+    psi_xr, ET_xr_all, et_var, et_scale, nodes_dict, fig_path, *,
+    date_start=None, date_end=None,
+    show_uh_s=True, show_uh_1=True, show_dh_s=True, show_dh_1=True,
+    colors_dict=None, scenario_id="?", dpi=150, show=False,
+    fname="fig7gj_et_psi_timeseries_monthly.png",
+) -> None:
+    """Fig 7gj -- monthly version of Fig 7g (psi mean; ETa monthly sum)."""
+    plot_et_psi_xr(
+        _resample_monthly(psi_xr), _resample_monthly(ET_xr_all, "sum"),
+        et_var, et_scale, nodes_dict, fig_path,
+        date_start=date_start, date_end=date_end,
+        show_uh_s=show_uh_s, show_uh_1=show_uh_1,
+        show_dh_s=show_dh_s, show_dh_1=show_dh_1,
+        colors_dict=colors_dict, scenario_id=scenario_id,
+        dpi=dpi, show=show, fname=fname,
+        et_unit="mm/month", et_as_line=True,
+    )
+
+
+def plot_et_sw_lai_xr_monthly(
+    sw_xr, ET_xr_all, et_var, et_scale, lai_ds, nodes_dict, fig_path, *,
+    lai_var="LAI", date_start=None, date_end=None,
+    show_uh_s=True, show_uh_1=True, show_dh_s=True, show_dh_1=True,
+    colors_dict=None, scenario_id="?", dpi=150, show=False,
+    fname="fig7bj_et_sw_lai_timeseries_monthly.png",
+) -> None:
+    """Fig 7bj -- monthly version of Fig 7b (sw, LAI mean; ETa monthly sum)."""
+    plot_et_sw_lai_xr(
+        _resample_monthly(sw_xr), _resample_monthly(ET_xr_all, "sum"),
+        et_var, et_scale, _resample_monthly(lai_ds), nodes_dict, fig_path,
+        lai_var=lai_var, date_start=date_start, date_end=date_end,
+        show_uh_s=show_uh_s, show_uh_1=show_uh_1,
+        show_dh_s=show_dh_s, show_dh_1=show_dh_1,
+        colors_dict=colors_dict, scenario_id=scenario_id,
+        dpi=dpi, show=show, fname=fname,
+        et_unit="mm/month", et_as_line=True,
+    )
+
+
+def plot_et_psi_lai_xr_monthly(
+    psi_xr, ET_xr_all, et_var, et_scale, lai_ds, nodes_dict, fig_path, *,
+    lai_var="LAI", date_start=None, date_end=None,
+    show_uh_s=True, show_uh_1=True, show_dh_s=True, show_dh_1=True,
+    colors_dict=None, scenario_id="?", dpi=150, show=False,
+    fname="fig7fj_et_psi_lai_timeseries_monthly.png",
+) -> None:
+    """Fig 7fj -- monthly version of Fig 7f (psi, LAI mean; ETa monthly sum)."""
+    plot_et_psi_lai_xr(
+        _resample_monthly(psi_xr), _resample_monthly(ET_xr_all, "sum"),
+        et_var, et_scale, _resample_monthly(lai_ds), nodes_dict, fig_path,
+        lai_var=lai_var, date_start=date_start, date_end=date_end,
+        show_uh_s=show_uh_s, show_uh_1=show_uh_1,
+        show_dh_s=show_dh_s, show_dh_1=show_dh_1,
+        colors_dict=colors_dict, scenario_id=scenario_id,
+        dpi=dpi, show=show, fname=fname,
+        et_unit="mm/month", et_as_line=True,
+    )
+
+
+def plot_lai_et_sw_psi_ratio_xr_monthly(
+    lai_ds, ET_xr_all, et_var, et_scale, ETp_xr, etp_var, etp_scale,
+    sw_xr, psi_xr, nodes_dict, grid3d, fig_path, *,
+    lai_var="LAI", date_start=None, date_end=None,
+    show_uh=True, show_dh=True, show_uh_1=True, show_dh_1=True,
+    colors_dict=None, scenario_id="?", dpi=150, show=False,
+    fname="fig8j_lai_et_sw_psi_ratio_timeseries_monthly.png",
+) -> None:
+    """Fig 7hj -- monthly version of Fig 7h. LAI/sw/psi: monthly mean;
+    ETa and ETp: monthly sum, so the ratio panel is sum(ETa)/sum(ETp)."""
+    plot_lai_et_sw_psi_ratio_xr(
+        _resample_monthly(lai_ds), _resample_monthly(ET_xr_all, "sum"),
+        et_var, et_scale,
+        _resample_monthly(ETp_xr, "sum"), etp_var, etp_scale,
+        _resample_monthly(sw_xr), _resample_monthly(psi_xr),
+        nodes_dict, grid3d, fig_path,
+        lai_var=lai_var, date_start=date_start, date_end=date_end,
+        show_uh=show_uh, show_dh=show_dh,
+        show_uh_1=show_uh_1, show_dh_1=show_dh_1,
+        colors_dict=colors_dict, scenario_id=scenario_id,
+        dpi=dpi, show=show, fname=fname, et_unit="mm/month",
+    )
+
+
+def plot_catchment_eta_etp_ratio_monthly(
+    ET_xr_all, et_var, et_scale, etp_mean_series, etp_median_series, fig_path, *,
+    date_start=None, date_end=None, scenario_id="?", dpi=150, show=False,
+    fname="fig_catchment_eta_etp_ratio_monthly.png",
+) -> None:
+    """Fig 7ij -- monthly version of the catchment ETa/ETp ratio."""
+    plot_catchment_eta_etp_ratio(
+        ET_xr_all, et_var, et_scale, etp_mean_series, etp_median_series, fig_path,
+        date_start=date_start, date_end=date_end, scenario_id=scenario_id,
+        dpi=dpi, show=show, fname=fname, freq=MONTHLY_RULE,
+    )

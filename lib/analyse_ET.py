@@ -27,6 +27,7 @@ from pathlib import Path
 
 import geopandas as gpd
 import matplotlib.pyplot as plt
+from matplotlib.colors import TwoSlopeNorm
 import numpy as np
 import pandas as pd
 import rioxarray  # noqa: F401 — registers .rio accessor
@@ -54,6 +55,15 @@ from results_plotter import save_fig, maybe_show
 fig_path = Path().cwd() / "../Analysis"
 et_path  = PathET / "20161001_20241231_ET.nc"
 etp_path = PathET / "20161001_20241231_ET0.nc"
+
+# -----------------------------------------------------------------------------
+# CLI defaults — edit here so the script runs with no arguments.
+# (diagnose_ET.py shares parse_args(), so these apply to it as well.)
+# -----------------------------------------------------------------------------
+DEFAULT_PLOTS = ["all"]       # row indices, PlotID names, or "all"
+DEFAULT_YEAR = 2019           # spatial-map year; also the default month-by-month year
+DEFAULT_RATIO_YEARS = None    # None = every year present in the clipped data
+DEFAULT_RATIO_MONTH_YEARS = None  # None = [DEFAULT_YEAR] (or --year if given)
 
 # =============================================================================
 # Shapefile loading
@@ -95,33 +105,49 @@ def resolve_plot_selection(
                 [1, "Plot6Control"] → mixed
     """
     plot_ids = list(gdf["PlotID"])
+    n = len(plot_ids)
 
     if selection is None or selection == ["all"]:
-        print(f"  Selected plots : all ({len(plot_ids)} plots)")
+        print(f"  Selected plots : all ({n} plots)")
         return gdf.copy()
 
-    resolved: list[str] = []
+    # Resolve every selection item to a ROW POSITION rather than a PlotID
+    # name. PlotID is not guaranteed unique (e.g. a shapefile where every
+    # feature shares the same layer name) — filtering by name in that case
+    # would silently match every row instead of just the one requested.
+    positions: list[int] = []
     for item in selection:
         if isinstance(item, int) or (isinstance(item, str) and item.isdigit()):
             idx = int(item)
-            if idx < 0 or idx >= len(plot_ids):
+            if idx < 0 or idx >= n:
                 raise IndexError(
-                    f"Index {idx} out of range — valid range 0–{len(plot_ids) - 1}."
+                    f"Index {idx} out of range — valid range 0–{n - 1}."
                 )
-            resolved.append(plot_ids[idx])
+            positions.append(idx)
         else:
-            if item not in plot_ids:
+            matches = [i for i, pid in enumerate(plot_ids) if pid == item]
+            if not matches:
                 raise ValueError(
                     f"PlotID '{item}' not found.\nAvailable: {plot_ids}"
                 )
-            resolved.append(item)
+            if len(matches) > 1:
+                print(
+                    f"  WARNING: PlotID '{item}' matches {len(matches)} rows "
+                    f"(indices {matches}) — PlotID is not unique in this "
+                    f"shapefile, selecting all of them. Use a row index "
+                    f"instead (e.g. --plots {matches[0]}) to pick just one."
+                )
+            positions.extend(matches)
 
     # deduplicate, preserving order
-    seen: set[str] = set()
-    unique = [p for p in resolved if not (p in seen or seen.add(p))]
+    seen: set[int] = set()
+    unique_positions = [p for p in positions if not (p in seen or seen.add(p))]
 
-    filtered = gdf[gdf["PlotID"].isin(unique)].copy().reset_index(drop=True)
-    print(f"  Selected plots : {unique}")
+    filtered = gdf.iloc[unique_positions].copy().reset_index(drop=True)
+    print(
+        f"  Selected plots : row index {unique_positions} "
+        f"→ PlotID {[plot_ids[i] for i in unique_positions]}"
+    )
     return filtered
 
 def selection_label(gdf: gpd.GeoDataFrame, selection: list[str | int] | None) -> str:
@@ -315,17 +341,293 @@ def run_plots(
         show=show,
     )
 
+def plot_eta_etp_timeseries(
+    ds_et_crop: xr.Dataset,
+    ds_etp_crop: xr.Dataset,
+    et_var: str,
+    etp_var: str,
+    fig_path: Path,
+    label: str,
+    show: bool = False,
+) -> None:
+    """
+    Time-series diagnostic comparing ETa and ETp for the current plot selection.
+
+    Top panel    : spatial-mean ETa and ETp per time step [mm]
+    Bottom panel : ETa / ETp ratio per time step (dashed line at 1.0 for reference)
+
+    NOTE: this is a standalone plot (not routed through results_plotter.py,
+    which wasn't available when this was added) — it reuses the same
+    save_fig / maybe_show helpers so behaviour and output layout stay
+    consistent with the other diagnostics. If results_plotter.py already has
+    a house style (colors, fonts, dpi) this doesn't pick it up automatically —
+    happy to align it once that file's shared.
+    """
+    out_path = fig_path / "ETa_ETp_ratio"
+    out_path.mkdir(parents=True, exist_ok=True)
+
+    eta_ts = ds_et_crop[et_var].mean(dim=("x", "y"), skipna=True)
+    etp_ts = ds_etp_crop[etp_var].mean(dim=("x", "y"), skipna=True)
+
+    # Align on common time steps in case ET / ETp have slightly different coverage
+    eta_ts, etp_ts = xr.align(eta_ts, etp_ts, join="inner")
+
+    if eta_ts.sizes.get("time", 0) == 0:
+        print("  [plot_eta_etp_timeseries] No overlapping time steps between ET and ETp — skipping.")
+        return
+
+    ratio_ts = eta_ts / etp_ts.where(etp_ts != 0)
+    time = eta_ts["time"].values
+
+    fig, (ax1, ax2) = plt.subplots(
+        2, 1, figsize=(11, 6), sharex=True,
+        gridspec_kw={"height_ratios": [2, 1]},
+    )
+
+    ax1.plot(time, eta_ts.values, label="ETa", color="tab:blue", lw=1.2)
+    ax1.plot(time, etp_ts.values, label="ETp", color="tab:orange", lw=1.2)
+    ax1.set_ylabel("ET [mm]")
+    ax1.legend(loc="upper right")
+    ax1.set_title(f"ETa & ETp time series — {label}")
+    ax1.grid(alpha=0.3)
+
+    ax2.plot(time, ratio_ts.values, color="tab:green", lw=1.0)
+    ax2.axhline(1.0, color="grey", lw=0.8, ls="--")
+    ax2.set_ylabel("ETa / ETp")
+    ax2.set_xlabel("Date")
+    ax2.grid(alpha=0.3)
+
+    fig.tight_layout()
+
+    fname = f"ETa_ETp_ratio_timeseries_{label}.png"
+    save_fig(fig, out_path, fname, dpi=150)
+    maybe_show(fig, show)
+
+
+def plot_ratio_spatial_by_year(
+    ds_et_crop: xr.Dataset,
+    ds_etp_crop: xr.Dataset,
+    et_var: str,
+    etp_var: str,
+    years: list[int],
+    fig_path: Path,
+    label: str,
+    gdf: "gpd.GeoDataFrame | None" = None,
+    selection: list[str | int] | None = None,
+    show: bool = False,
+) -> None:
+    """
+    Spatial map of the annual ETa/ETp ratio (per-pixel annual ETa sum divided
+    by per-pixel annual ETp sum), one panel per requested year, mosaicked
+    side by side with a shared diverging colorbar centered at 1.0.
+
+    A value > 1 means that pixel's ETa exceeded its ETp for that year;
+    < 1 means the opposite.
+
+    ds_et_crop / ds_etp_crop are expected to already be clipped (see
+    clip_dataset). Because clip_dataset crops to the selected polygon's
+    BOUNDING BOX (drop=True), an irregularly-shaped subcatchment can still
+    look "unclipped" in the rendered rectangle even though pixels outside
+    the polygon are correctly NaN. To make the clip visually unambiguous —
+    and to guard against the two datasets not sharing an identical grid —
+    this function:
+      1. Re-clips both DataArrays to `gdf`/`selection` again if provided
+         (redundant with clip_dataset, but catches any upstream leak).
+      2. Draws the selected polygon's boundary on top of each panel.
+      3. Prints the realised x/y extent so it can be checked against the
+         expected subcatchment bounds.
+    """
+    out_path = fig_path / "ETa_ETp_ratio"
+    out_path.mkdir(parents=True, exist_ok=True)
+
+    eta_da = ds_et_crop[et_var]
+    etp_da = ds_etp_crop[etp_var]
+
+    gdf_clip = None
+    if gdf is not None:
+        gdf_clip = resolve_plot_selection(gdf, selection)
+        eta_da = eta_da.rio.clip(gdf_clip.geometry, gdf_clip.crs, drop=True, all_touched=True)
+        etp_da = etp_da.rio.clip(gdf_clip.geometry, gdf_clip.crs, drop=True, all_touched=True)
+
+    eta_da, etp_da = xr.align(eta_da, etp_da, join="inner")
+
+    print(
+        f"  [plot_ratio_spatial_by_year] realised extent — "
+        f"x: {float(eta_da.x.min()):.1f}–{float(eta_da.x.max()):.1f}, "
+        f"y: {float(eta_da.y.min()):.1f}–{float(eta_da.y.max()):.1f} "
+        f"({eta_da.sizes.get('x', 0)}x{eta_da.sizes.get('y', 0)} px)"
+    )
+
+    ratio_maps: dict[int, xr.DataArray] = {}
+    for yr in years:
+        eta_yr = eta_da.sel(time=eta_da["time"].dt.year == yr).sum(dim="time", skipna=True)
+        etp_yr = etp_da.sel(time=etp_da["time"].dt.year == yr).sum(dim="time", skipna=True)
+        if eta_yr.size == 0 or etp_yr.size == 0:
+            print(f"  [plot_ratio_spatial_by_year] No data for year {yr} — skipping.")
+            continue
+        ratio_maps[yr] = eta_yr / etp_yr.where(etp_yr != 0)
+
+    if not ratio_maps:
+        print("  [plot_ratio_spatial_by_year] No years had data — nothing to plot.")
+        return
+
+    all_vals = np.concatenate(
+        [r.values.ravel()[~np.isnan(r.values.ravel())] for r in ratio_maps.values()]
+    )
+    if all_vals.size == 0:
+        print("  [plot_ratio_spatial_by_year] All-NaN ratio maps — nothing to plot.")
+        return
+
+    # Diverging colormap centred on 1.0; bounds from data (2nd/98th pct),
+    # but always straddling 1.0 so the reference colour stays meaningful.
+    vmin = min(float(np.nanpercentile(all_vals, 2)), 0.5)
+    vmax = max(float(np.nanpercentile(all_vals, 98)), 1.5)
+    norm = TwoSlopeNorm(vmin=vmin, vcenter=1.0, vmax=vmax)
+
+    yrs_ok = list(ratio_maps.keys())
+    ncols = min(len(yrs_ok), 4)
+    nrows = int(np.ceil(len(yrs_ok) / ncols))
+    fig, axes = plt.subplots(
+        nrows, ncols, figsize=(4 * ncols, 4 * nrows), squeeze=False
+    )
+
+    im = None
+    for ax, yr in zip(axes.ravel(), yrs_ok):
+        im = ratio_maps[yr].plot(
+            ax=ax, cmap="RdBu_r", norm=norm, add_colorbar=False
+        )
+        if gdf_clip is not None:
+            gdf_clip.boundary.plot(ax=ax, color="black", linewidth=1.2)
+        ax.set_title(str(yr))
+        ax.set_xlabel("")
+        ax.set_ylabel("")
+
+    for ax in axes.ravel()[len(yrs_ok):]:
+        ax.axis("off")
+
+    fig.suptitle(f"Annual ETa / ETp ratio — {label}")
+    fig.subplots_adjust(right=0.88, top=0.85)
+    cbar_ax = fig.add_axes([0.90, 0.15, 0.02, 0.65])
+    fig.colorbar(im, cax=cbar_ax, label="ETa / ETp")
+
+    fname = f"ETa_ETp_ratio_spatial_{'-'.join(str(y) for y in yrs_ok)}_{label}.png"
+    save_fig(fig, out_path, fname, dpi=150)
+    maybe_show(fig, show)
+
+
+_MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
+                "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+
+
+def plot_ratio_spatial_by_month(
+    ds_et_crop: xr.Dataset,
+    ds_etp_crop: xr.Dataset,
+    et_var: str,
+    etp_var: str,
+    year: int,
+    fig_path: Path,
+    label: str,
+    gdf: "gpd.GeoDataFrame | None" = None,
+    selection: list[str | int] | None = None,
+    show: bool = False,
+) -> None:
+    """
+    Spatial map of the ETa/ETp ratio for each month of a single year
+    (per-pixel monthly ETa sum divided by per-pixel monthly ETp sum), one
+    panel per month present, mosaicked with a shared diverging colorbar
+    centered at 1.0.
+
+    Same re-clip / boundary-overlay / extent-print safeguards as
+    plot_ratio_spatial_by_year — see that function's docstring for why.
+    """
+    out_path = fig_path / "ETa_ETp_ratio"
+    out_path.mkdir(parents=True, exist_ok=True)
+
+    eta_da = ds_et_crop[et_var]
+    etp_da = ds_etp_crop[etp_var]
+
+    gdf_clip = None
+    if gdf is not None:
+        gdf_clip = resolve_plot_selection(gdf, selection)
+        eta_da = eta_da.rio.clip(gdf_clip.geometry, gdf_clip.crs, drop=True, all_touched=True)
+        etp_da = etp_da.rio.clip(gdf_clip.geometry, gdf_clip.crs, drop=True, all_touched=True)
+
+    eta_da, etp_da = xr.align(eta_da, etp_da, join="inner")
+
+    print(
+        f"  [plot_ratio_spatial_by_month] realised extent — "
+        f"x: {float(eta_da.x.min()):.1f}–{float(eta_da.x.max()):.1f}, "
+        f"y: {float(eta_da.y.min()):.1f}–{float(eta_da.y.max()):.1f} "
+        f"({eta_da.sizes.get('x', 0)}x{eta_da.sizes.get('y', 0)} px)"
+    )
+
+    eta_yr = eta_da.sel(time=eta_da["time"].dt.year == year)
+    etp_yr = etp_da.sel(time=etp_da["time"].dt.year == year)
+
+    if eta_yr.sizes.get("time", 0) == 0:
+        print(f"  [plot_ratio_spatial_by_month] No data for year {year} — skipping.")
+        return
+
+    months_present = sorted(set(pd.to_datetime(eta_yr["time"].values).month))
+
+    ratio_maps: dict[int, xr.DataArray] = {}
+    for m in months_present:
+        eta_m = eta_yr.sel(time=eta_yr["time"].dt.month == m).sum(dim="time", skipna=True)
+        etp_m = etp_yr.sel(time=etp_yr["time"].dt.month == m).sum(dim="time", skipna=True)
+        ratio_maps[m] = eta_m / etp_m.where(etp_m != 0)
+
+    all_vals = np.concatenate(
+        [r.values.ravel()[~np.isnan(r.values.ravel())] for r in ratio_maps.values()]
+    )
+    if all_vals.size == 0:
+        print(f"  [plot_ratio_spatial_by_month] All-NaN ratio maps for {year} — nothing to plot.")
+        return
+
+    vmin = min(float(np.nanpercentile(all_vals, 2)), 0.5)
+    vmax = max(float(np.nanpercentile(all_vals, 98)), 1.5)
+    norm = TwoSlopeNorm(vmin=vmin, vcenter=1.0, vmax=vmax)
+
+    ncols = min(len(months_present), 4)
+    nrows = int(np.ceil(len(months_present) / ncols))
+    fig, axes = plt.subplots(
+        nrows, ncols, figsize=(4 * ncols, 4 * nrows), squeeze=False
+    )
+
+    im = None
+    for ax, m in zip(axes.ravel(), months_present):
+        im = ratio_maps[m].plot(
+            ax=ax, cmap="RdBu_r", norm=norm, add_colorbar=False
+        )
+        if gdf_clip is not None:
+            gdf_clip.boundary.plot(ax=ax, color="black", linewidth=1.2)
+        ax.set_title(_MONTH_NAMES[m - 1])
+        ax.set_xlabel("")
+        ax.set_ylabel("")
+
+    for ax in axes.ravel()[len(months_present):]:
+        ax.axis("off")
+
+    fig.suptitle(f"Monthly ETa / ETp ratio — {year} — {label}")
+    fig.subplots_adjust(right=0.88, top=0.9)
+    cbar_ax = fig.add_axes([0.90, 0.15, 0.02, 0.65])
+    fig.colorbar(im, cax=cbar_ax, label="ETa / ETp")
+
+    fname = f"ETa_ETp_ratio_spatial_monthly_{year}_{label}.png"
+    save_fig(fig, out_path, fname, dpi=150)
+    maybe_show(fig, show)
+
+
 # =============================================================================
 # CLI argument parsing
 # =============================================================================
 
-def parse_args() -> list[str] | None:
+def parse_args() -> tuple[list[str], int, list[int] | None, list[int] | None]:
     """
     Parse --plots from the command line.  Default is index 0.
 
     Examples
     --------
-    python analyse_ET.py                         # → [0]  (default)
+    python analyse_ET.py                         # → DEFAULT_PLOTS / DEFAULT_YEAR
     python analyse_ET.py --plots all             # → all plots
     python analyse_ET.py --plots 0 2             # → indices
     python analyse_ET.py --plots Plot4Mulching   # → name
@@ -336,24 +638,49 @@ def parse_args() -> list[str] | None:
         "--plots",
         nargs="+",
         metavar="PLOT",
-        default=["0"],          # ← default: plot index 0
+        default=DEFAULT_PLOTS,  # ← edit DEFAULT_PLOTS at the top of the file
         help=(
             "Plots to process: row index (0-based), PlotID name, 'all', or a mix. "
-            "Default: 0 (first plot)."
+            f"Default: {DEFAULT_PLOTS}."
         ),
     )
     parser.add_argument(
         "--year",
         type=int,
-        default=2020,
-        help="Year for spatial-map mosaic (default: 2020).",
+        default=DEFAULT_YEAR,
+        help=f"Year for spatial-map mosaic (default: {DEFAULT_YEAR}).",
+    )
+    parser.add_argument(
+        "--ratio-years",
+        nargs="+",
+        type=int,
+        default=DEFAULT_RATIO_YEARS,
+        metavar="YEAR",
+        help=(
+            "One or more years to map for the spatial ETa/ETp ratio mosaic "
+            "(e.g. --ratio-years 2019 2020 2023). Default: every year present "
+            "in the clipped data."
+        ),
+    )
+    parser.add_argument(
+        "--ratio-month-years",
+        nargs="+",
+        type=int,
+        default=DEFAULT_RATIO_MONTH_YEARS,
+        metavar="YEAR",
+        help=(
+            "One or more years to break out month-by-month in a spatial "
+            "ETa/ETp ratio mosaic (e.g. --ratio-month-years 2022 2023). "
+            "Each year gets its own 12-panel figure. Default: the year given "
+            "by --year."
+        ),
     )
 
     # sys.argv can contain injected garbage from conda launchers, Spyder, or
     # other wrappers (e.g. path fragments like "Install" from
-    # .../envs/Install/bin/python3).  Keep only tokens belonging to our two
+    # .../envs/Install/bin/python3).  Keep only tokens belonging to our
     # known flags and their values; discard everything else.
-    known_flags = {"--plots", "--year"}
+    known_flags = {"--plots", "--year", "--ratio-years", "--ratio-month-years"}
     clean: list[str] = []
     i = 1  # skip argv[0] (script name)
     while i < len(sys.argv):
@@ -370,7 +697,7 @@ def parse_args() -> list[str] | None:
     args = parser.parse_args(clean)
 
     # "all" is a special sentinel — pass through as-is for resolve_plot_selection
-    return args.plots, args.year
+    return args.plots, args.year, args.ratio_years, args.ratio_month_years
 
 
 # =============================================================================
@@ -378,7 +705,7 @@ def parse_args() -> list[str] | None:
 # =============================================================================
 
 if __name__ == "__main__":
-    selection, selected_year = parse_args()
+    selection, selected_year, ratio_years, ratio_month_years = parse_args()
 
     print("\n── Loading shapefiles ──────────────────────────────────────────")
     gdf_proj = load_shapefiles()
@@ -391,21 +718,54 @@ if __name__ == "__main__":
     ds_et_crop  = clip_dataset(ds_et,  gdf_proj, selection)
     ds_etp_crop = clip_dataset(ds_etp, gdf_proj, selection)
 
-    label  = selection_label(gdf_proj, selection)
-    et_var = next(iter(ds_et_crop.data_vars))
+    label   = selection_label(gdf_proj, selection)
+    et_var  = next(iter(ds_et_crop.data_vars))
+    etp_var = next(iter(ds_etp_crop.data_vars))
+
+    if ratio_years is None:
+        ratio_years = sorted(set(pd.to_datetime(ds_et_crop["time"].values).year))
+    if ratio_month_years is None:
+        ratio_month_years = [selected_year]
 
     print(f"\n── Plotting ────────────────────────────────────────────────────")
-    print(f"  ET variable  : {et_var}")
-    print(f"  Plot label   : {label}")
-    print(f"  Spatial year : {selected_year}")
-    print(f"  Output dir   : {fig_path}\n")
+    print(f"  ET variable      : {et_var}")
+    print(f"  ETp variable     : {etp_var}")
+    print(f"  Plot label       : {label}")
+    print(f"  Spatial year     : {selected_year}")
+    print(f"  Ratio years      : {ratio_years}")
+    print(f"  Ratio month-years: {ratio_month_years}")
+    print(f"  Output dir       : {fig_path}\n")
 
     run_plots(ds_et_crop, et_var=et_var, label=label,
               selected_year=selected_year, show=False)
 
-    et_var = next(iter(ds_etp_crop.data_vars))
-
-    run_plots(ds_etp_crop, et_var=et_var, label=label,
+    run_plots(ds_etp_crop, et_var=etp_var, label=label,
               selected_year=selected_year, product_name="ETp", show=False)
+
+    plot_eta_etp_timeseries(
+        ds_et_crop, ds_etp_crop,
+        et_var=et_var, etp_var=etp_var,
+        fig_path=fig_path, label=label,
+        show=False,
+    )
+
+    plot_ratio_spatial_by_year(
+        ds_et_crop, ds_etp_crop,
+        et_var=et_var, etp_var=etp_var,
+        years=ratio_years,
+        fig_path=fig_path, label=label,
+        gdf=gdf_proj, selection=selection,
+        show=False,
+    )
+
+    for yr in ratio_month_years:
+        plot_ratio_spatial_by_month(
+            ds_et_crop, ds_etp_crop,
+            et_var=et_var, etp_var=etp_var,
+            year=yr,
+            fig_path=fig_path, label=label,
+            gdf=gdf_proj, selection=selection,
+            show=False,
+        )
 
     print("\nDone.")
