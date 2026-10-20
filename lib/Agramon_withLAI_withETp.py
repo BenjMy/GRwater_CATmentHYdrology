@@ -113,7 +113,7 @@ else:
 
 CODES = ROOT / "BenCSIC" / "Codes" / "Tech4agro_org"
 
-MODULE_PATH = (CODES / "GRwater_geophy").resolve()
+# MODULE_PATH = (CODES / "GRwater_geophy").resolve()
 EO_PATH     = (CODES / "GRwater_CATmentHYdrology").resolve()
 
 LAI_PATH = (
@@ -125,8 +125,8 @@ PathET    = ROOT / "GRwater" / "data" / "satellite" / "Agramon"
 etp_path  = PathET / "20161001_20241231_ET0.nc"
 rain_path = PathET / "20161001_20241231_TP.nc"
 
-if str(MODULE_PATH) not in sys.path:
-    sys.path.append(str(MODULE_PATH))
+# if str(MODULE_PATH) not in sys.path:
+#     sys.path.append(str(MODULE_PATH))
 
 import Agramon_utils as AgUtils
 from geoutils import uCATHY
