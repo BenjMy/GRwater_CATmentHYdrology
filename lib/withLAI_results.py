@@ -43,12 +43,15 @@ Figures produced
   Fig 6b — 2D map of reference-node locations (where ψ / sw are extracted)
   Fig 7  — sw + Actual ETa time-series at reference nodes
   Fig 7b — sw + ETa + domain-mean LAI trend time-series (Fig 7 + LAI panel)
+<<<<<<< HEAD
   Fig 7i — Catchment-scale ETa/ETp ratio time series (domain mean & median)
   Monthly variants (state vars = monthly mean, fluxes = monthly sum):
     Fig 6f  hydro (rain/ETp + psi + sw)      Fig 7j   sw + ETa
     Fig 7gj psi + ETa                        Fig 7bj  sw + ETa + LAI
     Fig 7fj psi + ETa + LAI                  Fig 7hj  LAI/ETa/sw/psi/ETa÷ETp at nodes
     Fig 7ij catchment ETa÷ETp (ratio of monthly sums)
+=======
+>>>>>>> 1d78c26b5b57db0ec851d536dacab6ca80d61ed4
   Fig 8  — Catchment ET balance: monthly + annual bars  (→ ETa_balance_*.png)
   Fig 8b — ETa cumulative histogram: per-pixel annual sum distribution  (→ ETa_annual_sum_histogram_*.png)
   Fig 8c — ETa domain-total: monthly mean + annual total bar charts    (→ ETa_total_*.png)
@@ -189,18 +192,25 @@ def load_rain(path: Path = rain_path) -> xr.Dataset:
     return _load_forcing_nc(path, "rain")
 
 
+<<<<<<< HEAD
 def _domain_mean_daily_series(
     ds: xr.Dataset, var: str, gdf, stat: str = "mean"
 ) -> pd.Series:
     """Clip a satellite ETp/rain dataset to the catchment polygon and
     return its daily domain-mean (or domain-median, via ``stat``) as a
     ``pd.Series`` (mm/day, DatetimeIndex).
+=======
+def _domain_mean_daily_series(ds: xr.Dataset, var: str, gdf) -> pd.Series:
+    """Clip a satellite ETp/rain dataset to the catchment polygon and
+    return its daily domain-mean as a ``pd.Series`` (mm/day, DatetimeIndex).
+>>>>>>> 1d78c26b5b57db0ec851d536dacab6ca80d61ed4
 
     Uses rioxarray directly instead of ``AgUtils.extract_point_timeseries``:
     that helper was written for ERA5's lat/lon grid, whereas ``ds`` here is
     already projected to TARGET_CRS (EPSG:25830, x/y in metres) — calling
     it on this grid is what produced "satellite ETp/rain forcing not
     loaded" (it can't resolve ERA5-style coordinates/variable names on a
+<<<<<<< HEAD
     plain x/y raster). A direct clip + spatial reduction sidesteps that and
     also matches how the main run pipeline (Agramon_withLAI_withETp.py)
     already treats ETp/rain — as a mesh/domain aggregate, not a point pick.
@@ -208,6 +218,12 @@ def _domain_mean_daily_series(
     if stat not in ("mean", "median"):
         raise ValueError(f"stat must be 'mean' or 'median', got '{stat}'.")
 
+=======
+    plain x/y raster). A direct clip + spatial mean sidesteps that and
+    also matches how the main run pipeline (Agramon_withLAI_withETp.py)
+    already treats ETp/rain — as a mesh/domain average, not a point pick.
+    """
+>>>>>>> 1d78c26b5b57db0ec851d536dacab6ca80d61ed4
     da = ds[var]
 
     gdf_proj = gdf
@@ -222,8 +238,12 @@ def _domain_mean_daily_series(
 
     time_dim = "time" if "time" in da.dims else "datetime"
     spatial_dims = [d for d in da.dims if d != time_dim]
+<<<<<<< HEAD
     reduced = getattr(da, stat)(dim=spatial_dims, skipna=True)
     series = reduced.to_series()
+=======
+    series = da.mean(dim=spatial_dims, skipna=True).to_series()
+>>>>>>> 1d78c26b5b57db0ec851d536dacab6ca80d61ed4
     series.index = pd.DatetimeIndex(series.index)
     return series
 
@@ -347,9 +367,22 @@ def _plot_spatial_monthly_generic(
             {time_dim: da_year[time_dim].dt.month == month}
         ).mean(time_dim)                          # collapse time steps → (X, Y)
 
+<<<<<<< HEAD
         im = da_month.plot.imshow(
             ax=ax, cmap=cmap, x="X", y="Y",
             vmin=vmin_eff, vmax=vmax_eff, add_colorbar=False,
+=======
+        da_month.plot.imshow(
+            ax=ax,
+            cmap=cmap,
+            x="X",
+            y="Y",
+            vmin=vmin_eff,
+            vmax=vmax_eff,
+            add_colorbar=(idx == 0),
+            **( {"cbar_kwargs": {"label": cbar_label, "shrink": 0.8}}
+                if idx == 0 else {} ),
+>>>>>>> 1d78c26b5b57db0ec851d536dacab6ca80d61ed4
         )
 
         ax.set_title(MONTH_NAMES[month - 1], fontsize=10, pad=3)
@@ -371,11 +404,16 @@ def _plot_spatial_monthly_generic(
     for idx in range(n_months, nrows * ncols):
         axes[idx // ncols][idx % ncols].set_visible(False)
 
+<<<<<<< HEAD
     fig.colorbar(im, ax=used_axes, shrink=0.8, aspect=30, pad=0.015,
                  label=cbar_label)
     fig.supxlabel("X (m)", fontsize=9)
     fig.supylabel("Y (m)", fontsize=9)
     fig.suptitle(f"{title} — {selected_year}", fontsize=12, fontweight="bold")
+=======
+    fig.suptitle(f"{title} — {selected_year}", fontsize=12, y=1.01)
+    plt.tight_layout()
+>>>>>>> 1d78c26b5b57db0ec851d536dacab6ca80d61ed4
 
     if out_dir is not None:
         out_path = Path(out_dir) / f"{fname_prefix}_{selected_year}.png"
@@ -1049,6 +1087,7 @@ def _parse_args() -> argparse.Namespace:
         ),
     )
     p.add_argument(
+<<<<<<< HEAD
         "--dem-res", type=float, default=5.0, metavar="M",
         help=(
             "DEM resample resolution in metres. MUST equal the "
@@ -1058,6 +1097,8 @@ def _parse_args() -> argparse.Namespace:
         ),
     )
     p.add_argument(
+=======
+>>>>>>> 1d78c26b5b57db0ec851d536dacab6ca80d61ed4
         "--et-var", default=ET_VAR, choices=["ACT. ETRA", "ACT. ETRA_patched"],
         metavar="VAR",
         help=(
@@ -1458,16 +1499,23 @@ def resolve_nodes(
     nodes_dict: dict = {}
     for depth in args.depths:
         depth_label = int(depth) if float(depth).is_integer() else depth
+<<<<<<< HEAD
         _, outlet_node_idx = node_tree.query(
             [outlet_x, outlet_y, outlet_z - depth]
         )
         nodes_dict[f"outlet_z-{depth_label}m"] = int(outlet_node_idx)
+=======
+        nodes_dict[f"outlet_z-{depth_label}m"] = plotter.unwrap_node_id(
+            simu.find_nearest_node([outlet_x, outlet_y, outlet_z - depth])
+        )
+>>>>>>> 1d78c26b5b57db0ec851d536dacab6ca80d61ed4
         if mid_band_idx is not None:
             if depth == 0:
                 # Surface band indices already are node indices at depth 0.
                 nodes_dict[f"mid_z-{depth_label}m"] = [int(i) for i in mid_band_idx]
             else:
                 # Project every surface node in the band straight down by
+<<<<<<< HEAD
                 # `depth` and resolve the whole band to node indices in
                 # one vectorized KD-tree query, instead of one
                 # find_nearest_node() call per band node.
@@ -1481,6 +1529,23 @@ def resolve_nodes(
         else:
             _, mid_node_idx = node_tree.query([mid_x, mid_y, mid_z - depth])
             nodes_dict[f"mid_z-{depth_label}m"] = int(mid_node_idx)
+=======
+                # `depth` and resolve each one to its own subsurface node,
+                # so the band is preserved at every requested depth too.
+                nodes_dict[f"mid_z-{depth_label}m"] = [
+                    plotter.unwrap_node_id(
+                        simu.find_nearest_node(
+                            [surface_nodes[i, 0], surface_nodes[i, 1],
+                             surface_nodes[i, 2] - depth]
+                        )
+                    )
+                    for i in mid_band_idx
+                ]
+        else:
+            nodes_dict[f"mid_z-{depth_label}m"] = plotter.unwrap_node_id(
+                simu.find_nearest_node([mid_x, mid_y, mid_z - depth])
+            )
+>>>>>>> 1d78c26b5b57db0ec851d536dacab6ca80d61ed4
 
     print("  Resolved nodes:")
 
@@ -1619,7 +1684,11 @@ def run_pipeline(args: argparse.Namespace) -> None:
 
     # -- DEM -------------------------------------------------------------------
     adf_folder = f"{MODULE_PATH}/DTMplots/dtmplot{log_row['watershed_nb']}/"
+<<<<<<< HEAD
 
+=======
+    
+>>>>>>> 1d78c26b5b57db0ec851d536dacab6ca80d61ed4
     gdf_Agramon = AgUtils.load_plot_shapefiles(['microcuencas_13'], MODULE_PATH / "shapefiles")
     dem_tif_path = Path(args.dem_tif)  # same CLI default/value used at generation time
 
@@ -1627,7 +1696,11 @@ def run_pipeline(args: argparse.Namespace) -> None:
         dem_tif_path,
         gdf_clip=gdf_Agramon,
         fid=int(log_row["watershed_nb"]),
+<<<<<<< HEAD
         resample_resolution=args.dem_res,
+=======
+        resample_resolution=2,
+>>>>>>> 1d78c26b5b57db0ec851d536dacab6ca80d61ed4
     )
 
 
@@ -1636,6 +1709,7 @@ def run_pipeline(args: argparse.Namespace) -> None:
     #    adf_folder=adf_folder,
     #)
 
+<<<<<<< HEAD
     _first = next(iter(veg_map_history))
     if raster_DEM_masked.shape != veg_map_history[_first].shape:
         raise ValueError(
@@ -1644,6 +1718,8 @@ def run_pipeline(args: argparse.Namespace) -> None:
             "differs from the resolution used for the simulation."
         )
 
+=======
+>>>>>>> 1d78c26b5b57db0ec851d536dacab6ca80d61ed4
     veg_map_history_masked = veg_map_history.copy()
 
     for vmh in veg_map_history:
@@ -1701,7 +1777,11 @@ def run_pipeline(args: argparse.Namespace) -> None:
                     ds_sw_grid,
                     variable=args.sw_var,
                     selected_year=yr,
+<<<<<<< HEAD
                     out_dir=main_dir,
+=======
+                    out_dir=fig_dir,
+>>>>>>> 1d78c26b5b57db0ec851d536dacab6ca80d61ed4
                     cmap=CMAP_SW,
                     dpi=dpi,
                     show=show,
@@ -1860,17 +1940,26 @@ def run_pipeline(args: argparse.Namespace) -> None:
         # (replaces the ERA5 point time-series previously used here — see
         # Agramon_withLAI_withETp.py, step 1: "Load satellite ETp + rain
         # NetCDFs (EPSG:32630 → EPSG:25830)").
+<<<<<<< HEAD
         pev_series:        pd.Series | None = None
         pev_series_median: pd.Series | None = None
         tp_series:         pd.Series | None = None
+=======
+        pev_series: pd.Series | None = None
+        tp_series:  pd.Series | None = None
+>>>>>>> 1d78c26b5b57db0ec851d536dacab6ca80d61ed4
         try:
             ds_etp  = load_etp()
             ds_rain = load_rain()
             gdf_Agramon = AgUtils.load_plot_shapefiles(['microcuencas_13'],
                                                        MODULE_PATH / "shapefiles")
+<<<<<<< HEAD
             pev_series        = _domain_mean_daily_series(ds_etp,  "ET_0-gf", gdf_Agramon)
             pev_series_median = _domain_mean_daily_series(ds_etp,  "ET_0-gf", gdf_Agramon,
                                                             stat="median")
+=======
+            pev_series = _domain_mean_daily_series(ds_etp,  "ET_0-gf", gdf_Agramon)
+>>>>>>> 1d78c26b5b57db0ec851d536dacab6ca80d61ed4
             tp_series  = _domain_mean_daily_series(ds_rain, "TP-DD",   gdf_Agramon)
 
             # ET0 and TP come from separate NetCDFs and don't necessarily
@@ -1885,14 +1974,19 @@ def run_pipeline(args: argparse.Namespace) -> None:
                       f"{len(common_idx)} shared days "
                       f"(dropped {n_dropped_pev} ETp-only, "
                       f"{n_dropped_tp} rain-only day(s)).")
+<<<<<<< HEAD
             pev_series        = pev_series.loc[common_idx]
             pev_series_median = pev_series_median.loc[
                 pev_series_median.index.intersection(common_idx)
             ]
+=======
+            pev_series = pev_series.loc[common_idx]
+>>>>>>> 1d78c26b5b57db0ec851d536dacab6ca80d61ed4
             tp_series  = tp_series.loc[common_idx]
         except Exception as etp_exc:
             print(f"  WARNING: satellite ETp/rain forcing not loaded — "
                   f"rain/ETp panel will be empty.\n    ({etp_exc})")
+<<<<<<< HEAD
 
         # ETp mapped onto the CATHY mesh surface nodes (same convention as
         # ET_xr_all / psi_xr / sw_xr — see Agramon_withLAI_withETp.py, step 8
@@ -1926,6 +2020,8 @@ def run_pipeline(args: argparse.Namespace) -> None:
         except Exception as etp_node_exc:
             print(f"  WARNING: ETp-to-mesh mapping failed — "
                   f"Fig 7h (ETa/ETp ratio) will be skipped.\n    ({etp_node_exc})")
+=======
+>>>>>>> 1d78c26b5b57db0ec851d536dacab6ca80d61ed4
 #%%
         print("-- Fig 6: Hydro time-series (Rain/ETp + ψ + sw) -----------------")
         plotter.plot_hydro_xr(
@@ -2004,6 +2100,7 @@ def run_pipeline(args: argparse.Namespace) -> None:
             )
         except Exception as exc:
             print(f"  WARNING: plot_hydro_xr_weekly skipped — {exc}")
+<<<<<<< HEAD
 
         print("-- Fig 6e (per year): Hydro time-series -- daily -----------------")
         for _yr in _ts_years(sw_xr, args):
@@ -2049,6 +2146,8 @@ def run_pipeline(args: argparse.Namespace) -> None:
             except Exception as exc:
                 print(f"  WARNING: plot_hydro_xr_monthly skipped — {exc}")
 
+=======
+>>>>>>> 1d78c26b5b57db0ec851d536dacab6ca80d61ed4
 #%%
         print("-- Fig 6b: Reference node locations (map) -----------------------")
         try:
@@ -2089,6 +2188,7 @@ def run_pipeline(args: argparse.Namespace) -> None:
 
         print("-- Fig 7b: sw + ETa + LAI trend time-series ----------------------")
         lai_ds = plotter.lai_history_to_dataset(art["lai_history"], lai_var=LAI_VAR)
+<<<<<<< HEAD
 
         # Georeferenced copy for Fig 7h — lai_history was built by
         # interpolating the satellite LAI onto this same DEM raster grid
@@ -2110,6 +2210,8 @@ def run_pipeline(args: argparse.Namespace) -> None:
         except Exception as lai_geo_exc:
             print(f"  WARNING: could not georeference lai_ds — "
                   f"Fig 7h will be skipped.\n    ({lai_geo_exc})")
+=======
+>>>>>>> 1d78c26b5b57db0ec851d536dacab6ca80d61ed4
         try:
             plotter.plot_et_sw_lai_xr(
                 sw_xr, ET_xr_all, ET_VAR, ET_SCALE, lai_ds, nodes_dict, fig_dir,
@@ -2174,6 +2276,7 @@ def run_pipeline(args: argparse.Namespace) -> None:
         except Exception as exc:
             print(f"  WARNING: plot_et_sw_lai_xr_weekly skipped — {exc}")
 
+<<<<<<< HEAD
         print("-- Fig 7be (per year): sw + ETa + LAI time-series -- daily --------")
         for _yr in _ts_years(sw_xr, args):
             try:
@@ -2263,6 +2366,8 @@ def run_pipeline(args: argparse.Namespace) -> None:
             except Exception as exc:
                 print(f"  WARNING: plot_et_psi_lai_xr_monthly skipped — {exc}")
 
+=======
+>>>>>>> 1d78c26b5b57db0ec851d536dacab6ca80d61ed4
         print(f"-- Fig 7c: sw + ETa time-series -- fire years ({plotter.FIRE_DATE.year}-{plotter.FIRE_DATE.year + 1}) ---")
         try:
             plotter.plot_et_sw_xr_fire_year(
@@ -2277,6 +2382,7 @@ def run_pipeline(args: argparse.Namespace) -> None:
         except Exception as exc:
             print(f"  WARNING: plot_et_sw_xr_fire_year skipped — {exc}")
 
+<<<<<<< HEAD
         print(f"-- Fig 7gc: psi + ETa time-series -- fire years ({plotter.FIRE_DATE.year}-{plotter.FIRE_DATE.year + 1}) ---")
         try:
             plotter.plot_et_psi_xr_fire_year(
@@ -2291,6 +2397,8 @@ def run_pipeline(args: argparse.Namespace) -> None:
         except Exception as exc:
             print(f"  WARNING: plot_et_psi_xr_fire_year skipped — {exc}")
 
+=======
+>>>>>>> 1d78c26b5b57db0ec851d536dacab6ca80d61ed4
         print(f"-- Fig 7d: sw + ETa time-series -- fire month "
               f"({plotter.FIRE_DATE.strftime('%B %Y')}) -----------------")
         try:
@@ -2322,6 +2430,7 @@ def run_pipeline(args: argparse.Namespace) -> None:
         except Exception as exc:
             print(f"  WARNING: plot_et_sw_xr_weekly skipped — {exc}")
 
+<<<<<<< HEAD
         if args.monthly_ts:   # optional: --monthly-ts
             print("-- Fig 7j: sw + ETa time-series -- monthly ------------------------------")
             try:
@@ -2464,6 +2573,8 @@ def run_pipeline(args: argparse.Namespace) -> None:
             else:
                 print("  Skipped — domain-mean/median ETp series unavailable.")
 
+=======
+>>>>>>> 1d78c26b5b57db0ec851d536dacab6ca80d61ed4
     # ── Fig 8: Catchment ET balance (monthly + annual) ─────────────────────
     # plot_catchment_et expects a data-dict with keys:
     #   ET_xr       — spatial xr.Dataset with a CRS (used for pixel-area)

@@ -69,11 +69,14 @@ LAI-loop xarray-based hydro figures (test_withLAI_results — Fig 6 / 7)
     plot_et_sw_lai_xr_fire_year(...)    # Fig 7bc — fire year + following year
     plot_et_sw_lai_xr_fire_month(...)   # Fig 7bd — fire month only
     plot_et_sw_lai_xr_weekly(...)       # Fig 7be — weekly-resampled
+<<<<<<< HEAD
 
 LAI + ET + sw + psi + ETa/ETp ratio, at reference nodes (new)
     plot_lai_et_sw_psi_ratio_xr(lai_ds, ET_xr_all, et_var, et_scale,
                   ETp_xr, etp_var, etp_scale, sw_xr, psi_xr,
                   nodes_dict, grid3d, fig_path, ...)   # Fig 8 — 5-panel stack
+=======
+>>>>>>> 1d78c26b5b57db0ec851d536dacab6ca80d61ed4
 """
 
 from __future__ import annotations
@@ -107,7 +110,10 @@ COLORS_HYDRO: dict[str, str] = {
     "downhill_1m":      "#E69F00",
     "ET_mean":          "#009E73",
     "LAI":              "#4daf4a",
+<<<<<<< HEAD
     "ETp":              "#999999",
+=======
+>>>>>>> 1d78c26b5b57db0ec851d536dacab6ca80d61ed4
 }
 
 # ── Fire event marker ──────────────────────────────────────────────────────
@@ -433,12 +439,19 @@ def plot_veg_map_year(
         used.append(ax)
         ax.imshow(veg_map_history[d], origin="upper", cmap=cmap_veg,
                   vmin=0.5, vmax=3.5, aspect="equal")
+<<<<<<< HEAD
         ax.set_title(f"{d:%B}", fontsize=10, pad=3)
         ax.tick_params(labelsize=7, length=2.5, pad=1.5,
                        labelleft=(k % ncols == 0),
                        labelbottom=(k + ncols >= n))
     for k in range(n, nrows * ncols):
         axes[k // ncols][k % ncols].set_visible(False)
+=======
+        veg_colorbar(ax, cmap_veg)
+        ax.set_title(f"{d:%B %Y}", fontsize=10)
+        ax.set_xlabel("Column")
+        ax.set_ylabel("Row")
+>>>>>>> 1d78c26b5b57db0ec851d536dacab6ca80d61ed4
 
     bounds = [0.5, 1.5, 2.5, 3.5]
     sm = cm.ScalarMappable(cmap=cmap_veg, norm=mcolors.BoundaryNorm(bounds, cmap_veg.N))
@@ -1410,6 +1423,121 @@ def plot_hgraph_csv(
     save_fig(fig, fig_path, fname, dpi)
     maybe_show(fig, show)
 
+
+def plot_node_locations(
+    grid3d:      dict,
+    nodes_dict:  dict,
+    fig_path:    Path,
+    *,
+    dem_da:      xr.DataArray | None = None,
+    colors_dict: dict | None = None,
+    scenario_id: int | str = "?",
+    dpi:         int  = 150,
+    show:        bool = False,
+    fname:       str  = "fig_node_locations.png",
+) -> None:
+    """
+    Fig 6b — 2-D map of the reference-node locations where the psi and sw
+    time-series (Fig 6 / Fig 7) are extracted.
+
+    Nodes sharing the same site (e.g. every depth resolved at "outlet" or
+    "mid") sit at the same (X, Y) and are plotted together, annotated with
+    their depth tag and node index.
+
+    Parameters
+    ----------
+    grid3d      : dict returned by ``simu.read_outputs("grid3d")``; must
+                  contain "mesh3d_nodes" (array of X, Y, Z per node index).
+    nodes_dict  : dict returned by ``resolve_nodes()``, i.e.
+                  {"outlet_z-0m": <node id>, "mid_z-1m": <node id>, …}.
+    fig_path    : output directory.
+    dem_da      : optional xr.DataArray (dims "x"/"y" or "X"/"Y") used as a
+                  DEM basemap. Skipped silently if it can't be plotted.
+    colors_dict : override COLORS_HYDRO; "uphill_surface" colours "mid"
+                  sites, "downhill_surface" colours "outlet" sites.
+    scenario_id : label for the figure title.
+    """
+    colors_dict = colors_dict or COLORS_HYDRO
+    nodes = grid3d["mesh3d_nodes"]
+
+    # Work on a local copy — this function only needs a single point per
+    # site to draw a marker, but nodes_dict is shared with (and consumed
+    # by) other plotting calls, so we must never mutate the caller's dict.
+    # If "mid_z-0m" already holds a band (list of ids, from
+    # find_representative_mid_node(..., return_band=True) in
+    # resolve_nodes()), collapse it to one representative point here for
+    # display purposes only — the original band is left untouched in the
+    # caller's nodes_dict for downstream median-across-band extraction.
+    nodes_dict = dict(nodes_dict)
+    if "mid_z-0m" in nodes_dict:
+        nodes_dict["mid_z-0m"] = find_representative_mid_node(nodes)
+
+    # ── Group node labels by site (everything before "_z-") ───────────────────
+    sites: dict[str, list[tuple[str, int]]] = defaultdict(list)
+    for label in nodes_dict:
+        if "_z-" not in label:
+            continue
+        site = label.split("_z-")[0]
+        sites[site].append((label, _node_id(nodes_dict, label)))
+
+    if not sites:
+        print("  plot_node_locations: skipped — no depth-tagged nodes in nodes_dict.")
+        return
+
+    site_color_map = {
+        "mid":    colors_dict.get("uphill_surface",   "#0072B2"),
+        "outlet": colors_dict.get("downhill_surface", "#D55E00"),
+    }
+    fallback_cmap = plt.get_cmap("tab10")
+
+    fig, ax = plt.subplots(figsize=(7, 7))
+
+    # ── Optional DEM basemap ────────────────────────────────────────────────
+    if dem_da is not None:
+        try:
+            xdim = "x" if "x" in dem_da.dims else "X"
+            ydim = "y" if "y" in dem_da.dims else "Y"
+            dem_da.plot.imshow(
+                ax=ax, x=xdim, y=ydim, cmap="terrain", alpha=0.85,
+                add_colorbar=True,
+                cbar_kwargs={"label": "Elevation (m)", "shrink": 0.75},
+            )
+            ax.set_title("")
+        except Exception as exc:
+            print(f"  plot_node_locations: DEM basemap skipped ({exc}).")
+
+    # ── Reference-node markers ──────────────────────────────────────────────
+    for i, (site, entries) in enumerate(sites.items()):
+        color = site_color_map.get(site, fallback_cmap(i % 10))
+        xs, ys = [], []
+        for label, node_id in entries:
+            x, y, _z = nodes[node_id]
+            xs.append(x)
+            ys.append(y)
+            depth_tag = label.split("_z-")[1]
+            ax.annotate(
+                f"{depth_tag}\n(n={node_id})",
+                (x, y), textcoords="offset points", xytext=(6, 6),
+                fontsize=7, color=color,
+            )
+        ax.scatter(
+            xs, ys, s=70, color=color, edgecolor="black",
+            linewidth=0.6, zorder=3, label=site.capitalize(),
+        )
+
+    ax.set_xlabel("X (m)")
+    ax.set_ylabel("Y (m)")
+    ax.set_aspect("equal")
+    ax.set_title(
+        f"Sc.{scenario_id} | Reference node locations (psi / sw extraction)",
+        fontsize=11, fontweight="bold",
+    )
+    ax.legend(loc="best", fontsize=9)
+    ax.grid(True, linestyle="--", alpha=0.3)
+
+    plt.tight_layout()
+    save_fig(fig, fig_path, fname, dpi)
+    maybe_show(fig, show)
 
 def plot_node_locations(
     grid3d:      dict,
@@ -2645,6 +2773,7 @@ def plot_et_sw_xr_weekly(
 
 
 # =============================================================================
+<<<<<<< HEAD
 # Fig 7g -- psi + ETa (Fig 7, but the top panel is pressure head, not sw)
 # =============================================================================
 
@@ -2825,6 +2954,8 @@ def plot_et_psi_xr_fire_year(
 
 
 # =============================================================================
+=======
+>>>>>>> 1d78c26b5b57db0ec851d536dacab6ca80d61ed4
 # Fig 7b -- sw + ETa + LAI trend (Fig 7 with an added LAI panel)
 # =============================================================================
 
@@ -3114,6 +3245,7 @@ def plot_et_sw_lai_xr_weekly(
         et_unit="mm/week", et_as_line=True,
     )
 
+<<<<<<< HEAD
 
 def plot_et_psi_lai_xr(
     psi_xr:     xr.Dataset,
@@ -3335,6 +3467,8 @@ def plot_et_psi_lai_xr_weekly(
         et_unit="mm/week", et_as_line=True,
     )
 
+=======
+>>>>>>> 1d78c26b5b57db0ec851d536dacab6ca80d61ed4
 
 # =============================================================================
 # Colour / label constants
@@ -3741,6 +3875,7 @@ def plot_eta_total(
 
     print(f"  Computing annual domain {product_name} …")
     _plot_eta_total_freq(ds_et, "YE", fig_path, label=label, dpi=dpi, show=show, product_name=product_name)
+<<<<<<< HEAD
 
 
 # =============================================================================
@@ -4286,3 +4421,5 @@ def plot_catchment_eta_etp_ratio_monthly(
         date_start=date_start, date_end=date_end, scenario_id=scenario_id,
         dpi=dpi, show=show, fname=fname, freq=MONTHLY_RULE,
     )
+=======
+>>>>>>> 1d78c26b5b57db0ec851d536dacab6ca80d61ed4

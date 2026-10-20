@@ -22,7 +22,11 @@ set -uo pipefail
 # -- Defaults ------------------------------------------------------------
 START_YEAR=2016
 END_YEAR=2026
+<<<<<<< HEAD
 PLOTS=(2)                     # dem-plot(s) to run; one 1-13 value per sim run
+=======
+PLOTS=(2)                     # dem-plot(s) to run; one 1-9 value per sim run
+>>>>>>> 1d78c26b5b57db0ec851d536dacab6ca80d61ed4
 PMINS=(-1e35)                 # PMIN value(s) in m; one or more, crossed like --dem-plot
 OUTLET_MODE="closed"          # free | closed | both  (default "closed" so a
                                # bare run is a fully-closed box, matching
@@ -39,10 +43,13 @@ SPINUP_CYCLES=3
 IC_MODE="both"                # wt | pressure | both
 IC_WTPOSITION="1"             # m, used when ic_label=wt
 IC_PRESSURE_HEAD="-10"        # m, used when ic_label=pressure
+<<<<<<< HEAD
 FORCING="etp"                # era5 | etp | etp_ts (Agramon script file 1)
 ETP_TS_COLUMN="ET_0_wet"     # ET_0_wet | ET_0_dry, only for etp_ts
 ETP_TS_FEATURE_ID=""         # optional; defaults to dem-plot - 1 in Python
 DEM_SMOOTH_SIGMA="0.0"      # Gaussian smoothing sigma in DEM pixels
+=======
+>>>>>>> 1d78c26b5b57db0ec851d536dacab6ca80d61ed4
 
 # Kept in sync with Agramon_withLAI_withETp.py's own defaults for the
 # flags this script never overrides — needed so the "already succeeded?"
@@ -59,6 +66,7 @@ ZROOT_FACTORS=()                      # 5 values, empty = use Python script's de
 PERMX=""                              # m/s, empty = pyCATHY default (not overridden)
 PERMY_RATIO="1.0"
 PERMZ_RATIO="1.0"
+<<<<<<< HEAD
 SCF="1.0"                              # float in [0,1], matches
                                         # Agramon_withLAI_withETp.py's own
                                         # --scf default (no auto-inference from
@@ -74,11 +82,17 @@ PCREF=""                               # m, field capacity h3
 PCWLT=""                               # m, wilting point h4
 PZ=""                                  # empirical root-water-uptake exponent
 OMGC=""                                # 0-1, root water uptake compensation
+=======
+>>>>>>> 1d78c26b5b57db0ec851d536dacab6ca80d61ed4
 
 FORCE_RERUN=0                 # --force: run even if a matching completed
                                # scenario is already found on disk
 
+<<<<<<< HEAD
 SCRIPT_SIM="Agramon_withLAI_withETp.py"  # use file (1), with --forcing and --dem-smooth-sigma
+=======
+SCRIPT_SIM="Agramon_withLAI_withETp.py"
+>>>>>>> 1d78c26b5b57db0ec851d536dacab6ca80d61ed4
 SCRIPT_RES="withLAI_results.py"
 
 # -- Help ----------------------------------------------------------------
@@ -91,18 +105,25 @@ outlet mode x bottom mode x spin-up mode, then (optionally) post-processes.
 Every option below is a real flag understood by this script — it forwards
 straight to the matching Agramon_withLAI_withETp.py argument.
 
+<<<<<<< HEAD
 Atmospheric forcing (file 1):
   --forcing {era5|etp|etp_ts}  Forcing mode (default: ${FORCING})
   --etp-ts-column {ET_0_wet|ET_0_dry}  ETp column for etp_ts (default: ${ETP_TS_COLUMN})
   --etp-ts-feature-id ID       Optional treatment feature_id for etp_ts
   --dem-smooth-sigma SIGMA     Gaussian DEM smoothing in pixels (default: ${DEM_SMOOTH_SIGMA})
 
+=======
+>>>>>>> 1d78c26b5b57db0ec851d536dacab6ca80d61ed4
 Simulation period:
   --start-year YYYY     First year of forcing (default: ${START_YEAR})
   --end-year YYYY       Last year, exclusive   (default: ${END_YEAR})
 
 DEM plot(s):
+<<<<<<< HEAD
   --dem-plot N [N ...]  One or more dem-plot indices, 1-13 (default: ${PLOTS[*]}).
+=======
+  --dem-plot N [N ...]  One or more dem-plot indices, 1-9 (default: ${PLOTS[*]}).
+>>>>>>> 1d78c26b5b57db0ec851d536dacab6ca80d61ed4
                          Each value becomes its own simulation run.
 
 PMIN (--pmin under the hood):
@@ -172,6 +193,7 @@ Soil hydraulic conductivity (--permx / --permy-ratio / --permz-ratio):
   --permz-ratio VAL      PERMZ = --permx * this value (default: ${PERMZ_RATIO}).
                           Only takes effect when --permx is set.
 
+<<<<<<< HEAD
 Root water uptake (--scf under the hood):
   --scf VAL               Float in [0,1]: 0 = PMIN-threshold approach
                           (sparse/arid cover), 1 = Feddes approach (ET ~
@@ -212,6 +234,8 @@ Feddes parameters (root water uptake — FP_map):
                           in the batch — none are crossed like
                           --dem-plot/--pmin.
 
+=======
+>>>>>>> 1d78c26b5b57db0ec851d536dacab6ca80d61ed4
 Other:
   --force                Re-run a scenario even if a completed one with the
                           exact same parameters (incl. initial condition,
@@ -292,6 +316,7 @@ while [[ $# -gt 0 ]]; do
     case "$1" in
         --help|-h)
             usage; exit 0 ;;
+<<<<<<< HEAD
         --forcing)
             FORCING="$2"; shift 2 ;;
         --etp-ts-column)
@@ -300,6 +325,8 @@ while [[ $# -gt 0 ]]; do
             ETP_TS_FEATURE_ID="$2"; shift 2 ;;
         --dem-smooth-sigma)
             DEM_SMOOTH_SIGMA="$2"; shift 2 ;;
+=======
+>>>>>>> 1d78c26b5b57db0ec851d536dacab6ca80d61ed4
         --start-year)
             START_YEAR="$2"; shift 2 ;;
         --end-year)
@@ -340,7 +367,11 @@ while [[ $# -gt 0 ]]; do
             SPINUP_MODE="$2"; shift 2 ;;
         --spinup-cycles)
             SPINUP_CYCLES="$2"; shift 2 ;;
+<<<<<<< HEAD
         --ic|--ic-mode)
+=======
+        --ic)
+>>>>>>> 1d78c26b5b57db0ec851d536dacab6ca80d61ed4
             IC_MODE="$2"; shift 2 ;;
         --ic-wtposition)
             IC_WTPOSITION="$2"; shift 2 ;;
@@ -364,6 +395,7 @@ while [[ $# -gt 0 ]]; do
             PERMY_RATIO="$2"; shift 2 ;;
         --permz-ratio)
             PERMZ_RATIO="$2"; shift 2 ;;
+<<<<<<< HEAD
         --scf)
             SCF="$2"; shift 2 ;;
         --feddes-crop)
@@ -378,6 +410,8 @@ while [[ $# -gt 0 ]]; do
             PZ="$2"; shift 2 ;;
         --omgc)
             OMGC="$2"; shift 2 ;;
+=======
+>>>>>>> 1d78c26b5b57db0ec851d536dacab6ca80d61ed4
         --force)
             FORCE_RERUN=1; shift ;;
         *)
@@ -388,6 +422,7 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
+<<<<<<< HEAD
 # Validate options introduced in Agramon_withLAI_withETp.py file (1).
 case "${FORCING}" in
     era5|etp|etp_ts) ;;
@@ -406,6 +441,8 @@ if [ -n "${ETP_TS_FEATURE_ID}" ] && ! [[ "${ETP_TS_FEATURE_ID}" =~ ^[0-9]+$ ]]; 
     exit 1
 fi
 
+=======
+>>>>>>> 1d78c26b5b57db0ec851d536dacab6ca80d61ed4
 # -- Validate + expand modes into label lists ------------------------------
 case "$OUTLET_MODE" in
     free)   OUTLET_LABELS=(free) ;;
@@ -436,8 +473,13 @@ case "$IC_MODE" in
 esac
 
 for plot in "${PLOTS[@]}"; do
+<<<<<<< HEAD
     if ! [[ "$plot" =~ ^([1-9]|1[0-3])$ ]]; then
         echo "ERROR: --dem-plot values must be 1-13 (got '${plot}')" >&2
+=======
+    if ! [[ "$plot" =~ ^[1-9]$ ]]; then
+        echo "ERROR: --dem-plot values must be 1-9 (got '${plot}')" >&2
+>>>>>>> 1d78c26b5b57db0ec851d536dacab6ca80d61ed4
         exit 1
     fi
 done
@@ -449,6 +491,7 @@ for pmin in "${PMINS[@]}"; do
     fi
 done
 
+<<<<<<< HEAD
 if [ -n "${SCF}" ]; then
     if ! [[ "${SCF}" =~ ^-?[0-9]+([.][0-9]+)?([eE][-+]?[0-9]+)?$ ]]; then
         echo "ERROR: --scf must be numeric (got '${SCF}')" >&2
@@ -474,6 +517,8 @@ for pair in "--pcana:${PCANA}" "--pcref:${PCREF}" "--pcwlt:${PCWLT}" "--pz:${PZ}
     fi
 done
 
+=======
+>>>>>>> 1d78c26b5b57db0ec851d536dacab6ca80d61ed4
 YEARS="--start-year ${START_YEAR} --end-year ${END_YEAR}"
 
 # Root-depth / Ks overrides, forwarded verbatim if given (same value for
@@ -487,6 +532,7 @@ if [ -n "${PERMX}" ]; then
     # OUTLET_ARGS/BOTTOM_ARGS/--pmin above (e.g. --permx -1e-5).
     SOIL_ARGS="${SOIL_ARGS} --permx=${PERMX} --permy-ratio=${PERMY_RATIO} --permz-ratio=${PERMZ_RATIO}"
 fi
+<<<<<<< HEAD
 SOIL_ARGS="${SOIL_ARGS} --scf ${SCF}"
 if [ -n "${FEDDES_CROP}" ]; then
     SOIL_ARGS="${SOIL_ARGS} --feddes-crop ${FEDDES_CROP}"
@@ -506,6 +552,8 @@ fi
 if [ -n "${OMGC}" ]; then
     SOIL_ARGS="${SOIL_ARGS} --omgc=${OMGC}"
 fi
+=======
+>>>>>>> 1d78c26b5b57db0ec851d536dacab6ca80d61ed4
 
 # Build a filename tag from the resolved plot list + mode selections, so
 # different argument combos land in distinguishable log files instead of
@@ -526,11 +574,14 @@ echo "outlet modes  : ${OUTLET_LABELS[*]} (free = ${OUTLET_FREE_VAL} m/s)"
 echo "bottom modes  : ${BOTTOM_LABELS[*]} (free = ${BOTTOM_FREE_VAL} m/s)"
 echo "spinup modes  : ${SPINUP_LABELS[*]} (cycles = ${SPINUP_CYCLES})"
 echo "ic modes      : ${IC_LABELS[*]} (wt depth = ${IC_WTPOSITION} m, pressure = ${IC_PRESSURE_HEAD} m)"
+<<<<<<< HEAD
 echo "forcing       : ${FORCING}"
 if [ "${FORCING}" = "etp_ts" ]; then
     echo "ETp TS        : column=${ETP_TS_COLUMN}, feature_id=${ETP_TS_FEATURE_ID:-auto from plot}"
 fi
 echo "DEM smoothing : sigma=${DEM_SMOOTH_SIGMA} px"
+=======
+>>>>>>> 1d78c26b5b57db0ec851d536dacab6ca80d61ed4
 if [ ${#ZROOT_FACTORS[@]} -eq 5 ]; then
     echo "zroot-factors : ${ZROOT_FACTORS[*]}"
 else
@@ -541,12 +592,15 @@ if [ -n "${PERMX}" ]; then
 else
     echo "PERMX (Ks)    : (pyCATHY default)"
 fi
+<<<<<<< HEAD
 echo "SCF           : ${SCF}"
 if [ -n "${FEDDES_CROP}" ] || [ -n "${PCANA}" ] || [ -n "${PCREF}" ] || [ -n "${PCWLT}" ] || [ -n "${PZ}" ] || [ -n "${OMGC}" ]; then
     echo "Feddes (FP)   : crop=${FEDDES_CROP:-none} pcana=${PCANA:-default} pcref=${PCREF:-default} pcwlt=${PCWLT:-default} pz=${PZ:-default} omgc=${OMGC:-default}"
 else
     echo "Feddes (FP)   : (pyCATHY default)"
 fi
+=======
+>>>>>>> 1d78c26b5b57db0ec851d536dacab6ca80d61ed4
 if [ "${FORCE_RERUN}" = "1" ]; then
     echo "skip-existing : disabled (--force given, all combos will run)"
 else
@@ -586,6 +640,7 @@ check_already_done() {
     CHK_PERMX="${PERMX}" \
     CHK_PERMY_RATIO="${PERMY_RATIO}" \
     CHK_PERMZ_RATIO="${PERMZ_RATIO}" \
+<<<<<<< HEAD
     CHK_SCF="${SCF}" \
     CHK_FEDDES_CROP="${FEDDES_CROP}" \
     CHK_PCANA="${PCANA}" \
@@ -596,6 +651,8 @@ check_already_done() {
     CHK_FORCING="${FORCING}" \
     CHK_ETP_TS_COLUMN="${ETP_TS_COLUMN}" \
     CHK_ETP_TS_FEATURE_ID="${ETP_TS_FEATURE_ID}" \
+=======
+>>>>>>> 1d78c26b5b57db0ec851d536dacab6ca80d61ed4
     python3 - <<'PYEOF'
 import math
 import os
@@ -621,6 +678,7 @@ zroot_factors_str = os.environ.get("CHK_ZROOT_FACTORS", "")
 permx       = os.environ.get("CHK_PERMX", "")
 permy_ratio = os.environ.get("CHK_PERMY_RATIO", "")
 permz_ratio = os.environ.get("CHK_PERMZ_RATIO", "")
+<<<<<<< HEAD
 scf_str     = os.environ.get("CHK_SCF", "")
 feddes_crop = os.environ.get("CHK_FEDDES_CROP", "")
 pcana       = os.environ.get("CHK_PCANA", "")
@@ -632,6 +690,8 @@ forcing     = os.environ.get("CHK_FORCING", "etp")
 etp_ts_column = os.environ.get("CHK_ETP_TS_COLUMN", "ET_0_wet")
 etp_ts_feature_id = os.environ.get("CHK_ETP_TS_FEATURE_ID", "")
 dem_smooth_sigma = float(os.environ.get("CHK_DEM_SMOOTH_SIGMA", "0"))
+=======
+>>>>>>> 1d78c26b5b57db0ec851d536dacab6ca80d61ed4
 
 df = pd.read_csv(log_path)
 
@@ -650,6 +710,7 @@ mask = (
 )
 if "withLAI" in df.columns:
     mask &= (df["withLAI"] == 1)
+<<<<<<< HEAD
 # File (1) logs the forcing mode and ETp time-series settings. Treat older
 # rows without these columns as satellite-ETp runs only.
 if "forcing_mode" in df.columns:
@@ -663,6 +724,8 @@ if "forcing_mode" in df.columns:
             mask &= (pd.to_numeric(df["etp_ts_feature_id"], errors="coerce") == expected_feature_id)
 elif forcing != "etp":
     mask &= False
+=======
+>>>>>>> 1d78c26b5b57db0ec851d536dacab6ca80d61ed4
 if "ic_mode" in df.columns:
     # Rows logged before ic_mode existed won't match a specific ic_mode —
     # treated as "not confirmed for this axis", so they're re-run rather
@@ -688,6 +751,7 @@ else:
     if "permx" in df.columns:
         mask &= df["permx"].isna()
 
+<<<<<<< HEAD
 # --scf: plain float value match against the logged SCF (no more PMIN-based
 # auto-inference on either side — SCF is just a regular CLI parameter now).
 # Falls back to 1.0, matching Agramon_withLAI_withETp.py's own --scf
@@ -743,6 +807,8 @@ if "feddes_crop" in df.columns:
     else:
         mask &= df["feddes_crop"].isna()
 
+=======
+>>>>>>> 1d78c26b5b57db0ec851d536dacab6ca80d61ed4
 matches = df[mask]
 if matches.empty:
     print("MISSING (no matching logged run)")
@@ -815,7 +881,11 @@ for plot in "${PLOTS[@]}"; do
                     echo "  dem-plot ${plot} | pmin=${pmin} | outlet=${outlet_label} | bottom=${bottom_label} | spinup=${spinup_label} | ic=${ic_label} ...  $(date)"
                     echo "============================================================"
 
+<<<<<<< HEAD
                     if [ "${FORCE_RERUN}" != "1" ] && awk -v v="${DEM_SMOOTH_SIGMA}" 'BEGIN { exit !(v == 0) }'; then
+=======
+                    if [ "${FORCE_RERUN}" != "1" ]; then
+>>>>>>> 1d78c26b5b57db0ec851d536dacab6ca80d61ed4
                         status=$(check_already_done \
                             "${pmin}" "${plot}" "${OUTLET_FLUX_VAL}" \
                             "${BOTTOM_FLUX_VAL}" "${SPINUP_STR}" "${ic_label}")
@@ -828,6 +898,7 @@ for plot in "${PLOTS[@]}"; do
                         fi
                     fi
 
+<<<<<<< HEAD
                     ETP_TS_ARGS=""
                     if [ -n "${ETP_TS_FEATURE_ID}" ]; then
                         ETP_TS_ARGS="--etp-ts-feature-id=${ETP_TS_FEATURE_ID}"
@@ -842,6 +913,12 @@ for plot in "${PLOTS[@]}"; do
                         --dem-smooth-sigma "${DEM_SMOOTH_SIGMA}" \
                         ${ETP_TS_ARGS} \
                         --dem-plot "${plot}" --pmin="${pmin}"
+=======
+                    # FIX: --pmin="${pmin}", not a separate token - same argparse
+                    # negative-number ambiguity as OUTLET_ARGS/BOTTOM_ARGS above
+                    # (e.g. --pmin -1e99 was misread as an unrecognized option).
+                    python "${SCRIPT_SIM}" ${YEARS} ${SPINUP_ARGS} ${OUTLET_ARGS} ${BOTTOM_ARGS} ${IC_ARGS} ${SOIL_ARGS} --dem-plot "${plot}" --pmin="${pmin}"
+>>>>>>> 1d78c26b5b57db0ec851d536dacab6ca80d61ed4
                 done
             done
         done

@@ -49,6 +49,7 @@ overwriting one another in a flat directory.
       zones pre-fire and collapses toward the bare-soil-zone behaviour
       post-fire (mechanism check, not just domain-mean skill).
 
+<<<<<<< HEAD
   compare_ETa_vs_csv_<label>.png   [only for forcing=etp_ts runs]
       Simulated WB ETa vs the Agramon treatments CSV (agramon_treatments_ET.csv)
       for the run's feature_id: real ET ("ET"), ETp dry bound ("ET_0_dry") and
@@ -68,6 +69,8 @@ overwriting one another in a flat directory.
       when the EO file provides one, else its first variable. Condition is
       parsed from the folder name (..._forcing-etpts-<wet|dry>-fid<K>).
 
+=======
+>>>>>>> 1d78c26b5b57db0ec851d536dacab6ca80d61ed4
 Usage
 -----
     python analyse_ET_compare.py                          # default plot 0, scenario 0
@@ -78,12 +81,15 @@ Usage
     python analyse_ET_compare.py --year 2021              # spatial-map year
     python analyse_ET_compare.py --n-zones 3               # LAI-zone count
     python analyse_ET_compare.py --no-zones                # skip zone figures
+<<<<<<< HEAD
     python analyse_ET_compare.py --scenario 7 --path2prj ../SSHydro_withETp_withLAI \
                                   --log-file simulation_log_withETp_withLAI.csv
         # point --scenario's resolution at a specific project tree/log —
         # same values plot_scenarii_withETp_withLAI.sh passes to
         # withLAI_results.py for that experiment. Without these, --scenario
         # is resolved against the WB_PRJ_ROOT/LOG_FILE module defaults.
+=======
+>>>>>>> 1d78c26b5b57db0ec851d536dacab6ca80d61ed4
 """
 
 from __future__ import annotations
@@ -468,6 +474,7 @@ def _find_sim_dir(scenario: int, log_file: str | None = None) -> Path:
     return sim_dir
 
 
+<<<<<<< HEAD
 def _safe_open_wb_dataset(nc_path: Path, max_attempts: int = 5,
                            retry_wait_s: float = 2.0) -> xr.Dataset:
     """
@@ -519,6 +526,8 @@ def _safe_open_wb_dataset(nc_path: Path, max_attempts: int = 5,
     ) from last_err
 
 
+=======
+>>>>>>> 1d78c26b5b57db0ec851d536dacab6ca80d61ed4
 def load_wb_et(scenario: int = 0) -> tuple[xr.Dataset, Path]:
     """
     Load et_output.nc from a CATHY simulation, normalise to mm/day,
@@ -1286,6 +1295,7 @@ def plot_compare_annual_bias_per_zone(
 
 
 # =============================================================================
+<<<<<<< HEAD
 # Figure H — simulated WB ETa vs Agramon CSV (real ET, ETp dry / wet bounds)
 # =============================================================================
 
@@ -1494,6 +1504,8 @@ def plot_compare_wb_vs_csv(
 
 
 # =============================================================================
+=======
+>>>>>>> 1d78c26b5b57db0ec851d536dacab6ca80d61ed4
 # Orchestrator
 # =============================================================================
 
@@ -1508,15 +1520,21 @@ def run_comparison(
     fig_path:      Path = fig_path,
     da_lai_ref:    xr.DataArray | None = None,
     n_zones:       int = N_LAI_ZONES,
+<<<<<<< HEAD
     df_csv:        pd.DataFrame | None = None,
     csv_forcing:   tuple[str, int] | None = None,
+=======
+>>>>>>> 1d78c26b5b57db0ec851d536dacab6ca80d61ed4
 ) -> None:
     """
     Run all comparison figures. Writes under *fig_path*.
 
+<<<<<<< HEAD
     *df_csv* / *csv_forcing* (daily Agramon CSV frame and the
     (column, feature_id) of the etp_ts run) enable Fig H; None skips it.
 
+=======
+>>>>>>> 1d78c26b5b57db0ec851d536dacab6ca80d61ed4
     *da_lai_ref* is an optional clipped LAI DataArray (with a 'time' dim)
     used to build the per-zone figures (F, G); pass None to skip them
     (e.g. when LAI_PATH doesn't resolve to a real file).
@@ -1557,6 +1575,7 @@ def run_comparison(
         fig_path, label=label, dpi=dpi, show=show,
     )
 
+<<<<<<< HEAD
     if df_csv is not None and csv_forcing is not None:
         print("\n── Fig H : WB ETa vs Agramon CSV (real ET, dry/wet) ─────────────")
         plot_compare_wb_vs_csv(
@@ -1566,6 +1585,8 @@ def run_comparison(
     else:
         print("\n── Fig H : CSV comparison skipped (not an etp_ts run / no CSV) ──")
 
+=======
+>>>>>>> 1d78c26b5b57db0ec851d536dacab6ca80d61ed4
     if da_lai_ref is None:
         print("\n── Fig F/G : per-zone comparison skipped (no LAI reference) ─────")
         return
@@ -1591,7 +1612,11 @@ def run_comparison(
 # CLI argument parsing
 # =============================================================================
 
+<<<<<<< HEAD
 def parse_args() -> tuple[list[str], int, int, str, int, bool, str, str, Path, int | None, bool]:
+=======
+def parse_args() -> tuple[list[str], int, int, str]:
+>>>>>>> 1d78c26b5b57db0ec851d536dacab6ca80d61ed4
     parser = argparse.ArgumentParser(
         description="Compare EO-EB vs Water-Balance ETa for Agramon"
     )
@@ -1624,6 +1649,7 @@ def parse_args() -> tuple[list[str], int, int, str, int, bool, str, str, Path, i
         "--no-zones", action="store_true",
         help="Skip the per-zone comparison (Fig F/G) even if LAI_PATH resolves.",
     )
+<<<<<<< HEAD
     parser.add_argument(
         "--path2prj", default=str(WB_PRJ_ROOT),
         help=(
@@ -1658,6 +1684,11 @@ def parse_args() -> tuple[list[str], int, int, str, int, bool, str, str, Path, i
     known_flags = {"--plots", "--year", "--scenario", "--wb-et-var", "--n-zones",
                     "--path2prj", "--log-file", "--et-csv", "--csv-fid"}
     bool_flags  = {"--no-zones", "--no-csv"}
+=======
+
+    known_flags = {"--plots", "--year", "--scenario", "--wb-et-var", "--n-zones"}
+    bool_flags  = {"--no-zones"}
+>>>>>>> 1d78c26b5b57db0ec851d536dacab6ca80d61ed4
     clean: list[str] = []
     i = 1
     while i < len(sys.argv):
@@ -1675,9 +1706,13 @@ def parse_args() -> tuple[list[str], int, int, str, int, bool, str, str, Path, i
             i += 1
 
     args = parser.parse_args(clean)
+<<<<<<< HEAD
     return (args.plots, args.year, args.scenario, args.wb_et_var, args.n_zones,
             args.no_zones, args.path2prj, args.log_file,
             Path(args.et_csv), args.csv_fid, args.no_csv)
+=======
+    return args.plots, args.year, args.scenario, args.wb_et_var, args.n_zones, args.no_zones
+>>>>>>> 1d78c26b5b57db0ec851d536dacab6ca80d61ed4
 
 
 # =============================================================================
@@ -1685,6 +1720,7 @@ def parse_args() -> tuple[list[str], int, int, str, int, bool, str, str, Path, i
 # =============================================================================
 
 if __name__ == "__main__":
+<<<<<<< HEAD
     (selection, selected_year, scenario, WB_ET_VAR, n_zones, no_zones,
      path2prj, log_file, et_csv, csv_fid, no_csv) = parse_args()
 
@@ -1694,6 +1730,9 @@ if __name__ == "__main__":
     # wrong project tree and every load below fails to find the ET data.
     WB_PRJ_ROOT = Path(path2prj)
     LOG_FILE    = log_file
+=======
+    selection, selected_year, scenario, WB_ET_VAR, n_zones, no_zones = parse_args()
+>>>>>>> 1d78c26b5b57db0ec851d536dacab6ca80d61ed4
 
     print("\n── Loading shapefiles ──────────────────────────────────────────")
     gdf_proj  = load_shapefiles()
@@ -1740,6 +1779,7 @@ if __name__ == "__main__":
     scenario_dirname = sim_dir.name
     scenario_fig_path = fig_path / scenario_dirname
 
+<<<<<<< HEAD
     # Fig H inputs: only for etp_ts runs (forcing column + feature_id are in
     # the scenario folder name); --csv-fid overrides the feature_id.
     df_csv, csv_forcing = None, None
@@ -1755,6 +1795,8 @@ if __name__ == "__main__":
             df_csv = load_csv_et(et_csv, fid)
             csv_forcing = (col, fid) if df_csv is not None else None
 
+=======
+>>>>>>> 1d78c26b5b57db0ec851d536dacab6ca80d61ed4
     print(f"\n── Running comparison ──────────────────────────────────────────")
     print(f"  EO-EB var    : {var_eo}")
     print(f"  WB condition : {wb_cond or 'n/a (not an etp_ts run)'}")
@@ -1773,8 +1815,11 @@ if __name__ == "__main__":
         fig_path=scenario_fig_path,
         da_lai_ref=da_lai_ref,
         n_zones=n_zones,
+<<<<<<< HEAD
         df_csv=df_csv,
         csv_forcing=csv_forcing,
+=======
+>>>>>>> 1d78c26b5b57db0ec851d536dacab6ca80d61ed4
     )
 
     print("\nDone.")

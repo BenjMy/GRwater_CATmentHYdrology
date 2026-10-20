@@ -3,6 +3,7 @@
 # GRwater — Agramon LAI hydrology batch post-processor
 # Post-processes withETp_withLAI experiment scenarios by sim_index.
 #
+<<<<<<< HEAD
 # By default the scenario list is now read from simulation_log_${EXPERIMENT}.csv
 # (every logged sim_index, optionally narrowed with --forcing), so it no
 # longer has to be kept in sync by hand: sim_index does not map 1:1 to
@@ -32,6 +33,22 @@
 #     ETp dry/wet) automatically for etp_ts scenarios (the dry|wet column and
 #     feature_id come from the scenario folder name; other forcings skip it).
 #     --et-csv PATH / --no-csv are forwarded to it.
+=======
+# NOTE: SCENARIOS=(1..9) below assumes one sim_index per dem-plot, which
+# only holds if run_scenarii_withETp_withLAI.sh was run with a single
+# outlet/bottom/spinup combo. Once you run multiple BC/spin-up combos per
+# plot, sim_index no longer maps 1:1 to dem-plot — check
+# simulation_log_${EXPERIMENT}.csv (or list ../SSHydro_${EXPERIMENT}/
+# outputs/, folders are now self-describing, e.g.
+# scenario_7_plot2_outlet-free_bottom-closed_spinup-on3c) for the actual
+# sim_index list and update SCENARIOS accordingly.
+# withLAI_results.py resolves the tagged folder from sim_index for you —
+# only this list needs to be kept in sync.
+# analysis_ET_compare.py now mirrors that: its figures are written to
+# ../Analysis/ET_compare/<scenario_dirname>/ (the tagged scenario folder
+# name), so each scenario's ET-compare plots get their own subfolder
+# instead of overwriting one another in a flat directory.
+>>>>>>> 1d78c26b5b57db0ec851d536dacab6ca80d61ed4
 # =============================================================================
 set -euo pipefail
 
@@ -43,6 +60,7 @@ SCRIPT_CMP="analysis_ET_compare.py"
 EXPERIMENT="withETp_withLAI"
 PRJ_PATH="../SSHydro_${EXPERIMENT}"
 LOG_CSV="simulation_log_${EXPERIMENT}.csv"
+<<<<<<< HEAD
 FALLBACK_SCENARIOS=(1 2 3 4 5 6 7 8 9 10 11 12 13)   # used only if the log CSV is missing
 SCENARIOS=()          # filled from LOG_CSV below unless --scenario is given
 FORCING_FILTER=""     # empty = all forcings; else etp | etp_ts | era5
@@ -75,10 +93,18 @@ usage() {
     cat <<EOF
 Usage: $(basename "$0") [--scenario N [N ...]] [--forcing {etp|etp_ts|era5}]
                        [--dem-res M] [--et-csv PATH] [--no-csv] [--monthly-ts]
+=======
+SCENARIOS=(1 2 3 4 5 6 7 8 9 10 11 12 13)   # default list; override with --scenario
+
+usage() {
+    cat <<EOF
+Usage: $(basename "$0") [--scenario N [N ...]]
+>>>>>>> 1d78c26b5b57db0ec851d536dacab6ca80d61ed4
 
 Post-processes withETp_withLAI experiment scenarios by sim_index: runs
 ${SCRIPT_RES} then ${SCRIPT_CMP} for each scenario in turn.
 
+<<<<<<< HEAD
   --scenario N [N ...]  sim_index value(s) to post-process. Default: every
                          sim_index logged in ${LOG_CSV} (fallback if the
                          file is missing: ${FALLBACK_SCENARIOS[*]}).
@@ -103,10 +129,22 @@ ${SCRIPT_RES} then ${SCRIPT_CMP} for each scenario in turn.
                          etp_ts scenarios anyway).
   --monthly-ts           Also draw the optional monthly-resampled time-series
                          figures in ${SCRIPT_RES} (off by default).
+=======
+  --scenario N [N ...]  sim_index value(s) to post-process (default:
+                         ${SCENARIOS[*]}). Overrides the built-in default
+                         list entirely, e.g. --scenario 7 runs only
+                         scenario 7. sim_index no longer maps 1:1 to
+                         dem-plot once multiple outlet/bottom/spinup combos
+                         are run per plot — check ${LOG_CSV} or list
+                         ${PRJ_PATH}/outputs/ (folders are self-describing,
+                         e.g. scenario_7_plot2_outlet-free_bottom-closed_
+                         spinup-on3c) for the actual sim_index list.
+>>>>>>> 1d78c26b5b57db0ec851d536dacab6ca80d61ed4
   --help, -h             Show this help and exit
 
 Examples:
   $(basename "$0")
+<<<<<<< HEAD
       # post-processes every scenario logged in ${LOG_CSV}
 
   $(basename "$0") --forcing etp_ts
@@ -114,6 +152,9 @@ Examples:
 
   $(basename "$0") --forcing etp_ts --et-csv /path/agramon_treatments_ET.csv
       # etp_ts scenarios, ETa compared with a specific CSV
+=======
+      # post-processes the default scenario list: ${SCENARIOS[*]}
+>>>>>>> 1d78c26b5b57db0ec851d536dacab6ca80d61ed4
 
   $(basename "$0") --scenario 7
       # post-processes only scenario 7
@@ -130,6 +171,7 @@ while [[ $# -gt 0 ]]; do
     case "$1" in
         --help|-h)
             usage; exit 0 ;;
+<<<<<<< HEAD
         --forcing)
             FORCING_FILTER="${2:-}"
             case "${FORCING_FILTER}" in
@@ -159,6 +201,11 @@ while [[ $# -gt 0 ]]; do
             shift
             SCENARIOS=()
             SCENARIOS_GIVEN=1
+=======
+        --scenario)
+            shift
+            SCENARIOS=()
+>>>>>>> 1d78c26b5b57db0ec851d536dacab6ca80d61ed4
             while [[ $# -gt 0 && "$1" != --* ]]; do
                 SCENARIOS+=("$1")
                 shift
@@ -176,6 +223,7 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
+<<<<<<< HEAD
 # Default scenario list: everything logged in LOG_CSV (optionally filtered by
 # --forcing); only used when --scenario was not given.
 if [ "${SCENARIOS_GIVEN:-0}" != "1" ]; then
@@ -191,6 +239,8 @@ if [ "${SCENARIOS_GIVEN:-0}" != "1" ]; then
     fi
 fi
 
+=======
+>>>>>>> 1d78c26b5b57db0ec851d536dacab6ca80d61ed4
 for scenario in "${SCENARIOS[@]}"; do
     if ! [[ "$scenario" =~ ^[0-9]+$ ]]; then
         echo "ERROR: --scenario values must be non-negative integers (got '${scenario}')" >&2
@@ -222,6 +272,7 @@ echo
 failed=()
 failed_cmp=()
 skipped_cmp=()
+<<<<<<< HEAD
 
 # Optional extra args for analysis_ET_compare.py (kept in an array so empty
 # values never become stray "" arguments).
@@ -230,6 +281,8 @@ RES_EXTRA=()
 CMP_EXTRA=()
 [ -n "${ET_CSV}" ] && CMP_EXTRA+=(--et-csv "${ET_CSV}")
 [ "${NO_CSV}" = "1" ] && CMP_EXTRA+=(--no-csv)
+=======
+>>>>>>> 1d78c26b5b57db0ec851d536dacab6ca80d61ed4
 
 for scenario in "${SCENARIOS[@]}"; do
     echo "------------------------------------------------------------"
@@ -256,6 +309,7 @@ for scenario in "${SCENARIOS[@]}"; do
     fi
     echo
 
+<<<<<<< HEAD
     echo "  -- ET compare (EO-EB vs WB, + WB vs CSV for etp_ts) — scenario ${scenario} --"
     t_start=$(date +%s)
 
@@ -264,6 +318,13 @@ for scenario in "${SCENARIOS[@]}"; do
             --log-file  "${LOG_CSV}" \
             --path2prj  "${PRJ_PATH}" \
             "${CMP_EXTRA[@]+"${CMP_EXTRA[@]}"}"; then
+=======
+    echo "  -- ET compare (EO-EB vs WB) — scenario ${scenario} --------------"
+    t_start=$(date +%s)
+
+    if python "${SCRIPT_CMP}" \
+            --scenario "${scenario}"; then
+>>>>>>> 1d78c26b5b57db0ec851d536dacab6ca80d61ed4
         t_end=$(date +%s)
         echo "  ✓ ET compare ${scenario} completed in $(( t_end - t_start ))s"
     else

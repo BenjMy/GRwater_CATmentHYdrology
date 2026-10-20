@@ -104,6 +104,7 @@ ETP_TS_COLUMN_DEFAULT = "ET_0_wet"
 
 # ── Path setup ────────────────────────────────────────────────────────────────
 
+<<<<<<< HEAD
 # Auto-detect the machine from the home directory (no commenting/uncommenting).
 HOME = Path.home()
 if HOME.name == "z0272571a@campus.csic.es":
@@ -122,6 +123,28 @@ LAI_PATH = (
 ).resolve()
 
 PathET    = ROOT / "GRwater" / "data" / "satellite" / "Agramon"
+=======
+MODULE_PATH = Path(
+    "/home/z0272571a@campus.csic.es/Nextcloud/BenCSIC/Codes"
+    #"/home/ben/Nextcloud/BenCSIC/Codes"
+    "/Tech4agro_org/GRwater_geophy"
+).resolve()
+
+EO_PATH = Path(
+    "/home/z0272571a@campus.csic.es/Nextcloud/BenCSIC/Codes"
+    #"/home/ben/Nextcloud/BenCSIC/Codes"
+    "/Tech4agro_org/GRwater_CATmentHYdrology"
+).resolve()
+
+LAI_PATH = Path(
+    "/home/z0272571a@campus.csic.es/Nextcloud/BenCSIC/Training_Supervision"
+    #"/home/ben/Nextcloud/BenCSIC/Training_Supervision"
+    "/Supervision/Xela_Carracedo_Practicas_2026_data/301a-biophysical/agramon/input"
+).resolve()
+
+PathET    = Path("/home/z0272571a@campus.csic.es/Nextcloud/GRwater/data/satellite/Agramon")
+#PathET    = Path("/home/ben/Nextcloud/GRwater/data/satellite/Agramon")
+>>>>>>> 1d78c26b5b57db0ec851d536dacab6ca80d61ed4
 etp_path  = PathET / "20161001_20241231_ET0.nc"
 rain_path = PathET / "20161001_20241231_TP.nc"
 
@@ -155,6 +178,13 @@ LAI_THRESHOLDS = [1.0, 1.5, 2.0, 2.5]
 # passed to simu.update_cathyH(), since pyCATHY's SOIL vegetation table has a
 # fixed row count for the whole project — it is NOT allowed to vary month to
 # month with however many classes happen to be spatially present.
+N_VEG_CLASSES = len(LAI_THRESHOLDS) + 1  # = 5
+
+# Fixed number of semantic vegetation classes (bare/sparse/moderate/dense/very
+# dense). This must stay constant for the whole run and match MAXVEG passed
+# to simu.update_cathyH(), since pyCATHY's SOIL vegetation table has a fixed
+# row count for the whole project — it is NOT allowed to vary month to month
+# with however many classes happen to be spatially present.
 N_VEG_CLASSES = len(LAI_THRESHOLDS) + 1  # = 5
 
 # Vegetation zone → root-depth multiplier
@@ -263,6 +293,27 @@ def feddes_params_from_args(args: argparse.Namespace) -> dict[str, float | None]
         "feddes_crop": args.feddes_crop,
         "feddes_crop_ref": lit_ref,
     }
+
+# ── Sanity-check thresholds (monthly loop) ─────────────────────────────────
+# Tolerances for the physical-bounds and water-balance checks run after
+# every month (see `check_monthly_sanity`). Not physical hard limits —
+# just flags for "this deserves a look", so kept generous on purpose.
+SW_TOL           = 0.01     # SW allowed slightly outside [0, 1] before flagging
+PSI_SANITY_MIN   = -50.0    # m — PSI below this is flagged as extreme drying
+ETA_TOL          = 1e-8     # m/s — ETa allowed slightly above ETp before flagging
+WB_RESIDUAL_FRAC = 0.5      # flag if |water balance residual| > this fraction of rain_in
+
+
+def zroot_factors_from_args(args: argparse.Namespace) -> dict[int, float]:
+    """
+    Build the semantic-zone → root-depth-multiplier mapping consumed by
+    ``update_soil_for_active_zones`` from ``--zroot-factors`` (5 values,
+    positional order: bare, sparse, moderate, dense, very dense —
+    matching ``ZROOT_FACTORS``' key order 1-5). Centralised here so the
+    spin-up and main-loop call sites build the exact same mapping from
+    the exact same CLI values instead of risking drift between the two.
+    """
+    return {i + 1: v for i, v in enumerate(args.zroot_factors)}
 
 # ── Sanity-check thresholds (monthly loop) ─────────────────────────────────
 # Tolerances for the physical-bounds and water-balance checks run after
@@ -408,6 +459,7 @@ def _parse_args() -> argparse.Namespace:
              "moderate, dense, very dense vegetation."
     )
 
+<<<<<<< HEAD
     feddes = p.add_argument_group(
         "Feddes parameters (root water uptake — FP_map)")
     feddes.add_argument(
@@ -460,6 +512,8 @@ def _parse_args() -> argparse.Namespace:
              "pyCATHY's own FP_map default untouched."
     )
 
+=======
+>>>>>>> 1d78c26b5b57db0ec851d536dacab6ca80d61ed4
     soil = p.add_argument_group("Soil hydraulic conductivity (PERMX / Ks)")
     soil.add_argument(
         "--permx", type=float, default=None, metavar="M/S",
@@ -1048,6 +1102,7 @@ def log_simulation(log_path: Path, start_year: int, end_year: int,
                    zroot_factors: list = None,
                    permx: float = None,
                    permy_ratio: float = None,
+<<<<<<< HEAD
                    permz_ratio: float = None,
                    scf: float = None,
                    pcana: float = None,
@@ -1059,6 +1114,9 @@ def log_simulation(log_path: Path, start_year: int, end_year: int,
                    forcing_mode: str = None,
                    etp_ts_column: str = None,
                    etp_ts_feature_id: int = None) -> int:
+=======
+                   permz_ratio: float = None) -> int:
+>>>>>>> 1d78c26b5b57db0ec851d536dacab6ca80d61ed4
     """Register parameters in the shared CSV log and return the sim_index.
 
     outlet_flux / bottom_flux / spinup / ic_* are recorded too (not just
@@ -1073,6 +1131,7 @@ def log_simulation(log_path: Path, start_year: int, end_year: int,
     are as much a part of its identity as ZROOT or PMIN, so they belong
     in the CSV rather than only ever showing up in the console/markdown
     log.
+<<<<<<< HEAD
 
     pcana/pcref/pcwlt/pz/omgc/feddes_crop are the remaining Feddes (FP_map)
     parameters, logged the same way for the same reason — resolved once via
@@ -1085,6 +1144,8 @@ def log_simulation(log_path: Path, start_year: int, end_year: int,
     too. ``etp_ts_column`` / ``etp_ts_feature_id`` are only logged for
     "etp_ts" runs (None otherwise). Rows logged before these columns existed
     were all satellite-ETp runs, i.e. an empty/NaN forcing_mode means "etp".
+=======
+>>>>>>> 1d78c26b5b57db0ec851d536dacab6ca80d61ed4
     """
     params = {
         "start_year":   start_year,
@@ -1105,6 +1166,7 @@ def log_simulation(log_path: Path, start_year: int, end_year: int,
         "permx":        permx,
         "permy_ratio":  permy_ratio if permx is not None else None,
         "permz_ratio":  permz_ratio if permx is not None else None,
+<<<<<<< HEAD
         "PCANA":        pcana,
         "PCREF":        pcref,
         "PCWLT":        pcwlt,
@@ -1114,6 +1176,8 @@ def log_simulation(log_path: Path, start_year: int, end_year: int,
         "forcing_mode":      forcing_mode,
         "etp_ts_column":     etp_ts_column if forcing_mode == "etp_ts" else None,
         "etp_ts_feature_id": etp_ts_feature_id if forcing_mode == "etp_ts" else None,
+=======
+>>>>>>> 1d78c26b5b57db0ec851d536dacab6ca80d61ed4
     }
     sim_index = uCATHY.log_simulation(log_path, params)
     print(f"  sim_index = {sim_index}  (withLAI={with_lai})")
@@ -1123,8 +1187,12 @@ def log_simulation(log_path: Path, start_year: int, end_year: int,
 def build_scenario_dirname(sim_index: int, dem_plot: int,
                            outlet_flux: float, bottom_flux: float,
                            no_spinup: bool, spinup_cycles: int,
+<<<<<<< HEAD
                            pmin: float, ic_mode: str = "wt",
                            forcing_tag: str = "") -> str:
+=======
+                           pmin: float, ic_mode: str = "wt") -> str:
+>>>>>>> 1d78c26b5b57db0ec851d536dacab6ca80d61ed4
     """
     Human-readable, self-describing scenario folder name.
 
@@ -1143,10 +1211,13 @@ def build_scenario_dirname(sim_index: int, dem_plot: int,
     sim_index prefix), which also made them indistinguishable to any
     "has this combination already run?" check based on the tag alone.
 
+<<<<<<< HEAD
     ``forcing_tag`` is appended only for non-default forcings (currently the
     "etp_ts" runs, e.g. ``forcing-etpts-wet-fid1``), so legacy satellite-ETp
     folder names stay exactly as they were.
 
+=======
+>>>>>>> 1d78c26b5b57db0ec851d536dacab6ca80d61ed4
     e.g. scenario_7_plot2_outlet-free_bottom-closed_spinup-on3c_pmin-3.0_ic-wt
     """
     outlet_label = "closed" if outlet_flux == 0 else "free"
@@ -1159,8 +1230,11 @@ def build_scenario_dirname(sim_index: int, dem_plot: int,
            f"_spinup-{spinup_label}"
            f"_pmin-{pmin_label}"
            f"_ic-{ic_mode}")
+<<<<<<< HEAD
     if forcing_tag:
         tag += f"_{forcing_tag}"
+=======
+>>>>>>> 1d78c26b5b57db0ec851d536dacab6ca80d61ed4
     return f"scenario_{sim_index}_{tag}"
 
 
@@ -1485,7 +1559,10 @@ def update_soil_for_active_zones(
     remap: dict[int, int],
     base_zroot: float,
     pmin: float,
+<<<<<<< HEAD
     scf: float,
+=======
+>>>>>>> 1d78c26b5b57db0ec851d536dacab6ca80d61ed4
     zroot_factors: dict[int, float] | None = None,
     permx: float | None = None,
     permy_ratio: float = 1.0,
@@ -1493,12 +1570,15 @@ def update_soil_for_active_zones(
     vgncell: float | None = None,
     vgrmccell: float | None = None,
     vgpsatcell: float | None = None,
+<<<<<<< HEAD
     pcana: float | None = None,
     pcref: float | None = None,
     pcwlt: float | None = None,
     pz: float | None = None,
     omgc: float | None = None,
     feddes_crop: str | None = None,
+=======
+>>>>>>> 1d78c26b5b57db0ec851d536dacab6ca80d61ed4
 ) -> None:
     """
     ``zroot_factors`` overrides the module-level ZROOT_FACTORS mapping
@@ -1513,12 +1593,15 @@ def update_soil_for_active_zones(
     via ``permy_ratio``/``permz_ratio`` (anisotropy). Left untouched
     (pyCATHY's own SPP default) when permx is None.
 
+<<<<<<< HEAD
     ``scf`` is the root water uptake stress compensation factor, a float
     in [0, 1]: 1 = Feddes approach (ET ~ all transpiration), 0 =
     PMIN-threshold approach (sparse/arid cover), values in between blend
     the two. Passed straight through to ``simu.update_soil(SCF=scf)``
     alongside PMIN — normally just ``args.scf`` at the call site.
 
+=======
+>>>>>>> 1d78c26b5b57db0ec851d536dacab6ca80d61ed4
     ``vgncell`` / ``vgrmccell`` / ``vgpsatcell``, when given, override the
     van Genuchten retention-curve columns (VGNCELL = n, VGRMCCELL =
     residual water content θr, VGPSATCELL = 1/alpha) uniformly across
@@ -1526,6 +1609,7 @@ def update_soil_for_active_zones(
     left at pyCATHY's own SPP default when None. Note VGRMCCELL must
     stay below POROS — simu.update_soil() itself warns (doesn't raise)
     if VGRMCCELL >= POROS for any row.
+<<<<<<< HEAD
 
     ``pcana`` / ``pcref`` / ``pcwlt`` / ``pz`` / ``omgc``, when given,
     override the remaining Feddes (FP_map) columns — PCANA = anaerobiosis
@@ -1541,6 +1625,8 @@ def update_soil_for_active_zones(
     are not explicitly overridden. ``feddes_crop`` itself is accepted here
     only for the run-log label below; the actual value resolution already
     happened in the caller.
+=======
+>>>>>>> 1d78c26b5b57db0ec851d536dacab6ca80d61ed4
     """
     inv_remap: dict[int, int] = {v: k for k, v in remap.items()}
     if zroot_factors is None:
@@ -1616,6 +1702,7 @@ def update_soil_for_active_zones(
               "residual water content exceeds porosity, fix before running.")
     vg_label = ", ".join(vg_label_parts) if vg_label_parts else "pyCATHY default"
 
+<<<<<<< HEAD
     # Feddes (FP_map) overrides — PCANA/PCREF/PCWLT/PZ/OMGC — same
     # broadcast-to-every-row pattern as the VG* overrides above. ZROOT is
     # already handled per-zone by the loop earlier in this function.
@@ -1647,6 +1734,14 @@ def update_soil_for_active_zones(
           f"(semantic: {semantic_active}) | PMIN: {pmin:g} m | SCF: {scf_label} | "
           f"Ks: {permx_label} | retention curve: {vg_label} | "
           f"Feddes: {fp_label}")
+=======
+    simu.update_soil(FP_map=df_fp, SPP_map=df_spp, PMIN=pmin)
+    semantic_active = sorted(inv_remap.get(z, z) for z in active_zones)
+    print(f"    → Soil updated | table rows: {n_zones} (all zones, fixed) "
+          f"| spatially active this month: {sorted(active_zones)} "
+          f"(semantic: {semantic_active}) | Ks: {permx_label} | "
+          f"retention curve: {vg_label}")
+>>>>>>> 1d78c26b5b57db0ec851d536dacab6ca80d61ed4
 
 
 def iter_monthly_lai(lai_ds: xr.Dataset):
@@ -2297,6 +2392,156 @@ def check_monthly_sanity(
     return warnings
 
 
+def add_datetime_col(df: pd.DataFrame, base_dt) -> pd.DataFrame:
+    """
+    Add a 'datetime' column as base_dt + time_sec (returns df).
+
+    Guards against a pyCATHY output-reading quirk where 'time_sec' is
+    sometimes already a Timedelta dtype (instead of a plain float number
+    of seconds) — calling pd.to_timedelta(..., unit="s") on data that's
+    already Timedelta makes pandas try Timedelta+float arithmetic
+    internally and raises "unsupported operand type(s) for +: 'Timedelta'
+    and 'float'". When time_sec is already a Timedelta we use it as-is;
+    otherwise we coerce to float first and apply unit="s" as before.
+    """
+    ts = df["time_sec"]
+    if pd.api.types.is_timedelta64_dtype(ts):
+        df["datetime"] = base_dt + ts
+    else:
+        df["datetime"] = base_dt + pd.to_timedelta(ts.astype(float), unit="s")
+    return df
+
+
+def check_monthly_sanity(
+    dt,
+    month_stats: dict,
+    psi_month_df,
+    sw_month_df,
+    df_et,
+    df_rec,
+    t_month,
+    idx_month,
+    ETp_nodes,
+    rain_nodes,
+    sw_tol: float = SW_TOL,
+    psi_sanity_min: float = PSI_SANITY_MIN,
+    eta_tol: float = ETA_TOL,
+    wb_residual_frac: float = WB_RESIDUAL_FRAC,
+) -> list[str]:
+    """
+    Run cheap physical-bounds and (approximate) water-balance sanity
+    checks on one month's outputs. Fills diagnostic fields into
+    `month_stats` in place and returns a list of human-readable warning
+    strings (empty if nothing looked off). Never raises — a check that
+    can't be computed for this month (missing data, unexpected columns)
+    is silently skipped rather than aborting the run.
+
+    Water-balance note
+    -------------------
+    The residual is rain_in − ETa_out − recharge_out only: it does NOT
+    account for the change in subsurface storage (ΔS), because that
+    would require per-node porosity and control-volume information not
+    readily available here. So this is not a strict mass-balance
+    closure — treat a large residual as "worth checking the psi/sw
+    trend for this month", not as proof of a bug on its own. It also
+    assumes the 'recharge' output column(s) are in the same units
+    (m/s) as ETa/rain; if your CATHY build reports recharge in
+    different units, `recharge_out_mm` below will be wrong and should
+    be ignored.
+    """
+    warnings: list[str] = []
+
+    # ── Physical bounds: SW should stay within [0, 1] ──
+    if sw_month_df is not None and len(sw_month_df):
+        sw_vals = sw_month_df["sw"].to_numpy(dtype=float)
+        n_bad = int(((sw_vals < -sw_tol) | (sw_vals > 1 + sw_tol)).sum())
+        month_stats["sw_out_of_bounds_n"] = n_bad
+        if n_bad:
+            warnings.append(
+                f"{dt:%Y-%m}: {n_bad} SW value(s) outside [0,1] "
+                f"(range [{sw_vals.min():.3f}, {sw_vals.max():.3f}])."
+            )
+
+    # ── Physical bounds: PSI shouldn't be sitting at extreme drying values ──
+    if psi_month_df is not None and len(psi_month_df):
+        psi_vals = psi_month_df["psi"].to_numpy(dtype=float)
+        n_extreme = int((psi_vals < psi_sanity_min).sum())
+        month_stats["psi_extreme_n"] = n_extreme
+        if n_extreme:
+            warnings.append(
+                f"{dt:%Y-%m}: {n_extreme} PSI value(s) below sanity threshold "
+                f"{psi_sanity_min:.0f} m (min {psi_vals.min():.2f} m)."
+            )
+
+    # ── Physical bounds: ETa should not exceed ETp ──
+    if (df_et is not None and len(df_et) and t_month is not None and len(t_month)
+            and ETp_nodes is not None and idx_month is not None and len(idx_month)):
+        try:
+            t_month_arr = np.asarray(t_month, dtype=float)
+            tsec = df_et["time_sec"].to_numpy(dtype=float)
+            i_right  = np.clip(np.searchsorted(t_month_arr, tsec), 0, len(t_month_arr) - 1)
+            i_left   = np.clip(i_right - 1, 0, len(t_month_arr) - 1)
+            use_left = np.abs(t_month_arr[i_left] - tsec) < np.abs(t_month_arr[i_right] - tsec)
+            i_time   = np.where(use_left, i_left, i_right)
+
+            node_idx = df_et["SURFACE NODE"].to_numpy(dtype=int)
+            n_surf   = ETp_nodes.shape[1]
+            if node_idx.max() == n_surf:
+                node_idx = node_idx - 1
+
+            rows     = idx_month[i_time]
+            etp_vals = ETp_nodes[rows, node_idx]
+            eta_col  = "ACT. ETRA_patched" if "ACT. ETRA_patched" in df_et.columns else "ACT. ETRA"
+            eta_vals = df_et[eta_col].to_numpy(dtype=float)
+
+            n_exceed = int((eta_vals > etp_vals + eta_tol).sum())
+            month_stats["eta_exceeds_etp_n"] = n_exceed
+            if n_exceed:
+                max_excess = float((eta_vals - etp_vals).max())
+                warnings.append(
+                    f"{dt:%Y-%m}: {n_exceed} ETa value(s) exceed ETp "
+                    f"(max excess {max_excess:.3e} m/s)."
+                )
+        except Exception:
+            pass  # sanity check itself must never break the run
+
+    # ── Water balance: rain_in vs ETa_out vs recharge_out (flux-only) ──
+    rain_in_mm = eta_out_mm = recharge_out_mm = None
+
+    if rain_nodes is not None and idx_month is not None and len(idx_month):
+        rain_in_mm = float((rain_nodes[idx_month].mean(axis=1) * 86400 * 1000).sum())
+        month_stats["rain_in_mm"] = rain_in_mm
+
+    if df_et is not None and len(df_et):
+        eta_col = "ACT. ETRA_patched" if "ACT. ETRA_patched" in df_et.columns else "ACT. ETRA"
+        if eta_col in df_et.columns:
+            eta_by_time = df_et.groupby("time_sec")[eta_col].mean()
+            eta_out_mm = float((eta_by_time * 86400 * 1000).sum())
+            month_stats["eta_out_mm"] = eta_out_mm
+
+    if df_rec is not None and len(df_rec):
+        rec_value_cols = [c for c in df_rec.select_dtypes(include=[np.number]).columns
+                           if c not in ("X", "Y", "time_sec")]
+        if rec_value_cols:
+            rec_by_time = df_rec.groupby("time_sec")[rec_value_cols].mean().mean(axis=1)
+            recharge_out_mm = float((rec_by_time * 86400 * 1000).sum())
+            month_stats["recharge_out_mm"] = recharge_out_mm
+
+    if rain_in_mm is not None and eta_out_mm is not None and recharge_out_mm is not None:
+        residual_mm = rain_in_mm - eta_out_mm - recharge_out_mm
+        month_stats["water_balance_residual_mm"] = residual_mm
+        if rain_in_mm > 1e-6 and abs(residual_mm) > wb_residual_frac * rain_in_mm:
+            warnings.append(
+                f"{dt:%Y-%m}: water balance residual {residual_mm:.1f} mm "
+                f"(rain {rain_in_mm:.1f}, ETa {eta_out_mm:.1f}, "
+                f"recharge {recharge_out_mm:.1f}) — large relative to rain "
+                f"input. Excludes storage change (ΔS); also check the "
+                f"psi/sw trend for this month before assuming a bug."
+            )
+
+    return warnings
+
+
 # ── Spin-up (pre-2016 equilibration) ────────────────────────────────────────
 
 def pick_default_spinup_year(valid_times: np.ndarray) -> int:
@@ -2394,14 +2639,20 @@ def run_spinup(
     update_soil_for_active_zones(
         simu, active_zones, remap=remap,
         base_zroot=args.zroot, pmin=args.pmin,
+<<<<<<< HEAD
         scf=args.scf,
+=======
+>>>>>>> 1d78c26b5b57db0ec851d536dacab6ca80d61ed4
         zroot_factors=zroot_factors_from_args(args),
         permx=args.permx,
         permy_ratio=args.permy_ratio,
         permz_ratio=args.permz_ratio,
+<<<<<<< HEAD
         pcana=_feddes["pcana"], pcref=_feddes["pcref"], pcwlt=_feddes["pcwlt"],
         pz=_feddes["pz"], omgc=_feddes["omgc"],
         feddes_crop=_feddes["feddes_crop"],
+=======
+>>>>>>> 1d78c26b5b57db0ec851d536dacab6ca80d61ed4
     )
     if md_log is not None:
         md_log.bullet(f"Static spin-up vegetation from {dt0:%Y-%m}: "
@@ -2568,6 +2819,7 @@ def run_pipeline(args: argparse.Namespace) -> None:
 
     # ── 1. Resolve DEM source ─────────────────────────────────
     dem_tif_path = Path(args.dem_tif)
+<<<<<<< HEAD
 
     # SCF is taken straight from --scf and reused everywhere below (soil
     # updates, CSV log, markdown log) so it can never drift between call
@@ -2603,17 +2855,29 @@ def run_pipeline(args: argparse.Namespace) -> None:
     spinup_banner_label = (
         "disabled" if args.no_spinup else f"{args.spinup_cycles} cycle(s)"
     )
+=======
+>>>>>>> 1d78c26b5b57db0ec851d536dacab6ca80d61ed4
 
     print("\n" + "=" * 60)
     print("  LT Subsurface Hydrology with LAI + ETp — pyCATHY")
     print(f"  Forcing source : {forcing_label}")
     print(f"  Period         : {args.start_year} – {args.end_year - 1}")
     print(f"  Target CRS     : {TARGET_CRS}")
+<<<<<<< HEAD
     print(f"  ZROOT          : {args.zroot} m  |  PMIN : {args.pmin} m  |  SCF : {scf_label}")
     print(f"  ZROOT factors  : {args.zroot_factors} "
           f"(bare/sparse/moderate/dense/very_dense)")
     print(f"  Feddes (FP)    : {feddes_label}")
     print(f"  PERMX (Ks)     : {banner_permx_label}")
+=======
+    print(f"  ZROOT          : {args.zroot} m  |  PMIN : {args.pmin} m")
+    print(f"  ZROOT factors  : {args.zroot_factors} "
+          f"(bare/sparse/moderate/dense/very_dense)")
+    print(f"  PERMX (Ks)     : "
+          f"{'pyCATHY default' if args.permx is None else f'{args.permx:.3e} m/s'}"
+          f"{'' if args.permx is None else f'  |  PERMY ratio {args.permy_ratio}'
+                                            f'  |  PERMZ ratio {args.permz_ratio}'}")
+>>>>>>> 1d78c26b5b57db0ec851d536dacab6ca80d61ed4
     print(f"  DEM source     : {dem_tif_path}")
     print(f"  Log file       : {args.log_file}")
     print(f"  Spin-up        : {spinup_banner_label}")
@@ -2674,12 +2938,15 @@ def run_pipeline(args: argparse.Namespace) -> None:
         permx=args.permx,
         permy_ratio=args.permy_ratio,
         permz_ratio=args.permz_ratio,
+<<<<<<< HEAD
         pcana=feddes["pcana"], pcref=feddes["pcref"], pcwlt=feddes["pcwlt"],
         pz=feddes["pz"], omgc=feddes["omgc"],
         feddes_crop=feddes["feddes_crop"],
         forcing_mode=FORCING_MODE,
         etp_ts_column=args.etp_ts_column,
         etp_ts_feature_id=etp_ts_fid,
+=======
+>>>>>>> 1d78c26b5b57db0ec851d536dacab6ca80d61ed4
     )
 
     # Single source of truth for this run's folder name (project dir,
@@ -2689,8 +2956,11 @@ def run_pipeline(args: argparse.Namespace) -> None:
     scenario_dirname = build_scenario_dirname(
         sim_index, args.dem_plot, args.outlet_flux, args.bottom_flux,
         args.no_spinup, args.spinup_cycles, args.pmin, args.ic_mode,
+<<<<<<< HEAD
         forcing_tag=(f"forcing-etpts-{args.etp_ts_column.removeprefix('ET_0_')}"
                      f"-fid{etp_ts_fid}" if USE_ETP_TS_FORCING else ""),
+=======
+>>>>>>> 1d78c26b5b57db0ec851d536dacab6ca80d61ed4
     )
 
     # ── Markdown run log ───────────────────────────────────────
@@ -2718,7 +2988,11 @@ def run_pipeline(args: argparse.Namespace) -> None:
         "Forcing source": FORCING_LABELS[FORCING_MODE],
         "Period": f"{args.start_year} – {args.end_year - 1}",
         "Target CRS": TARGET_CRS,
+<<<<<<< HEAD
         "ZROOT / PMIN / SCF": f"{args.zroot} m / {args.pmin} m / {scf_label}",
+=======
+        "ZROOT / PMIN": f"{args.zroot} m / {args.pmin} m",
+>>>>>>> 1d78c26b5b57db0ec851d536dacab6ca80d61ed4
         "ZROOT factors (bare/sparse/moderate/dense/very_dense)":
             ",".join(f"{v:g}" for v in args.zroot_factors),
         "PERMX / Ks override": (
@@ -2726,7 +3000,10 @@ def run_pipeline(args: argparse.Namespace) -> None:
             else f"PERMX={args.permx:.3e} m/s, PERMY ratio={args.permy_ratio}, "
                  f"PERMZ ratio={args.permz_ratio}"
         ),
+<<<<<<< HEAD
         "Feddes (FP_map) override": feddes_label,
+=======
+>>>>>>> 1d78c26b5b57db0ec851d536dacab6ca80d61ed4
         "Initial condition": (f"WT depth {args.ic_wtposition} m (INDP=3)"
                                if args.ic_mode == "wt"
                                else f"uniform pressure head "
@@ -2750,7 +3027,11 @@ def run_pipeline(args: argparse.Namespace) -> None:
         dem_tif_path,
         gdf_clip=gdf_Agramon,
         fid=args.dem_plot,
+<<<<<<< HEAD
         resample_resolution=5
+=======
+        resample_resolution=2
+>>>>>>> 1d78c26b5b57db0ec851d536dacab6ca80d61ed4
     )
 
 
@@ -3110,9 +3391,13 @@ def run_pipeline(args: argparse.Namespace) -> None:
                 "units": "m/s",
                 "description": (
                     "Potential ET forcing per surface node, as mapped from "
+<<<<<<< HEAD
                     + ("the uniform CSV ETp time series" if USE_ETP_TS_FORCING
                        else "the satellite ET0 raster")
                     + " onto the mesh (node index "
+=======
+                    "the satellite ET0 raster onto the mesh (node index "
+>>>>>>> 1d78c26b5b57db0ec851d536dacab6ca80d61ed4
                     "matches the first n_surf rows of grid3d['mesh3d_nodes'])."
                 ),
             },
@@ -3161,6 +3446,7 @@ def run_pipeline(args: argparse.Namespace) -> None:
             )
             veg_xr.to_netcdf(out_dir / "veg_map_history.nc")
 
+<<<<<<< HEAD
         if lai_history:
             sorted_lai_dates = sorted(lai_history)
             lai_arr = np.stack([lai_history[d] for d in sorted_lai_dates], axis=0)
@@ -3176,6 +3462,8 @@ def run_pipeline(args: argparse.Namespace) -> None:
             )
             lai_xr.to_netcdf(out_dir / "lai_output.nc")
 
+=======
+>>>>>>> 1d78c26b5b57db0ec851d536dacab6ca80d61ed4
         if et_records:
             ET_xr_all = xr.concat(et_records, dim="datetime")
             ET_xr_all.time.attrs.pop("dtype", None)
@@ -3208,10 +3496,13 @@ def run_pipeline(args: argparse.Namespace) -> None:
             xr.concat(all_recharge_recs, dim="datetime").to_netcdf(
                 out_dir / "recharge_output.nc")
 
+<<<<<<< HEAD
         if all_hgraph_recs:
             pd.concat(all_hgraph_recs, ignore_index=True).to_csv(
                 out_dir / "hgraph_output.csv", index=False)
 
+=======
+>>>>>>> 1d78c26b5b57db0ec851d536dacab6ca80d61ed4
     # ── 12. Main LAI loop — one CATHY run per calendar month ──
     print("\n── Starting LAI → vegetation-map loop ──────────────────────────────")
     md_log.section("Monthly simulation loop")
@@ -3263,15 +3554,21 @@ def run_pipeline(args: argparse.Namespace) -> None:
                                      remap=remap,
                                      base_zroot=args.zroot,
                                      pmin=args.pmin,
+<<<<<<< HEAD
                                      scf=args.scf,
+=======
+>>>>>>> 1d78c26b5b57db0ec851d536dacab6ca80d61ed4
                                      zroot_factors=zroot_factors_from_args(args),
                                      permx=args.permx,
                                      permy_ratio=args.permy_ratio,
                                      permz_ratio=args.permz_ratio,
+<<<<<<< HEAD
                                      pcana=feddes["pcana"], pcref=feddes["pcref"],
                                      pcwlt=feddes["pcwlt"], pz=feddes["pz"],
                                      omgc=feddes["omgc"],
                                      feddes_crop=feddes["feddes_crop"],
+=======
+>>>>>>> 1d78c26b5b57db0ec851d536dacab6ca80d61ed4
                                      )
         active_zones_prev = active_zones
 
@@ -3522,7 +3819,11 @@ def run_pipeline(args: argparse.Namespace) -> None:
             # FIX: floor the net-forcing ETa artefact at ETp for this month
             # (adds 'ACT. ETRA_patched'; 'ACT. ETRA' stays unmodified).
             if USE_ETP_FORCING:
+<<<<<<< HEAD
                 df_et, n_eta_patched, n_eta_net_neg = apply_eta_artefact_floor(
+=======
+                df_et, n_eta_patched = apply_eta_artefact_floor(
+>>>>>>> 1d78c26b5b57db0ec851d536dacab6ca80d61ed4
                     df_et, t_month, ETp_nodes, rain_nodes, idx_month,
                     net_neg_mode=args.eta_net_neg_mode,
                 )
@@ -3573,6 +3874,7 @@ def run_pipeline(args: argparse.Namespace) -> None:
         except Exception as exc:
             print(f"  Warning: could not read recharge for {dt:%Y-%m} ({exc})")
 
+<<<<<<< HEAD
         # 12.11a  Surface runoff hydrograph (hgraph) — discharge at the
         # outlet, one time series per monthly run (no X/Y spatial dims,
         # so it's accumulated/saved as CSV rather than NetCDF).
@@ -3605,6 +3907,9 @@ def run_pipeline(args: argparse.Namespace) -> None:
                 print(f"  Warning: could not save monthly LAI for {dt:%Y-%m} ({exc})")
 
         # 12.11c  Sanity checks (physical bounds + approximate water balance)
+=======
+        # 12.11b  Sanity checks (physical bounds + approximate water balance)
+>>>>>>> 1d78c26b5b57db0ec851d536dacab6ca80d61ed4
         try:
             sanity_warnings = check_monthly_sanity(
                 dt, month_stats,
