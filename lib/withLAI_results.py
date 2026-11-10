@@ -28,6 +28,9 @@ Figures produced
   Fig 2  — ET spatial mean by month / year
   Fig 3  — ET time series per vegetation type
   Fig 4  — Spatial ET maps per month for SELECTED_YEAR (3×4 subplots)
+  Fig 4b — Spatial surface soil-moisture saturation maps per month for
+           SELECTED_YEAR (same 3×4 layout, surface-node values from
+           sw_output.nc interpolated onto the ET raster grid)
   Fig 5  — Vegetation zone map samples (one per year)
   Fig 5b — Monthly vegetation maps for SELECTED_YEAR
   Fig 5c — Monthly LAI maps for SELECTED_YEAR
@@ -39,6 +42,13 @@ Figures produced
   Fig 6  — Hydro time-series: Rain/ETp + ψ evolution at reference nodes
   Fig 6b — 2D map of reference-node locations (where ψ / sw are extracted)
   Fig 7  — sw + Actual ETa time-series at reference nodes
+  Fig 7b — sw + ETa + domain-mean LAI trend time-series (Fig 7 + LAI panel)
+  Fig 7i — Catchment-scale ETa/ETp ratio time series (domain mean & median)
+  Monthly variants (state vars = monthly mean, fluxes = monthly sum):
+    Fig 6f  hydro (rain/ETp + psi + sw)      Fig 7j   sw + ETa
+    Fig 7gj psi + ETa                        Fig 7bj  sw + ETa + LAI
+    Fig 7fj psi + ETa + LAI                  Fig 7hj  LAI/ETa/sw/psi/ETa÷ETp at nodes
+    Fig 7ij catchment ETa÷ETp (ratio of monthly sums)
   Fig 8  — Catchment ET balance: monthly + annual bars  (→ ETa_balance_*.png)
   Fig 8b — ETa cumulative histogram: per-pixel annual sum distribution  (→ ETa_annual_sum_histogram_*.png)
   Fig 8c — ETa domain-total: monthly mean + annual total bar charts    (→ ETa_total_*.png)
@@ -72,26 +82,41 @@ import numpy as np
 import pandas as pd
 import xarray as xr
 import matplotlib.colors as mcolors
+import rioxarray as rxr  # noqa: F401  (activates .rio accessor)
+from Agramon_withLAI_withETp import load_dem_from_tif  # or move it to Agramon_utils
 
 # ── Path setup ────────────────────────────────────────────────────────────────
 
 MODULE_PATH = Path(
-    #"/home/z0272571a@campus.csic.es/Nextcloud/BenCSIC/Codes"
-    "/home/ben/Nextcloud/BenCSIC/Codes"
+    "/home/z0272571a@campus.csic.es/Nextcloud/BenCSIC/Codes"
+    #"/home/ben/Nextcloud/BenCSIC/Codes"
     "/Tech4agro_org/GRwater_geophy"
 ).resolve()
 
 EO_PATH = Path(
-    #"/home/z0272571a@campus.csic.es/Nextcloud/BenCSIC/Codes"
-    "/home/ben/Nextcloud/BenCSIC/Codes"
+    "/home/z0272571a@campus.csic.es/Nextcloud/BenCSIC/Codes"
+    #"/home/ben/Nextcloud/BenCSIC/Codes"
     "/Tech4agro_org/GRwater_CATmentHYdrology"
 ).resolve()
 
 LAI_PATH = Path(
-    #"/home/z0272571a@campus.csic.es/Nextcloud/BenCSIC/Training_Supervision"
-    "/home/ben/Nextcloud/BenCSIC/Training_Supervision"
+    "/home/z0272571a@campus.csic.es/Nextcloud/BenCSIC/Training_Supervision"
+    #"/home/ben/Nextcloud/BenCSIC/Training_Supervision"
     "/Supervision/Xela_Carracedo_Practicas_2026_data/301a-biophysical/agramon/input"
 ).resolve()
+
+# Satellite ETp + rain forcing (replaces ERA5 for the Fig 6/7 rain/ETp
+# panel — see Agramon_withLAI_withETp.py, which uses the same files to
+# force the ATMBC boundary).
+PathET    = Path("/home/z0272571a@campus.csic.es/Nextcloud/GRwater/data/satellite/Agramon")
+#PathET    = Path("/home/ben/Nextcloud/GRwater/data/satellite/Agramon")
+etp_path  = PathET / "20161001_20241231_ET0.nc"
+rain_path = PathET / "20161001_20241231_TP.nc"
+
+# LAI / ETp / rain source rasters are EPSG:32630 (UTM 30N, WGS84); DEM /
+# shapefiles / mesh are TARGET_CRS = EPSG:25830 (UTM 30N, ETRS89) defined
+# below. Same zone, different datum — always reproject before use.
+NATIVE_CRS = "EPSG:32630"
 
 
 if str(MODULE_PATH) not in sys.path:
@@ -99,6 +124,7 @@ if str(MODULE_PATH) not in sys.path:
 
 import Agramon_utils as AgUtils
 from pyCATHY import cathy_tools
+from pyCATHY import meshtools as mt   # used to map satellite ETp onto mesh nodes for Fig 7h
 
 # ── Shared plotter module ─────────────────────────────────────────────────────
 
@@ -110,9 +136,11 @@ warnings.filterwarnings("ignore", category=DeprecationWarning)
 # ── Plot constants ────────────────────────────────────────────────────────────
 
 TARGET_CRS = "EPSG:25830"
-ET_VAR     = 'ACT. ETRA' #"ACT. ETRA" ACT. ETRA_patched
+ET_VAR     = 'ACT. ETRA_patched' #"ACT. ETRA" ACT. ETRA_patched
+#ET_VAR     = 'ACT. ETRA' #"ACT. ETRA" ACT. ETRA_patched
 ET_SCALE   = 1e3 * 86400                           # m/s → mm/day
 CMAP_ET    = "YlGnBu"
+CMAP_SW    = "Blues"
 CMAP_VEG   = mcolors.ListedColormap(["#d4b483", "#78c679", "#006837"])
 
 LAI_VAR  = "LAI"
@@ -127,8 +155,101 @@ MONTH_NAMES = [
 
 
 # =============================================================================
+# Satellite ETp + rain forcing (Fig 6/7 rain panel — replaces ERA5)
+# =============================================================================
+def _load_forcing_nc(path: Path, label: str) -> xr.Dataset:
+    """Open a satellite ETp/rain NetCDF, assign its native CRS (EPSG:32630),
+    and reproject to TARGET_CRS (EPSG:25830). Mirrors ``_load_nc`` in
+    Agramon_withLAI_withETp.py.
+    """
+    ds = (
+        xr.open_dataset(path, decode_times=True, mask_and_scale=True)
+          .drop_vars("spatial_ref", errors="ignore")
+    )
+    ds = ds.rio.write_crs(NATIVE_CRS, inplace=False)
+    ds = ds.rio.set_spatial_dims(x_dim="x", y_dim="y", inplace=False)
+    print(f"  {label} native CRS : {ds.rio.crs}")
+
+    if str(ds.rio.crs) != TARGET_CRS:
+        print(f"  Reprojecting {label}  {ds.rio.crs} → {TARGET_CRS}")
+        ds = ds.rio.reproject(TARGET_CRS)
+
+    ds = ds.rio.write_crs(TARGET_CRS, inplace=False)
+    ds = ds.rio.set_spatial_dims(x_dim="x", y_dim="y", inplace=False)
+    return ds
+
+
+def load_etp(path: Path = etp_path) -> xr.Dataset:
+    """Load satellite ETp (ET0) dataset and reproject to TARGET_CRS."""
+    return _load_forcing_nc(path, "ETp")
+
+
+def load_rain(path: Path = rain_path) -> xr.Dataset:
+    """Load satellite rain (TP) dataset and reproject to TARGET_CRS."""
+    return _load_forcing_nc(path, "rain")
+
+
+def _domain_mean_daily_series(
+    ds: xr.Dataset, var: str, gdf, stat: str = "mean"
+) -> pd.Series:
+    """Clip a satellite ETp/rain dataset to the catchment polygon and
+    return its daily domain-mean (or domain-median, via ``stat``) as a
+    ``pd.Series`` (mm/day, DatetimeIndex).
+
+    Uses rioxarray directly instead of ``AgUtils.extract_point_timeseries``:
+    that helper was written for ERA5's lat/lon grid, whereas ``ds`` here is
+    already projected to TARGET_CRS (EPSG:25830, x/y in metres) — calling
+    it on this grid is what produced "satellite ETp/rain forcing not
+    loaded" (it can't resolve ERA5-style coordinates/variable names on a
+    plain x/y raster). A direct clip + spatial reduction sidesteps that and
+    also matches how the main run pipeline (Agramon_withLAI_withETp.py)
+    already treats ETp/rain — as a mesh/domain aggregate, not a point pick.
+    """
+    if stat not in ("mean", "median"):
+        raise ValueError(f"stat must be 'mean' or 'median', got '{stat}'.")
+
+    da = ds[var]
+
+    gdf_proj = gdf
+    if gdf.crs is not None and str(gdf.crs) != TARGET_CRS:
+        gdf_proj = gdf.to_crs(TARGET_CRS)
+
+    try:
+        da = da.rio.clip(gdf_proj.geometry.values, gdf_proj.crs, drop=True)
+    except Exception as clip_exc:
+        print(f"  WARNING: clip to catchment failed for '{var}' — "
+              f"using full raster extent instead.\n    ({clip_exc})")
+
+    time_dim = "time" if "time" in da.dims else "datetime"
+    spatial_dims = [d for d in da.dims if d != time_dim]
+    reduced = getattr(da, stat)(dim=spatial_dims, skipna=True)
+    series = reduced.to_series()
+    series.index = pd.DatetimeIndex(series.index)
+    return series
+
+
+# =============================================================================
 # Spatial ET monthly subplot (Fig 4)
 # =============================================================================
+TS_YEARS = (2019, 2020, 2024)   # years drawn by the per-year time-series figures
+
+
+def _ts_years(ds, args) -> list[int]:
+    """Years in TS_YEARS that are present in *ds* (and inside the
+    --date-start/--date-end window, if given)."""
+    td = "datetime" if "datetime" in ds.dims else "time"
+    have = set(pd.DatetimeIndex(ds[td].values).year.tolist())
+    yrs = [y for y in TS_YEARS if y in have]
+    if getattr(args, "date_start", None):
+        yrs = [y for y in yrs if y >= pd.Timestamp(args.date_start).year]
+    if getattr(args, "date_end", None):
+        yrs = [y for y in yrs if y <= pd.Timestamp(args.date_end).year]
+    missing = [y for y in TS_YEARS if y not in yrs]
+    if missing:
+        print(f"  (per-year figures: no data for {missing} — skipped)")
+    return yrs
+
+
 def plot_et_spatial_monthly(
     ET_xr_all: xr.Dataset,
     variable: str,
@@ -161,72 +282,262 @@ def plot_et_spatial_monthly(
     show : bool
         If True, calls plt.show() after saving/building the figure.
     """
-    da_year = (
-        ET_xr_all[variable]
-        .sel(datetime=ET_xr_all["datetime"].dt.year == selected_year)
-        * scale
+    da_all = ET_xr_all[variable] * scale
+    _plot_spatial_monthly_generic(
+        da_all, "datetime", selected_year, out_dir, cmap, dpi, show,
+        title=f"Monthly ET ({variable})",
+        cbar_label=f"{variable} (mm/day)",
+        fname_prefix="et_spatial_monthly",
     )
-    # da_year.plot.imshow()
 
-    if da_year.sizes["datetime"] == 0:
-        print(f"  plot_et_spatial_monthly: no data for {selected_year} — skipping.")
+
+def _plot_spatial_monthly_generic(
+    da_all:        xr.DataArray,
+    time_dim:      str,
+    selected_year: int,
+    out_dir:       Path | None,
+    cmap:          str,
+    dpi:           int,
+    show:          bool,
+    title:         str,
+    cbar_label:    str,
+    fname_prefix:  str,
+    vmin:          float | None = None,
+    vmax:          float | None = None,
+) -> None:
+    """
+    Shared 3×4 (month) mosaic imshow, used by both plot_et_spatial_monthly
+    and plot_sw_spatial_monthly so the two stay visually consistent.
+    """
+    da_year = da_all.sel({time_dim: da_all[time_dim].dt.year == selected_year})
+
+    if da_year.sizes[time_dim] == 0:
+        print(f"  {fname_prefix}: no data for {selected_year} — skipping.")
         return
 
-    # One panel per month — take the mean over time steps within each month
-    months = np.unique(da_year["datetime"].dt.month.values)
+    months   = np.unique(da_year[time_dim].dt.month.values)
     n_months = len(months)
-    ncols = min(4, n_months)
-    nrows = int(np.ceil(n_months / ncols))
+    ncols    = min(4, n_months)
+    nrows    = int(np.ceil(n_months / ncols))
 
+    _ny = da_year.sizes.get("Y", da_year.sizes.get("y", 1))
+    _nx = da_year.sizes.get("X", da_year.sizes.get("x", 1))
+    _map_aspect = float(np.clip(_ny / max(_nx, 1), 0.4, 2.5))   # height / width
+
+    # constrained_layout + ONE shared colourbar: every panel keeps the same
+    # size (a per-panel-0 colourbar used to shrink the first map), and the
+    # gaps between subplots are handled automatically.
     fig, axes = plt.subplots(
         nrows, ncols,
-        figsize=(5 * ncols, 4 * nrows),
+        figsize=(3.6 * ncols + 1.2, (3.6 * _map_aspect + 0.30) * nrows + 0.6),
         squeeze=False,
+        constrained_layout=True,
     )
+    fig.get_layout_engine().set(w_pad=0.04, h_pad=0.05, wspace=0.03, hspace=0.06)
 
-    vmin = float(da_year.min())
-    vmax = float(da_year.max())
+    vmin_eff = float(da_year.min()) if vmin is None else vmin
+    vmax_eff = float(da_year.max()) if vmax is None else vmax
 
+    used_axes, im = [], None
     for idx, month in enumerate(months):
         ax = axes[idx // ncols][idx % ncols]
+        used_axes.append(ax)
 
         da_month = da_year.sel(
-            datetime=da_year["datetime"].dt.month == month
-        ).mean("datetime")                          # collapse time steps → (X, Y)
+            {time_dim: da_year[time_dim].dt.month == month}
+        ).mean(time_dim)                          # collapse time steps → (X, Y)
 
-        da_month.plot.imshow(
-            ax=ax,
-            cmap=cmap,
-            x="X",
-            y="Y",
-            vmin=vmin,
-            vmax=vmax,
-            add_colorbar=(idx == 0),
-            **( {"cbar_kwargs": {"label": f"{variable} (mm/day)", "shrink": 0.8}}
-                if idx == 0 else {} ),
+        im = da_month.plot.imshow(
+            ax=ax, cmap=cmap, x="X", y="Y",
+            vmin=vmin_eff, vmax=vmax_eff, add_colorbar=False,
         )
 
-        ax.set_title(MONTH_NAMES[month - 1], fontsize=9)
+        ax.set_title(MONTH_NAMES[month - 1], fontsize=10, pad=3)
         ax.set_xlabel("")
         ax.set_ylabel("")
         ax.set_aspect("equal")
+        ax.xaxis.set_major_locator(plt.MaxNLocator(3))
+        ax.yaxis.set_major_locator(plt.MaxNLocator(4))
+        ax.ticklabel_format(useOffset=False, style="plain")
+        ax.tick_params(labelsize=7, length=2.5, pad=1.5)
+        for lab in ax.get_xticklabels():
+            lab.set_rotation(30)
+            lab.set_ha("right")
+        # coordinate labels only on the outer edge of the mosaic
+        ax.tick_params(labelleft=(idx % ncols == 0),
+                       labelbottom=(idx + ncols >= n_months))
 
     # Hide unused axes
     for idx in range(n_months, nrows * ncols):
         axes[idx // ncols][idx % ncols].set_visible(False)
 
-    fig.suptitle(f"Monthly ET ({variable}) — {selected_year}", fontsize=12, y=1.01)
-    plt.tight_layout()
+    fig.colorbar(im, ax=used_axes, shrink=0.8, aspect=30, pad=0.015,
+                 label=cbar_label)
+    fig.supxlabel("X (m)", fontsize=9)
+    fig.supylabel("Y (m)", fontsize=9)
+    fig.suptitle(f"{title} — {selected_year}", fontsize=12, fontweight="bold")
 
     if out_dir is not None:
-        out_path = Path(out_dir) / f"et_spatial_monthly_{selected_year}.png"
+        out_path = Path(out_dir) / f"{fname_prefix}_{selected_year}.png"
         fig.savefig(out_path, dpi=dpi, bbox_inches="tight")
-        print(f"  ET spatial map saved → {out_path}")
+        print(f"  {title} map saved → {out_path}")
 
     if show:
         plt.show()
     else:
         plt.close(fig)
+
+
+# =============================================================================
+# Surface soil-moisture saturation → spatial grid (Fig 4b)
+# =============================================================================
+# sw_output.nc only carries values at 3-D mesh *nodes* (dims: datetime,
+# node) — there's no ready-made (X, Y) raster the way there is for ET.
+# build_sw_surface_grid() recovers one by interpolating the surface-layer
+# nodes (grid3d['mesh3d_nodes'][:nnod]) onto the exact (X, Y) coordinates
+# ET_xr_all already uses, so the result can be imshow'n with the same
+# machinery as ET/LAI. nearest-neighbour is used deliberately (not
+# linear/cubic): these are point values at the same physical locations
+# the ET raster's own grid is built on, so no smoothing should be
+# introduced by the regridding step itself.
+
+def build_sw_surface_grid(
+    sw_xr:     xr.Dataset,
+    grid3d:    dict,
+    ET_xr_all: xr.Dataset,
+    sw_var:    str = "sw",
+    x_dim:     str = "X",
+    y_dim:     str = "Y",
+    mask_to_dem: bool = True,
+) -> xr.Dataset:
+    """
+    Interpolate surface-node soil-moisture saturation onto the same
+    (X, Y) raster grid used by et_output.nc.
+
+    Parameters
+    ----------
+    sw_xr : xr.Dataset
+        Raw sw_output.nc — dims (datetime, node).
+    grid3d : dict
+        Return value of ``simu.read_outputs("grid3d")``; needs ``"nnod"``
+        (surface node count) and ``"mesh3d_nodes"`` (all mesh nodes,
+        columns x, y, z — the first ``nnod`` rows are the surface layer).
+    ET_xr_all : xr.Dataset
+        et_output.nc — supplies the target (X, Y) raster coordinates.
+    sw_var : str
+        Variable name inside sw_xr (default: "sw").
+    mask_to_dem : bool
+        If True (default), set pixels outside the DEM footprint to NaN.
+        The footprint is taken directly from ``ET_xr_all`` itself (it is
+        already NaN outside the catchment, since it's real CATHY model
+        output on the DEM's own active cells) rather than from a
+        separately-loaded DEM raster — that avoids any risk of shape or
+        orientation mismatch between a standalone raster_DEM array and
+        this (Y, X) grid, which is what silently skipped the masking
+        before.
+
+    Returns
+    -------
+    xr.Dataset with dims (datetime, Y, X) and variable *sw_var*,
+    coordinates matching ET_xr_all exactly — ready for
+    plot_sw_spatial_monthly() or any other ET-style spatial figure.
+    """
+    from scipy.interpolate import griddata
+
+    if sw_var not in sw_xr:
+        raise KeyError(
+            f"'{sw_var}' not found in sw_output.nc. "
+            f"Available: {list(sw_xr.data_vars)}"
+        )
+
+    nnod          = int(grid3d["nnod"])
+    surface_nodes = grid3d["mesh3d_nodes"][:nnod]
+    node_xy       = surface_nodes[:, :2]
+
+    da_sw    = sw_xr[sw_var]
+    time_dim = "datetime" if "datetime" in da_sw.dims else "time"
+    sw_surf  = da_sw.isel(node=slice(0, nnod))
+
+    X_vals = ET_xr_all[x_dim].values
+    Y_vals = ET_xr_all[y_dim].values
+    Xg, Yg = np.meshgrid(X_vals, Y_vals)
+
+    n_t = sw_surf.sizes[time_dim]
+    grid_vals = np.empty((n_t, len(Y_vals), len(X_vals)), dtype=float)
+    for i in range(n_t):
+        vals = sw_surf.isel({time_dim: i}).values
+        grid_vals[i] = griddata(node_xy, vals, (Xg, Yg), method="nearest")
+
+    # Crop to the DEM footprint — griddata's "nearest" fill extrapolates
+    # a value into every pixel of the (Y, X) bounding box, including
+    # outside the actual catchment. Reuse ET_xr_all's own NaN footprint
+    # (same grid, guaranteed aligned) instead of a separate DEM raster.
+    if mask_to_dem:
+        et_var_any  = next(iter(ET_xr_all.data_vars))
+        et_da       = ET_xr_all[et_var_any]
+        et_time_dim = next((d for d in ("datetime", "time") if d in et_da.dims), None)
+        if et_time_dim is not None:
+            et_da = et_da.isel({et_time_dim: 0})
+        et_da = et_da.transpose(y_dim, x_dim)
+        in_dem = np.isfinite(et_da.values)
+
+        if in_dem.shape == (len(Y_vals), len(X_vals)):
+            grid_vals = np.where(in_dem[None, :, :], grid_vals, np.nan)
+            print(f"  SW surface grid: masked {int((~in_dem).sum())} "
+                  f"pixel(s) outside the DEM (via ET footprint).")
+        else:
+            print(f"  WARNING: ET footprint shape {in_dem.shape} != "
+                  f"({len(Y_vals)}, {len(X_vals)}) — DEM masking skipped.")
+
+    ds_sw_grid = xr.Dataset(
+        {sw_var: ((time_dim, y_dim, x_dim), grid_vals)},
+        coords={
+            time_dim: sw_surf[time_dim].values,
+            y_dim: Y_vals,
+            x_dim: X_vals,
+        },
+    )
+    print(f"  SW surface grid built: '{sw_var}' on ({y_dim}, {x_dim}) = "
+          f"{ds_sw_grid.sizes[y_dim]}x{ds_sw_grid.sizes[x_dim]}, "
+          f"{n_t} timesteps (from {nnod} surface nodes).")
+    return ds_sw_grid
+
+
+def plot_sw_spatial_monthly(
+    ds_sw_grid:    xr.Dataset,
+    variable:      str = "sw",
+    selected_year: int = 2020,
+    out_dir:       Path | None = None,
+    cmap:          str = "Blues",
+    dpi:           int = 150,
+    show:          bool = False,
+    vmin:          float | None = 0.0,
+    vmax:          float | None = 1.0,
+) -> None:
+    """
+    Monthly spatial maps of surface soil-moisture saturation for
+    *selected_year*, in the same 3×4 mosaic layout as
+    plot_et_spatial_monthly.
+
+    Parameters
+    ----------
+    ds_sw_grid : xr.Dataset
+        Output of build_sw_surface_grid() — dims (datetime|time, Y, X).
+    variable : str
+        Variable name inside ds_sw_grid (default: "sw").
+    vmin, vmax : float or None
+        Fixed colour-scale bounds (default 0-1, the usual saturation
+        range). Pass None/None to auto-scale per year, like ET.
+    """
+    time_dim = "datetime" if "datetime" in ds_sw_grid[variable].dims else "time"
+    _plot_spatial_monthly_generic(
+        ds_sw_grid[variable], time_dim, selected_year, out_dir, cmap, dpi, show,
+        title=f"Monthly surface saturation ({variable})",
+        cbar_label=f"{variable} (-)",
+        fname_prefix="sw_spatial_monthly",
+        vmin=vmin, vmax=vmax,
+    )
+
 
 # =============================================================================
 # Shared pre-processing helper
@@ -690,7 +1001,7 @@ def _parse_args() -> argparse.Namespace:
 
     # Scenario selection — mirrors LT_SShydro_results.py
     p.add_argument(
-        "--scenario", type=int, default=3, metavar="N",
+        "--scenario", type=int, default=5, metavar="N",
         help=(
             "sim_index to visualise (from simulation_log.csv). "
             "Defaults to the first withLAI=1 row in the log."
@@ -724,8 +1035,37 @@ def _parse_args() -> argparse.Namespace:
         ),
     )
     p.add_argument(
-        "--dem-plot", type=int, default=1, choices=range(1, 9), metavar="N",
+        "--dem-plot", type=int, default=3, choices=range(1, 9), metavar="N",
         help="DTM plot index (1-8) used to load the DEM raster.",
+    )
+    p.add_argument(
+        "--dem-tif", default=str(MODULE_PATH / "DTMplots/20250618_AGRAMON100m_micasense_dtm.tif"),
+        metavar="PATH",
+        help=(
+            "Full path to the GeoTIFF DEM used to build the mesh "
+            "(must match --dem-tif used at generation time in "
+            "Agramon_withLAI_withETp.py; default: "
+            "20250618_AGRAMON100m_micasense_dtm.tif in MODULE_PATH)."
+        ),
+    )
+    p.add_argument(
+        "--dem-res", type=float, default=5.0, metavar="M",
+        help=(
+            "DEM resample resolution in metres. MUST equal the "
+            "resample_resolution used by Agramon_withLAI_withETp.py when the "
+            "simulation was run (5 m), otherwise the DEM mask grid does not "
+            "match veg_map_history (default: 5)."
+        ),
+    )
+    p.add_argument(
+        "--et-var", default=ET_VAR, choices=["ACT. ETRA", "ACT. ETRA_patched"],
+        metavar="VAR",
+        help=(
+            "Which ET variable to plot/aggregate throughout: 'ACT. ETRA' "
+            "(raw solver output) or 'ACT. ETRA_patched' (artefact-floored, "
+            "see apply_eta_artefact_floor in Agramon_withLAI_withETp.py). "
+            "Overrides the ET_VAR module constant for this run."
+        ),
     )
 
     # Content selection
@@ -736,6 +1076,18 @@ def _parse_args() -> argparse.Namespace:
     p.add_argument(
         "--lai-vmax", type=float, default=LAI_VMAX, metavar="VAL",
         help="Upper bound for LAI colour scale.",
+    )
+    p.add_argument(
+        "--sw-var", default="sw", metavar="VAR",
+        help="Variable name inside sw_output.nc to plot (default: 'sw').",
+    )
+    p.add_argument(
+        "--sw-vmin", type=float, default=0.0, metavar="VAL",
+        help="Lower bound for the surface-saturation colour scale (Fig 4b).",
+    )
+    p.add_argument(
+        "--sw-vmax", type=float, default=1.0, metavar="VAL",
+        help="Upper bound for the surface-saturation colour scale (Fig 4b).",
     )
 
     # Date filtering (Fig 6 / Fig 7 hydro plots)
@@ -767,6 +1119,11 @@ def _parse_args() -> argparse.Namespace:
     p.add_argument("--no-downhill-1m",   dest="show_dh_1", action="store_false")
     p.set_defaults(show_uh_s=True, show_uh_1=True, show_dh_s=True, show_dh_1=True)
     p.add_argument(
+        "--monthly-ts", action="store_true",
+        help="Also draw the (optional) monthly-resampled time-series figures "
+             "(Fig 6f, 7j, 7gj, 7bj, 7fj, 7hj, 7ij). Off by default.",
+    )
+    p.add_argument(
         "--no-gifs", action="store_true",
         help="Skip GIF animation generation (can be slow).",
     )
@@ -790,7 +1147,7 @@ def _resolve_log(path2prj: Path, log_file: str) -> Path:
     lp = Path(log_file)
     if not lp.is_absolute():
         # .resolve() elimina los '..' y convierte la ruta en absoluta
-        lp = (path2prj / 'Codigos_HydroModel' / lp).resolve()
+        lp = (path2prj / 'lib' / lp).resolve()
     else:
         lp = lp.resolve()
 
@@ -881,38 +1238,6 @@ def _require(path: Path, label: str) -> None:
         )
 
 
-def _open_nc_safe(path: Path, as_dataarray: bool = False):
-    """Open a NetCDF file with xarray, working around a known xarray/CF
-    decoding bug where a variable (typically 'time') already carries a
-    'dtype' key in its attrs. In that case xarray's CF-timedelta decoder
-    raises:
-
-        ValueError: failed to prevent overwriting existing key 'dtype'
-        in attrs on variable 'time' ...
-
-    when it tries to move that attr into the encoding dict. This happens
-    for some of our written NetCDFs (e.g. recharge_output.nc) but not
-    others, depending on how the file was saved.
-
-    We first try a normal open; if it fails with that specific error we
-    retry with decode_timedelta=False, which skips the problematic
-    timedelta-from-units decoding path entirely (the raw values/attrs are
-    still available, they just aren't auto-converted to timedelta64).
-    """
-    opener = xr.open_dataarray if as_dataarray else xr.open_dataset
-    try:
-        return opener(path)
-    except ValueError as e:
-        if "overwriting existing key" in str(e) and "dtype" in str(e):
-            print(
-                f"  [warn] {path.name}: CF timedelta-decoding conflict on "
-                f"a variable's 'dtype' attr -- retrying with "
-                f"decode_timedelta=False"
-            )
-            return opener(path, decode_timedelta=False)
-        raise
-
-
 def load_artefacts(out_dir: Path, path2prj: Path | None = None, sim_index: int | None = None) -> dict:
     """Load all pre-computed NetCDF / pickle artefacts from *out_dir*.
 
@@ -927,25 +1252,25 @@ def load_artefacts(out_dir: Path, path2prj: Path | None = None, sim_index: int |
     # ET
     et_nc = out_dir / "et_output.nc"
     _require(et_nc, "et_output.nc")
-    ET_xr_all = _open_nc_safe(et_nc)
+    ET_xr_all = xr.open_dataset(et_nc)
     print(f"  ET      : {et_nc}  |  variables: {list(ET_xr_all.data_vars)}")
 
     # PSI
     psi_nc = out_dir / "psi_output.nc"
     _require(psi_nc, "psi_output.nc")
-    psi_xr = _open_nc_safe(psi_nc)
+    psi_xr = xr.open_dataset(psi_nc)
     print(f"  PSI     : {psi_nc}")
 
     # SW
     sw_nc = out_dir / "sw_output.nc"
     _require(sw_nc, "sw_output.nc")
-    sw_xr = _open_nc_safe(sw_nc)
+    sw_xr = xr.open_dataset(sw_nc)
     print(f"  SW      : {sw_nc}")
 
     # Vegetation map history
     veg_nc = out_dir / "veg_map_history.nc"
     _require(veg_nc, "veg_map_history.nc")
-    veg_xr_full = _open_nc_safe(veg_nc, as_dataarray=True)
+    veg_xr_full = xr.open_dataarray(veg_nc)
     sorted_dates = [pd.Timestamp(t).to_pydatetime() for t in veg_xr_full["time"].values]
     veg_map_history = {
         pd.Timestamp(t).to_pydatetime(): veg_xr_full.sel(time=t).values
@@ -968,11 +1293,22 @@ def load_artefacts(out_dir: Path, path2prj: Path | None = None, sim_index: int |
     # Recharge NetCDF (preferred over simu.read_outputs for Fig 10)
     recharge_nc = out_dir / "recharge_output.nc"
     if recharge_nc.exists():
-        xr_recharge = _open_nc_safe(recharge_nc)
+        xr_recharge = xr.open_dataset(recharge_nc)
         print(f"  Recharge NC: {recharge_nc}  |  variables: {list(xr_recharge.data_vars)}")
     else:
         xr_recharge = None
         print("  Recharge NC: recharge_output.nc not found -- Fig 10 will fall back to simu.")
+
+    # Hydrograph CSV (preferred over live simu.show() for Fig 9 — the full
+    # multi-month backup written by Agramon_withLAI_withETp.py, instead of
+    # whichever single month's run simu currently holds in memory).
+    hgraph_csv = out_dir / "hgraph_output.csv"
+    if hgraph_csv.exists():
+        df_hgraph = pd.read_csv(hgraph_csv, parse_dates=["datetime"])
+        print(f"  Hgraph CSV : {hgraph_csv}  |  {len(df_hgraph)} rows")
+    else:
+        df_hgraph = None
+        print("  Hgraph CSV : hgraph_output.csv not found -- Fig 9 will fall back to simu.")
 
     # LAI history pickle (optional)
     lai_pkl = out_dir / "veg_map_history.pkl"
@@ -1016,6 +1352,7 @@ def load_artefacts(out_dir: Path, path2prj: Path | None = None, sim_index: int |
         sorted_dates=sorted_dates,
         # recharge_monthly=recharge_monthly,
         xr_recharge=xr_recharge,
+        df_hgraph=df_hgraph,
         lai_history=lai_history,
         simu=simu,
     )
@@ -1025,9 +1362,26 @@ def load_artefacts(out_dir: Path, path2prj: Path | None = None, sim_index: int |
 # Node resolution (mirrors LT_SShydro_results.py)
 # =============================================================================
 
-def resolve_nodes(simu, grid3d: dict, args: argparse.Namespace) -> dict:
+def resolve_nodes(
+    simu,
+    grid3d: dict,
+    args: argparse.Namespace,
+    *,
+    psi_xr: "xr.Dataset | None" = None,
+    sw_xr:  "xr.Dataset | None" = None,
+) -> dict:
     """
     Identify outlet and mid-uphill reference nodes at each requested depth.
+
+    The outlet is always a single reference node. The mid-uphill site is,
+    by default, a *band* of nodes within ±2% elevation of the domain's
+    mid-elevation (see ``results_plotter.find_representative_mid_node(...,
+    return_band=True)``) rather than a single arbitrarily-chosen point —
+    downstream plotting takes the per-timestep median across the band, so
+    "mid elevation" reflects the whole band. If the caller pins an exact
+    XY location via ``args.uphill_xy``, that single point is used instead
+    (a band doesn't make sense once the user has asked for one specific
+    location).
 
     Parameters
     ----------
@@ -1035,15 +1389,32 @@ def resolve_nodes(simu, grid3d: dict, args: argparse.Namespace) -> dict:
     grid3d   : dict returned by ``simu.read_outputs("grid3d")``.
     args     : parsed CLI namespace; uses ``outlet_xy``, ``uphill_xy``,
                and ``depths``.
+    psi_xr / sw_xr : optional pressure-head / soil-water xr.Datasets
+               (already loaded, same ones passed to Fig 6/7). When given,
+               the console summary also reports min/max/mean ψ and sw
+               across every node in each band, over the full simulation —
+               a quick sanity check that band nodes aren't just numerically
+               identical to each other.
 
     Returns
     -------
-    dict mapping label → node-index, e.g.
-        { "outlet_z-0m": 142, "outlet_z-1m": 998, "mid_z-0m": 57, … }
+    dict mapping label → node-index (or list[node-index] for a mid-uphill
+    band), e.g.
+        { "outlet_z-0m": 142, "outlet_z-1m": 998,
+          "mid_z-0m": [57, 61, 64], "mid_z-1m": [1011, 1015, 1018], … }
     """
     nnod          = int(grid3d["nnod"])
     nodes         = grid3d["mesh3d_nodes"]
     surface_nodes = nodes[:nnod]
+    # Single KD-tree over the full 3D mesh, built once. Previously every
+    # depth × every band node called simu.find_nearest_node() individually
+    # (686 nodes × 2 non-zero depths = ~1372 separate lookups) — whatever
+    # that method does internally per call, doing it in a Python loop is
+    # the dominant cost of this whole section. A vectorized query against
+    # one tree replaces the entire band lookup at a given depth with a
+    # single call.
+    from scipy.spatial import cKDTree
+    node_tree = cKDTree(nodes)
 
     # Outlet — lowest surface node or user-supplied XY
     if args.outlet_xy:
@@ -1054,33 +1425,91 @@ def resolve_nodes(simu, grid3d: dict, args: argparse.Namespace) -> dict:
         outlet_idx = int(surface_nodes[:, 2].argmin())
     outlet_x, outlet_y, outlet_z = surface_nodes[outlet_idx]
 
-    # Mid-uphill — mid-elevation surface node or user-supplied XY
+    # Mid-uphill — a band of nodes around mid-elevation, or a single
+    # user-supplied XY point.
+    mid_band_idx: np.ndarray | None = None
     if args.uphill_xy:
         ux, uy = args.uphill_xy
         dists  = np.hypot(surface_nodes[:, 0] - ux, surface_nodes[:, 1] - uy)
         mid_idx = int(dists.argmin())
+        mid_x, mid_y, mid_z = surface_nodes[mid_idx]
     else:
-        min_z   = surface_nodes[:, 2].min()
-        max_z   = surface_nodes[:, 2].max()
-        mid_idx = int(np.abs(surface_nodes[:, 2] - (min_z + max_z) / 2).argmin())
-    mid_x, mid_y, mid_z = surface_nodes[mid_idx]
+        mid_band_idx = plotter.find_representative_mid_node(
+            surface_nodes, return_band=True
+        )
+        # Recentred single point too, purely for the console summary below
+        # (the band itself is what actually gets used downstream).
+        mid_idx = plotter.find_representative_mid_node(
+            surface_nodes, return_band=False
+        )
+        mid_x, mid_y, mid_z = surface_nodes[mid_idx]
 
     print(f"  Outlet:     X={outlet_x:.2f}, Y={outlet_y:.2f}, Z={outlet_z:.2f}")
-    print(f"  Mid-uphill: X={mid_x:.2f},   Y={mid_y:.2f},   Z={mid_z:.2f}")
+    print(f"  Mid-uphill: X={mid_x:.2f},   Y={mid_y:.2f},   Z={mid_z:.2f}", end="")
+    if mid_band_idx is not None:
+        band_z = surface_nodes[mid_band_idx, 2]
+        print(
+            f"  (band: {len(mid_band_idx)} node(s), "
+            f"Z range {band_z.min():.2f}–{band_z.max():.2f})"
+        )
+    else:
+        print("  (single user-supplied point)")
 
     nodes_dict: dict = {}
     for depth in args.depths:
         depth_label = int(depth) if float(depth).is_integer() else depth
-        nodes_dict[f"outlet_z-{depth_label}m"] = simu.find_nearest_node(
+        _, outlet_node_idx = node_tree.query(
             [outlet_x, outlet_y, outlet_z - depth]
         )
-        nodes_dict[f"mid_z-{depth_label}m"] = simu.find_nearest_node(
-            [mid_x, mid_y, mid_z - depth]
-        )
+        nodes_dict[f"outlet_z-{depth_label}m"] = int(outlet_node_idx)
+        if mid_band_idx is not None:
+            if depth == 0:
+                # Surface band indices already are node indices at depth 0.
+                nodes_dict[f"mid_z-{depth_label}m"] = [int(i) for i in mid_band_idx]
+            else:
+                # Project every surface node in the band straight down by
+                # `depth` and resolve the whole band to node indices in
+                # one vectorized KD-tree query, instead of one
+                # find_nearest_node() call per band node.
+                query_pts = np.column_stack([
+                    surface_nodes[mid_band_idx, 0],
+                    surface_nodes[mid_band_idx, 1],
+                    surface_nodes[mid_band_idx, 2] - depth,
+                ])
+                _, band_node_idx = node_tree.query(query_pts)
+                nodes_dict[f"mid_z-{depth_label}m"] = [int(i) for i in band_node_idx]
+        else:
+            _, mid_node_idx = node_tree.query([mid_x, mid_y, mid_z - depth])
+            nodes_dict[f"mid_z-{depth_label}m"] = int(mid_node_idx)
 
     print("  Resolved nodes:")
+
+    def _var_stats(ds: "xr.Dataset | None", ids) -> str:
+        """Min/max/mean of ds's data variable across every id in `ids`
+        (band or single node) and across the whole time series."""
+        if ds is None:
+            return ""
+        var      = list(ds.data_vars)[0]
+        time_dim = plotter._infer_time_dim(ds)
+        da       = ds[var]
+        sel_ids  = ids if isinstance(ids, list) else [ids]
+        vals     = da.sel(node=sel_ids).values
+        return (
+            f" [{var}: min/max/mean = "
+            f"{np.nanmin(vals):.3f}/{np.nanmax(vals):.3f}/{np.nanmean(vals):.3f}]"
+        )
+
     for k, v in nodes_dict.items():
-        print(f"    {k}: {v}")
+        if isinstance(v, list):
+            v_arr = np.asarray(v)
+            line = (
+                f"    {k}: band of {len(v)} node(s) "
+                f"(id min/max/mean = {v_arr.min()}/{v_arr.max()}/{v_arr.mean():.1f})"
+            )
+        else:
+            line = f"    {k}: {v}"
+        line += _var_stats(psi_xr, v) + _var_stats(sw_xr, v)
+        print(line)
     return nodes_dict
 
 
@@ -1089,6 +1518,9 @@ def resolve_nodes(simu, grid3d: dict, args: argparse.Namespace) -> dict:
 # =============================================================================
 
 def run_pipeline(args: argparse.Namespace) -> None:
+    global ET_VAR
+    ET_VAR = args.et_var
+    print(f"  ET variable in use : {ET_VAR}")
 
     # -- Backend ---------------------------------------------------------------
     if args.backend:
@@ -1124,18 +1556,24 @@ def run_pipeline(args: argparse.Namespace) -> None:
     # Figures reuse the same tagged name so a figures/ tree mirrors the
     # outputs/ tree one-to-one, and comparing scenarios visually is just a
     # matter of opening the two folders side by side.
-    fig_dir = (
+    main_dir = (
         Path(args.fig_dir).resolve()
         if args.fig_dir
         else path2prj / "figures" / scenario_dirname
     )
+    main_dir.mkdir(parents=True, exist_ok=True)
+    # Main figures (per-year weekly time series + the monthly spatial mosaics)
+    # are written to main_dir; every other figure goes to main_dir/supp_figs.
+    # All pre-existing plotting calls use `fig_dir`, so pointing it at the
+    # supplementary folder routes them there without touching each call.
+    fig_dir = main_dir / "supp_figs"
     fig_dir.mkdir(parents=True, exist_ok=True)
 
     print(f"\n{'=' * 60}")
     print(f"  LAI Loop Results Viewer -- {scenario_dirname}")
     print(f"  Log row   : {log_row.to_dict()}")
     print(f"  Artefacts : {out_dir}")
-    print(f"  Figures   : {fig_dir}")
+    print(f"  Figures   : {main_dir}   (others in {fig_dir.name}/)")
     print(f"{'=' * 60}\n")
 
     # -- Load artefacts --------------------------------------------------------
@@ -1147,9 +1585,16 @@ def run_pipeline(args: argparse.Namespace) -> None:
     # (psi_output.nc, sw_output.nc, et_output.nc) — no pyCATHY simu reload.
     psi_xr = art["psi_xr"]
     sw_xr  = art["sw_xr"]
-    simu.grid3d
 
-    simu.read_outputs('grid3d')
+    # Cache grid3d early (needed below for the surface-saturation spatial
+    # grid, and reused further down for node resolution / Fig 6b).
+    grid3d = None
+    if simu is not None:
+        try:
+            grid3d = simu.read_outputs('grid3d')
+        except Exception as exc:
+            print(f"  WARNING: grid3d read failed — surface-saturation "
+                  f"spatial maps (Fig 4b) will be skipped.\n    ({exc})")
 
     # psi_xr_surf = art["psi_xr"].isel(node=slice(0,1060))
     # sw_xr_surf = art["sw_xr"].isel(node=slice(0,1060))
@@ -1174,10 +1619,30 @@ def run_pipeline(args: argparse.Namespace) -> None:
 
     # -- DEM -------------------------------------------------------------------
     adf_folder = f"{MODULE_PATH}/DTMplots/dtmplot{log_row['watershed_nb']}/"
-    raster_DEM, raster_DEM_masked, xllcorner, yllcorner, res_x, res_y = AgUtils.load_dem(
-        TARGET_CRS=TARGET_CRS,
-        adf_folder=adf_folder,
+
+    gdf_Agramon = AgUtils.load_plot_shapefiles(['microcuencas_13'], MODULE_PATH / "shapefiles")
+    dem_tif_path = Path(args.dem_tif)  # same CLI default/value used at generation time
+
+    raster_DEM, raster_DEM_masked, xllcorner, yllcorner, res_x, res_y = load_dem_from_tif(
+        dem_tif_path,
+        gdf_clip=gdf_Agramon,
+        fid=int(log_row["watershed_nb"]),
+        resample_resolution=args.dem_res,
     )
+
+
+    # raster_DEM, raster_DEM_masked, xllcorner, yllcorner, res_x, res_y = AgUtils.load_dem(
+    #    TARGET_CRS=TARGET_CRS,
+    #    adf_folder=adf_folder,
+    #)
+
+    _first = next(iter(veg_map_history))
+    if raster_DEM_masked.shape != veg_map_history[_first].shape:
+        raise ValueError(
+            f"DEM grid {raster_DEM_masked.shape} != veg map grid "
+            f"{veg_map_history[_first].shape}: --dem-res ({args.dem_res} m) "
+            "differs from the resolution used for the simulation."
+        )
 
     veg_map_history_masked = veg_map_history.copy()
 
@@ -1210,7 +1675,7 @@ def run_pipeline(args: argparse.Namespace) -> None:
     plot_et_spatial_monthly(
         ET_xr_all, ET_VAR, ET_SCALE,
         2019,
-        fig_dir,
+        main_dir,
         cmap=CMAP_ET,
         dpi=dpi,
         show=show,
@@ -1218,11 +1683,36 @@ def run_pipeline(args: argparse.Namespace) -> None:
     plot_et_spatial_monthly(
         ET_xr_all, ET_VAR, ET_SCALE,
         2021,
-        fig_dir,
+        main_dir,
         cmap=CMAP_ET,
         dpi=dpi,
         show=show,
     )
+
+    # -- Fig 4b: Spatial surface soil-moisture saturation maps per month ------
+    print(f"-- Fig 4b: Spatial surface saturation monthly maps -- {args.selected_year} ----------")
+    if grid3d is not None:
+        try:
+            ds_sw_grid = build_sw_surface_grid(
+                sw_xr, grid3d, ET_xr_all, sw_var=args.sw_var,
+            )
+            for yr in (2019, args.selected_year):
+                plot_sw_spatial_monthly(
+                    ds_sw_grid,
+                    variable=args.sw_var,
+                    selected_year=yr,
+                    out_dir=main_dir,
+                    cmap=CMAP_SW,
+                    dpi=dpi,
+                    show=show,
+                    vmin=args.sw_vmin,
+                    vmax=args.sw_vmax,
+                )
+        except Exception as exc:
+            print(f"  WARNING: Surface saturation spatial maps skipped — {exc}")
+    else:
+        print("  Skipped — grid3d unavailable (CATHY project not loaded).")
+
     # -- Fig 5: Vegetation map samples (one per year) --------------------------
     print("-- Fig 5: Vegetation map samples -- by year -------------------------")
     plotter.plot_veg_map_samples(veg_map_history_masked, CMAP_VEG, fig_dir, dpi=dpi, show=show)
@@ -1230,15 +1720,15 @@ def run_pipeline(args: argparse.Namespace) -> None:
     # -- Fig 5b: Monthly vegetation maps for selected year ---------------------
     print(f"-- Fig 5b: Vegetation map -- {args.selected_year} (monthly) ----------")
     plotter.plot_veg_map_year(
-        veg_map_history_masked, 2016, CMAP_VEG, fig_dir, dpi=dpi, show=show
+        veg_map_history_masked, 2016, CMAP_VEG, main_dir, dpi=dpi, show=show
     )
     plotter.plot_veg_map_year(
-        veg_map_history_masked, args.selected_year, CMAP_VEG, fig_dir, dpi=dpi, show=show
+        veg_map_history_masked, args.selected_year, CMAP_VEG, main_dir, dpi=dpi, show=show
     )
 
     # -- Fig 5c: Monthly LAI maps for selected year ----------------------------
     print(f"-- Fig 5c: LAI maps -- {args.selected_year} (monthly) ----------------")
-    ds_lai = _open_nc_safe(LAI_PATH / "lai_monthly.nc")
+    ds_lai = xr.open_dataset(LAI_PATH / "lai_monthly.nc")
     plotter.plot_lai_map_year(
         ds_lai, LAI_VAR, args.selected_year,
         LAI_CMAP, LAI_VMIN, args.lai_vmax,
@@ -1352,11 +1842,11 @@ def run_pipeline(args: argparse.Namespace) -> None:
     # Both figures are built directly from the xarray artefacts already loaded
 
     print("-- Resolving reference nodes for Fig 6 / 7 -------------------------")
-    if simu is not None:
-        # simu is still used only for node resolution (grid3d + find_nearest_node)
+    if simu is not None and grid3d is not None:
+        # grid3d was already fetched above (for Fig 4b); simu is still
+        # needed here for find_nearest_node() inside resolve_nodes().
         try:
-            grid3d     = simu.read_outputs("grid3d")
-            nodes_dict = resolve_nodes(simu, grid3d, args)
+            nodes_dict = resolve_nodes(simu, grid3d, args, psi_xr=psi_xr, sw_xr=sw_xr)
         except Exception as exc:
             print(f"  WARNING: Node resolution failed — Fig 6/7 skipped.\n    ({exc})")
             nodes_dict = None
@@ -1366,25 +1856,76 @@ def run_pipeline(args: argparse.Namespace) -> None:
         nodes_dict = None
 
     if nodes_dict is not None:
-        # Try to load ERA5 forcing for the rain/ETp panel in Fig 6
-        pev_series: pd.Series | None = None
-        tp_series:  pd.Series | None = None
+        # Load satellite ETp + rain forcing for the rain/ETp panel in Fig 6
+        # (replaces the ERA5 point time-series previously used here — see
+        # Agramon_withLAI_withETp.py, step 1: "Load satellite ETp + rain
+        # NetCDFs (EPSG:32630 → EPSG:25830)").
+        pev_series:        pd.Series | None = None
+        pev_series_median: pd.Series | None = None
+        tp_series:         pd.Series | None = None
         try:
-            ds = AgUtils.load_era5_series(
-                root_path=EO_PATH,
-                # start_year=int(log_row["start_year"]),
-                # end_year=int(log_row["end_year"]),
-                start_year=2017,
-                end_year=2025,
-            )
+            ds_etp  = load_etp()
+            ds_rain = load_rain()
             gdf_Agramon = AgUtils.load_plot_shapefiles(['microcuencas_13'],
                                                        MODULE_PATH / "shapefiles")
-            daily_ts    = AgUtils.extract_point_timeseries(ds, gdf_Agramon)
-            pev_series  = daily_ts["pev"].to_series()
-            tp_series   = daily_ts["tp"].to_series()
-        except Exception as era5_exc:
-            print(f"  WARNING: ERA5 forcing not loaded — "
-                  f"rain/ETp panel will be empty.\n    ({era5_exc})")
+            pev_series        = _domain_mean_daily_series(ds_etp,  "ET_0-gf", gdf_Agramon)
+            pev_series_median = _domain_mean_daily_series(ds_etp,  "ET_0-gf", gdf_Agramon,
+                                                            stat="median")
+            tp_series  = _domain_mean_daily_series(ds_rain, "TP-DD",   gdf_Agramon)
+
+            # ET0 and TP come from separate NetCDFs and don't necessarily
+            # share the same valid-date coverage (e.g. 3014 vs 3620 days)
+            # — align to their common dates so every panel/mask downstream
+            # sees two series of equal length.
+            common_idx = pev_series.index.intersection(tp_series.index)
+            n_dropped_pev = len(pev_series) - len(common_idx)
+            n_dropped_tp  = len(tp_series)  - len(common_idx)
+            if n_dropped_pev or n_dropped_tp:
+                print(f"  Aligning ETp/rain to common dates: "
+                      f"{len(common_idx)} shared days "
+                      f"(dropped {n_dropped_pev} ETp-only, "
+                      f"{n_dropped_tp} rain-only day(s)).")
+            pev_series        = pev_series.loc[common_idx]
+            pev_series_median = pev_series_median.loc[
+                pev_series_median.index.intersection(common_idx)
+            ]
+            tp_series  = tp_series.loc[common_idx]
+        except Exception as etp_exc:
+            print(f"  WARNING: satellite ETp/rain forcing not loaded — "
+                  f"rain/ETp panel will be empty.\n    ({etp_exc})")
+
+        # ETp mapped onto the CATHY mesh surface nodes (same convention as
+        # ET_xr_all / psi_xr / sw_xr — see Agramon_withLAI_withETp.py, step 8
+        # "Map ETp and rain to mesh surface nodes"). Only needed for Fig 7h
+        # (ETa/ETp ratio at reference nodes); kept separate from the
+        # pev_series/tp_series block above so a mapping failure there
+        # doesn't also take down Fig 6's rain/ETp panel.
+        ETp_xr: "xr.Dataset | None" = None
+        try:
+            n_surf_etp  = int(grid3d["nnod"])
+            # build_mesh_dataset() only ever reads x/y/z off
+            # simu.mesh_pv_attributes.points — and that attribute is only
+            # populated by create_mesh_vtk(), which reruns the full CATHY
+            # preprocessor + processor (recompiles Fortran, executes
+            # pycppp, can even sys.exit() on some DEM/outlet conditions).
+            # We already have the same node coordinates from grid3d
+            # (mesh3d_nodes, used by resolve_nodes() above), so build the
+            # minimal node-coordinate dataset map_grid_to_mesh actually
+            # needs directly, instead of going through either of those.
+            mesh_nodes_etp = grid3d["mesh3d_nodes"]
+            ds_mesh_etp = xr.Dataset(
+                coords={
+                    "node": np.arange(mesh_nodes_etp.shape[0]),
+                    "x": ("node", mesh_nodes_etp[:, 0]),
+                    "y": ("node", mesh_nodes_etp[:, 1]),
+                    "z": ("node", mesh_nodes_etp[:, 2]),
+                }
+            )
+            ds_ETp_mapped = mt.map_grid_to_mesh(ds_etp, ds_mesh_etp, variables=["ET_0-gf"])
+            ETp_xr        = ds_ETp_mapped.isel(node=slice(0, n_surf_etp))
+        except Exception as etp_node_exc:
+            print(f"  WARNING: ETp-to-mesh mapping failed — "
+                  f"Fig 7h (ETa/ETp ratio) will be skipped.\n    ({etp_node_exc})")
 #%%
         print("-- Fig 6: Hydro time-series (Rain/ETp + ψ + sw) -----------------")
         plotter.plot_hydro_xr(
@@ -1442,6 +1983,72 @@ def run_pipeline(args: argparse.Namespace) -> None:
             )
         except Exception as exc:
             print(f"  WARNING: plot_hydro_xr_fire_month skipped — {exc}")
+
+        print("-- Fig 6e: Hydro time-series -- weekly ---------------------------")
+        try:
+            plotter.plot_hydro_xr_weekly(
+                psi_xr, sw_xr, nodes_dict, fig_dir,
+                pev_series=pev_series,
+                tp_series=tp_series,
+                date_start=args.date_start,
+                date_end=args.date_end,
+                show_rain=args.show_rain,
+                show_psi=args.show_psi,
+                show_sw=args.show_sw,
+                show_uh_s=args.show_uh_s,
+                show_uh_1=args.show_uh_1,
+                show_dh_s=args.show_dh_s,
+                show_dh_1=args.show_dh_1,
+                scenario_id=sim_index,
+                dpi=dpi, show=show,
+            )
+        except Exception as exc:
+            print(f"  WARNING: plot_hydro_xr_weekly skipped — {exc}")
+
+        print("-- Fig 6e (per year): Hydro time-series -- daily -----------------")
+        for _yr in _ts_years(sw_xr, args):
+            try:
+                plotter.plot_hydro_xr(
+                    psi_xr, sw_xr, nodes_dict, main_dir,
+                    pev_series=pev_series,
+                    tp_series=tp_series,
+                    date_start=f"{_yr}-01-01",
+                    date_end=f"{_yr}-12-31",
+                    show_rain=args.show_rain,
+                    show_psi=args.show_psi,
+                    show_sw=args.show_sw,
+                    show_uh_s=args.show_uh_s,
+                    show_uh_1=args.show_uh_1,
+                    show_dh_s=args.show_dh_s,
+                    show_dh_1=args.show_dh_1,
+                    scenario_id=sim_index,
+                    dpi=dpi, show=show,
+                    fname=f"fig6e_hydro_timeseries_daily_{_yr}.png",
+                )
+            except Exception as exc:
+                print(f"  WARNING: plot_hydro_xr {_yr} skipped — {exc}")
+        if args.monthly_ts:   # optional: --monthly-ts
+            print("-- Fig 6f: Hydro time-series -- monthly ------------------------------")
+            try:
+                plotter.plot_hydro_xr_monthly(
+                    psi_xr, sw_xr, nodes_dict, fig_dir,
+                    pev_series=pev_series,
+                    tp_series=tp_series,
+                    date_start=args.date_start,
+                    date_end=args.date_end,
+                    show_rain=args.show_rain,
+                    show_psi=args.show_psi,
+                    show_sw=args.show_sw,
+                    show_uh_s=args.show_uh_s,
+                    show_uh_1=args.show_uh_1,
+                    show_dh_s=args.show_dh_s,
+                    show_dh_1=args.show_dh_1,
+                    scenario_id=sim_index,
+                    dpi=dpi, show=show,
+                )
+            except Exception as exc:
+                print(f"  WARNING: plot_hydro_xr_monthly skipped — {exc}")
+
 #%%
         print("-- Fig 6b: Reference node locations (map) -----------------------")
         try:
@@ -1480,11 +2087,390 @@ def run_pipeline(args: argparse.Namespace) -> None:
             dpi=dpi, show=show,
         )
 
+        print("-- Fig 7b: sw + ETa + LAI trend time-series ----------------------")
+        lai_ds = plotter.lai_history_to_dataset(art["lai_history"], lai_var=LAI_VAR)
+
+        # Georeferenced copy for Fig 7h — lai_history was built by
+        # interpolating the satellite LAI onto this same DEM raster grid
+        # (Agramon_withLAI_withETp.py: ds_LAI_raster = ds_LAI.interp(x=dem.x,
+        # y=dem.y)), so lai_ds's plain 'row'/'col' dims line up 1:1 with
+        # raster_DEM's 'y'/'x' coordinates. Fig 7h needs real x/y to look up
+        # each reference node's nearest LAI pixel.
+        lai_ds_geo: "xr.Dataset | None" = None
+        try:
+            if lai_ds.sizes.get("row") == raster_DEM.sizes["y"] and \
+               lai_ds.sizes.get("col") == raster_DEM.sizes["x"]:
+                lai_ds_geo = lai_ds.rename({"row": "y", "col": "x"}).assign_coords(
+                    x=("x", raster_DEM["x"].values),
+                    y=("y", raster_DEM["y"].values),
+                )
+            else:
+                print("  WARNING: LAI grid shape doesn't match raster_DEM — "
+                      "Fig 7h (LAI at nodes) will be skipped.")
+        except Exception as lai_geo_exc:
+            print(f"  WARNING: could not georeference lai_ds — "
+                  f"Fig 7h will be skipped.\n    ({lai_geo_exc})")
+        try:
+            plotter.plot_et_sw_lai_xr(
+                sw_xr, ET_xr_all, ET_VAR, ET_SCALE, lai_ds, nodes_dict, fig_dir,
+                lai_var=LAI_VAR,
+                date_start=args.date_start,
+                date_end=args.date_end,
+                show_uh_s=args.show_uh_s,
+                show_uh_1=args.show_uh_1,
+                show_dh_s=args.show_dh_s,
+                show_dh_1=args.show_dh_1,
+                scenario_id=sim_index,
+                dpi=dpi, show=show,
+            )
+        except Exception as exc:
+            print(f"  WARNING: plot_et_sw_lai_xr skipped — {exc}")
+
+        print(f"-- Fig 7bc: sw + ETa + LAI time-series -- fire years ({plotter.FIRE_DATE.year}-{plotter.FIRE_DATE.year + 1}) ---")
+        try:
+            plotter.plot_et_sw_lai_xr_fire_year(
+                sw_xr, ET_xr_all, ET_VAR, ET_SCALE, lai_ds, nodes_dict, fig_dir,
+                lai_var=LAI_VAR,
+                show_uh_s=args.show_uh_s,
+                show_uh_1=args.show_uh_1,
+                show_dh_s=args.show_dh_s,
+                show_dh_1=args.show_dh_1,
+                scenario_id=sim_index,
+                dpi=dpi, show=show,
+            )
+        except Exception as exc:
+            print(f"  WARNING: plot_et_sw_lai_xr_fire_year skipped — {exc}")
+
+        print(f"-- Fig 7bd: sw + ETa + LAI time-series -- fire month "
+              f"({plotter.FIRE_DATE.strftime('%B %Y')}) -----------------")
+        try:
+            plotter.plot_et_sw_lai_xr_fire_month(
+                sw_xr, ET_xr_all, ET_VAR, ET_SCALE, lai_ds, nodes_dict, fig_dir,
+                lai_var=LAI_VAR,
+                show_uh_s=args.show_uh_s,
+                show_uh_1=args.show_uh_1,
+                show_dh_s=args.show_dh_s,
+                show_dh_1=args.show_dh_1,
+                scenario_id=sim_index,
+                dpi=dpi, show=show,
+            )
+        except Exception as exc:
+            print(f"  WARNING: plot_et_sw_lai_xr_fire_month skipped — {exc}")
+
+        print("-- Fig 7be: sw + ETa + LAI time-series -- weekly ------------------")
+        try:
+            plotter.plot_et_sw_lai_xr_weekly(
+                sw_xr, ET_xr_all, ET_VAR, ET_SCALE, lai_ds, nodes_dict, fig_dir,
+                lai_var=LAI_VAR,
+                date_start=args.date_start,
+                date_end=args.date_end,
+                show_uh_s=args.show_uh_s,
+                show_uh_1=args.show_uh_1,
+                show_dh_s=args.show_dh_s,
+                show_dh_1=args.show_dh_1,
+                scenario_id=sim_index,
+                dpi=dpi, show=show,
+            )
+        except Exception as exc:
+            print(f"  WARNING: plot_et_sw_lai_xr_weekly skipped — {exc}")
+
+        print("-- Fig 7be (per year): sw + ETa + LAI time-series -- daily --------")
+        for _yr in _ts_years(sw_xr, args):
+            try:
+                plotter.plot_et_sw_lai_xr(
+                    sw_xr, ET_xr_all, ET_VAR, ET_SCALE, lai_ds, nodes_dict, main_dir,
+                    lai_var=LAI_VAR,
+                    date_start=f"{_yr}-01-01",
+                    date_end=f"{_yr}-12-31",
+                    show_uh_s=args.show_uh_s,
+                    show_uh_1=args.show_uh_1,
+                    show_dh_s=args.show_dh_s,
+                    show_dh_1=args.show_dh_1,
+                    scenario_id=sim_index,
+                    dpi=dpi, show=show,
+                    fname=f"fig7be_et_sw_lai_timeseries_daily_{_yr}.png",
+                )
+            except Exception as exc:
+                print(f"  WARNING: plot_et_sw_lai_xr {_yr} skipped — {exc}")
+
+        if args.monthly_ts:   # optional: --monthly-ts
+            print("-- Fig 7bj: sw + ETa + LAI time-series -- monthly ------------------------------")
+            try:
+                plotter.plot_et_sw_lai_xr_monthly(
+                    sw_xr, ET_xr_all, ET_VAR, ET_SCALE, lai_ds, nodes_dict, fig_dir,
+                    lai_var=LAI_VAR,
+                    date_start=args.date_start,
+                    date_end=args.date_end,
+                    show_uh_s=args.show_uh_s,
+                    show_uh_1=args.show_uh_1,
+                    show_dh_s=args.show_dh_s,
+                    show_dh_1=args.show_dh_1,
+                    scenario_id=sim_index,
+                    dpi=dpi, show=show,
+                )
+            except Exception as exc:
+                print(f"  WARNING: plot_et_sw_lai_xr_monthly skipped — {exc}")
+
+        print("-- Fig 7f: psi + ETa + LAI trend time-series ---------------------")
+        try:
+            plotter.plot_et_psi_lai_xr(
+                psi_xr, ET_xr_all, ET_VAR, ET_SCALE, lai_ds, nodes_dict, fig_dir,
+                lai_var=LAI_VAR,
+                date_start=args.date_start,
+                date_end=args.date_end,
+                show_uh_s=args.show_uh_s,
+                show_uh_1=args.show_uh_1,
+                show_dh_s=args.show_dh_s,
+                show_dh_1=args.show_dh_1,
+                scenario_id=sim_index,
+                dpi=dpi, show=show,
+            )
+        except Exception as exc:
+            print(f"  WARNING: plot_et_psi_lai_xr skipped — {exc}")
+
+        print("-- Fig 7fe: psi + ETa + LAI time-series -- weekly -----------------")
+        try:
+            plotter.plot_et_psi_lai_xr_weekly(
+                psi_xr, ET_xr_all, ET_VAR, ET_SCALE, lai_ds, nodes_dict, fig_dir,
+                lai_var=LAI_VAR,
+                date_start=args.date_start,
+                date_end=args.date_end,
+                show_uh_s=args.show_uh_s,
+                show_uh_1=args.show_uh_1,
+                show_dh_s=args.show_dh_s,
+                show_dh_1=args.show_dh_1,
+                scenario_id=sim_index,
+                dpi=dpi, show=show,
+            )
+        except Exception as exc:
+            print(f"  WARNING: plot_et_psi_lai_xr_weekly skipped — {exc}")
+
+        if args.monthly_ts:   # optional: --monthly-ts
+            print("-- Fig 7fj: psi + ETa + LAI time-series -- monthly ------------------------------")
+            try:
+                plotter.plot_et_psi_lai_xr_monthly(
+                    psi_xr, ET_xr_all, ET_VAR, ET_SCALE, lai_ds, nodes_dict, fig_dir,
+                    lai_var=LAI_VAR,
+                    date_start=args.date_start,
+                    date_end=args.date_end,
+                    show_uh_s=args.show_uh_s,
+                    show_uh_1=args.show_uh_1,
+                    show_dh_s=args.show_dh_s,
+                    show_dh_1=args.show_dh_1,
+                    scenario_id=sim_index,
+                    dpi=dpi, show=show,
+                )
+            except Exception as exc:
+                print(f"  WARNING: plot_et_psi_lai_xr_monthly skipped — {exc}")
+
+        print(f"-- Fig 7c: sw + ETa time-series -- fire years ({plotter.FIRE_DATE.year}-{plotter.FIRE_DATE.year + 1}) ---")
+        try:
+            plotter.plot_et_sw_xr_fire_year(
+                sw_xr, ET_xr_all, ET_VAR, ET_SCALE, nodes_dict, fig_dir,
+                show_uh_s=args.show_uh_s,
+                show_uh_1=args.show_uh_1,
+                show_dh_s=args.show_dh_s,
+                show_dh_1=args.show_dh_1,
+                scenario_id=sim_index,
+                dpi=dpi, show=show,
+            )
+        except Exception as exc:
+            print(f"  WARNING: plot_et_sw_xr_fire_year skipped — {exc}")
+
+        print(f"-- Fig 7gc: psi + ETa time-series -- fire years ({plotter.FIRE_DATE.year}-{plotter.FIRE_DATE.year + 1}) ---")
+        try:
+            plotter.plot_et_psi_xr_fire_year(
+                psi_xr, ET_xr_all, ET_VAR, ET_SCALE, nodes_dict, fig_dir,
+                show_uh_s=args.show_uh_s,
+                show_uh_1=args.show_uh_1,
+                show_dh_s=args.show_dh_s,
+                show_dh_1=args.show_dh_1,
+                scenario_id=sim_index,
+                dpi=dpi, show=show,
+            )
+        except Exception as exc:
+            print(f"  WARNING: plot_et_psi_xr_fire_year skipped — {exc}")
+
+        print(f"-- Fig 7d: sw + ETa time-series -- fire month "
+              f"({plotter.FIRE_DATE.strftime('%B %Y')}) -----------------")
+        try:
+            plotter.plot_et_sw_xr_fire_month(
+                sw_xr, ET_xr_all, ET_VAR, ET_SCALE, nodes_dict, fig_dir,
+                show_uh_s=args.show_uh_s,
+                show_uh_1=args.show_uh_1,
+                show_dh_s=args.show_dh_s,
+                show_dh_1=args.show_dh_1,
+                scenario_id=sim_index,
+                dpi=dpi, show=show,
+            )
+        except Exception as exc:
+            print(f"  WARNING: plot_et_sw_xr_fire_month skipped — {exc}")
+
+        print("-- Fig 7e: sw + ETa time-series -- weekly ------------------------")
+        try:
+            plotter.plot_et_sw_xr_weekly(
+                sw_xr, ET_xr_all, ET_VAR, ET_SCALE, nodes_dict, fig_dir,
+                date_start=args.date_start,
+                date_end=args.date_end,
+                show_uh_s=args.show_uh_s,
+                show_uh_1=args.show_uh_1,
+                show_dh_s=args.show_dh_s,
+                show_dh_1=args.show_dh_1,
+                scenario_id=sim_index,
+                dpi=dpi, show=show,
+            )
+        except Exception as exc:
+            print(f"  WARNING: plot_et_sw_xr_weekly skipped — {exc}")
+
+        if args.monthly_ts:   # optional: --monthly-ts
+            print("-- Fig 7j: sw + ETa time-series -- monthly ------------------------------")
+            try:
+                plotter.plot_et_sw_xr_monthly(
+                    sw_xr, ET_xr_all, ET_VAR, ET_SCALE, nodes_dict, fig_dir,
+                    date_start=args.date_start,
+                    date_end=args.date_end,
+                    show_uh_s=args.show_uh_s,
+                    show_uh_1=args.show_uh_1,
+                    show_dh_s=args.show_dh_s,
+                    show_dh_1=args.show_dh_1,
+                    scenario_id=sim_index,
+                    dpi=dpi, show=show,
+                )
+            except Exception as exc:
+                print(f"  WARNING: plot_et_sw_xr_monthly skipped — {exc}")
+
+            print("-- Fig 7gj: psi + ETa time-series -- monthly ------------------------------")
+            try:
+                plotter.plot_et_psi_xr_monthly(
+                    psi_xr, ET_xr_all, ET_VAR, ET_SCALE, nodes_dict, fig_dir,
+                    date_start=args.date_start,
+                    date_end=args.date_end,
+                    show_uh_s=args.show_uh_s,
+                    show_uh_1=args.show_uh_1,
+                    show_dh_s=args.show_dh_s,
+                    show_dh_1=args.show_dh_1,
+                    scenario_id=sim_index,
+                    dpi=dpi, show=show,
+                )
+            except Exception as exc:
+                print(f"  WARNING: plot_et_psi_xr_monthly skipped — {exc}")
+
+        print("-- Fig 7h: LAI + ETa + sw + psi + ETa/ETp ratio at nodes ---------")
+        if lai_ds_geo is not None and ETp_xr is not None:
+            try:
+                plotter.plot_lai_et_sw_psi_ratio_xr(
+                    lai_ds_geo, ET_xr_all, ET_VAR, ET_SCALE,
+                    ETp_xr, "ET_0-gf", 1.0,
+                    sw_xr, psi_xr,
+                    nodes_dict, grid3d, fig_dir,
+                    lai_var=LAI_VAR,
+                    date_start=args.date_start,
+                    date_end=args.date_end,
+                    show_uh=args.show_uh_s,
+                    show_dh=args.show_dh_s,
+                    show_uh_1=args.show_uh_1,
+                    show_dh_1=args.show_dh_1,
+                    scenario_id=sim_index,
+                    dpi=dpi, show=show,
+                )
+            except Exception as exc:
+                print(f"  WARNING: plot_lai_et_sw_psi_ratio_xr skipped — {exc}")
+        else:
+            print("  Skipped — LAI georeferencing or mesh-mapped ETp unavailable "
+                  "(see warnings above).")
+
+        print("-- Fig 8 (per year): LAI + ETa + sw + psi + ETa/ETp ratio ---------")
+        if lai_ds_geo is not None and ETp_xr is not None:
+            for _yr in _ts_years(sw_xr, args):
+                try:
+                    plotter.plot_lai_et_sw_psi_ratio_xr(
+                        lai_ds_geo, ET_xr_all, ET_VAR, ET_SCALE,
+                        ETp_xr, "ET_0-gf", 1.0,
+                        sw_xr, psi_xr,
+                        nodes_dict, grid3d, main_dir,
+                        lai_var=LAI_VAR,
+                        date_start=f"{_yr}-01-01",
+                        date_end=f"{_yr}-12-31",
+                        show_uh=args.show_uh_s,
+                        show_dh=args.show_dh_s,
+                        show_uh_1=args.show_uh_1,
+                        show_dh_1=args.show_dh_1,
+                        scenario_id=sim_index,
+                        dpi=dpi, show=show,
+                        fname=f"fig8_lai_et_sw_psi_ratio_timeseries_{_yr}.png",
+                    )
+                except Exception as exc:
+                    print(f"  WARNING: plot_lai_et_sw_psi_ratio_xr {_yr} skipped — {exc}")
+        else:
+            print("  Skipped — LAI georeferencing or mesh-mapped ETp unavailable.")
+
+        if args.monthly_ts:   # optional: --monthly-ts
+            print("-- Fig 7hj: LAI + ETa + sw + psi + ETa/ETp ratio -- monthly ------")
+            if lai_ds_geo is not None and ETp_xr is not None:
+                try:
+                    plotter.plot_lai_et_sw_psi_ratio_xr_monthly(
+                        lai_ds_geo, ET_xr_all, ET_VAR, ET_SCALE,
+                        ETp_xr, "ET_0-gf", 1.0,
+                        sw_xr, psi_xr,
+                        nodes_dict, grid3d, fig_dir,
+                        lai_var=LAI_VAR,
+                        date_start=args.date_start,
+                        date_end=args.date_end,
+                        show_uh=args.show_uh_s,
+                        show_dh=args.show_dh_s,
+                        show_uh_1=args.show_uh_1,
+                        show_dh_1=args.show_dh_1,
+                        scenario_id=sim_index,
+                        dpi=dpi, show=show,
+                    )
+                except Exception as exc:
+                    print(f"  WARNING: plot_lai_et_sw_psi_ratio_xr_monthly skipped — {exc}")
+            else:
+                print("  Skipped — LAI georeferencing or mesh-mapped ETp unavailable.")
+
+        print("-- Fig 7i: Catchment-scale ETa/ETp ratio (mean & median) --------")
+        if pev_series is not None and pev_series_median is not None:
+            try:
+                plotter.plot_catchment_eta_etp_ratio(
+                    ET_xr_all, ET_VAR, ET_SCALE,
+                    pev_series, pev_series_median,
+                    fig_dir,
+                    date_start=args.date_start,
+                    date_end=args.date_end,
+                    scenario_id=sim_index,
+                    dpi=dpi, show=show,
+                )
+            except Exception as exc:
+                print(f"  WARNING: plot_catchment_eta_etp_ratio skipped — {exc}")
+        else:
+            print("  Skipped — domain-mean/median ETp series unavailable "
+                  "(see warnings above).")
+
+        if args.monthly_ts:   # optional: --monthly-ts
+            print("-- Fig 7ij: Catchment-scale ETa/ETp ratio -- monthly -------------")
+            if pev_series is not None and pev_series_median is not None:
+                try:
+                    plotter.plot_catchment_eta_etp_ratio_monthly(
+                        ET_xr_all, ET_VAR, ET_SCALE,
+                        pev_series, pev_series_median,
+                        fig_dir,
+                        date_start=args.date_start,
+                        date_end=args.date_end,
+                        scenario_id=sim_index,
+                        dpi=dpi, show=show,
+                    )
+                except Exception as exc:
+                    print(f"  WARNING: plot_catchment_eta_etp_ratio_monthly skipped — {exc}")
+            else:
+                print("  Skipped — domain-mean/median ETp series unavailable.")
+
     # ── Fig 8: Catchment ET balance (monthly + annual) ─────────────────────
     # plot_catchment_et expects a data-dict with keys:
     #   ET_xr       — spatial xr.Dataset with a CRS (used for pixel-area)
-    #   ET_xr_mean  — xr.Dataset/DataArray with spatial-mean "ACT. ETRA" values
+    #   ET_xr_mean  — xr.Dataset/DataArray with spatial-mean ET_VAR values
     #   time_dates  — array-like of datetimes aligned with ET_xr_mean
+    # (et_var=ET_VAR is passed explicitly below so this matches whichever
+    #  variable name ET_xr_mean was actually built with, above.)
     # We build these from ET_xr_all which is already loaded.
     print("-- Fig 8: Catchment ET balance (monthly + annual) ----------------")
     # try:
@@ -1516,7 +2502,8 @@ def run_pipeline(args: argparse.Namespace) -> None:
     plotter.plot_catchment_et(data_catchment,
                               fig_dir,
                               dpi=dpi,
-                              show=show
+                              show=show,
+                              et_var=ET_VAR,
                               )
 
 
@@ -1554,16 +2541,28 @@ def run_pipeline(args: argparse.Namespace) -> None:
     #     print(f"  WARNING: plot_eta_total skipped — {exc}")
 
     # ── Fig 9: Hydraulic graph ─────────────────────────────────────────────
-    # Requires simu (pyCATHY object) to call simu.show(prop="hgraph").
+    # Prefer hgraph_output.csv (full multi-month backup) over live
+    # simu.show(), which only ever has one month's run in memory.
     print("-- Fig 9: Hydraulic graph ----------------------------------------")
-    if art["simu"] is not None:
+    df_hgraph = art.get("df_hgraph")
+    if df_hgraph is not None:
+        try:
+            plotter.plot_hgraph_csv(
+                df_hgraph, fig_dir,
+                dpi=dpi, show=show, scenario_id=sim_index,
+                date_start=args.date_start, date_end=args.date_end,
+            )
+        except Exception as exc:
+            print(f"  WARNING: plot_hgraph_csv skipped — {exc}")
+    elif art["simu"] is not None:
+        print("  hgraph_output.csv not found — falling back to simu.show()")
         try:
             data_hgraph = dict(simu=art["simu"])
             plotter.plot_hgraph(data_hgraph, fig_dir, dpi=dpi, show=show)
         except Exception as exc:
             print(f"  WARNING: plot_hgraph skipped — {exc}")
     else:
-        print("  Skipped — CATHY project not loaded (simu is None).")
+        print("  Skipped — hgraph_output.csv not found and CATHY project not loaded.")
 
     # ── Fig 10: Recharge (monthly + annual bar charts) ─────────────────────
     # Use recharge_output.nc saved by test_Agramon_withLAI.py instead of
@@ -1601,7 +2600,7 @@ def run_pipeline(args: argparse.Namespace) -> None:
         print("  Skipped — recharge_output.nc not found and CATHY project not loaded.")
 
     print(f"\n{'=' * 60}")
-    print(f"  DONE -- scenario {sim_index} | all figures in {fig_dir}")
+    print(f"  DONE -- scenario {sim_index} | main figures in {main_dir} | others in {fig_dir}")
     print(f"{'=' * 60}")
 
 
