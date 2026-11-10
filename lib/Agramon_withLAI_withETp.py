@@ -440,6 +440,9 @@ def _parse_args() -> argparse.Namespace:
     )
     out.add_argument("--no-plots", action="store_true",
                      help="Skip all matplotlib visualisations")
+    out.add_argument("--debug", action="store_true",
+                     help="Print extra diagnostics (LAI interpolation NaN "
+                          "checks and per-catchment LAI coverage). Off by default.")
     out.add_argument("--save-monthly", action="store_true",
                      help="Also write a standalone NetCDF file per month per "
                           "variable to outputs/<scenario>/monthly/ (psi, sw, "
@@ -1968,45 +1971,31 @@ def run_pipeline(args: argparse.Namespace) -> None:
     lai_near = ds_LAI.reindex(x=x_t, y=y_t, method="nearest")
     ds_LAI_raster = lai_lin.fillna(lai_near)
 
-    x0, x1 = float(raster_DEM.x.min()), float(raster_DEM.x.max())
-    y0, y1 = float(raster_DEM.y.min()), float(raster_DEM.y.max())
-    raw = ds_LAI["LAI"].isel(time=1).where(
-        (ds_LAI.x > x0-20) & (ds_LAI.x < x1+20) &
-        (ds_LAI.y > y0-20) & (ds_LAI.y < y1+20), drop=True)
-    print("raw LAI patch shape:", raw.shape, "| NaN fraction:", float(np.isnan(raw).mean()))
-    print(np.isnan(raw.values).astype(int))        # 1 = NaN in the source LAI
+    # Diagnostics on the LAI interpolation (stdout only); off by default.
+    if args.debug:
+        x0, x1 = float(raster_DEM.x.min()), float(raster_DEM.x.max())
+        y0, y1 = float(raster_DEM.y.min()), float(raster_DEM.y.max())
+        raw = ds_LAI["LAI"].isel(time=1).where(
+            (ds_LAI.x > x0-20) & (ds_LAI.x < x1+20) &
+            (ds_LAI.y > y0-20) & (ds_LAI.y < y1+20), drop=True)
+        print("raw LAI patch shape:", raw.shape, "| NaN fraction:", float(np.isnan(raw).mean()))
+        print(np.isnan(raw.values).astype(int))        # 1 = NaN in the source LAI
 
-    valid = raster_DEM_masked != -9999
-    v = ds_LAI_raster["LAI"].isel(time=1).values
-    print("NaN inside DEM footprint after interp:", int(np.isnan(v[valid]).sum()), "of", int(valid.sum()))
-    print("NaN outside footprint:", int(np.isnan(v[~valid]).sum()), "of", int((~valid).sum()))
-
-
-    print(gdf_Agramon[["fid_1"] + [c for c in ("PlotID",) if c in gdf_Agramon]].to_string())
-
-    lai_any = ds_LAI["LAI"].notnull().any("time").astype(float)   # LAI exists in ≥1 month
-    lai_all = ds_LAI["LAI"].notnull().all("time").astype(float)   # LAI exists in every month
-    for fid, g in gdf_Agramon.groupby("fid_1"):
-        a = lai_any.rio.clip(g.geometry, all_touched=True, drop=True)
-        b = lai_all.rio.clip(g.geometry, all_touched=True, drop=True)
-        print(f"fid_1={fid:>2}  bounds={[round(v) for v in g.total_bounds]}  "
-              f"LAI valid in ≥1 month: {np.nanmean(a):.0%} | in all months: {np.nanmean(b):.0%}")
+        valid = raster_DEM_masked != -9999
+        v = ds_LAI_raster["LAI"].isel(time=1).values
+        print("NaN inside DEM footprint after interp:", int(np.isnan(v[valid]).sum()), "of", int(valid.sum()))
+        print("NaN outside footprint:", int(np.isnan(v[~valid]).sum()), "of", int((~valid).sum()))
 
 
-    # L = ds_LAI_raster["LAI"].values            # (time, y, x)
-    # valid = raster_DEM_masked != -9999
+        print(gdf_Agramon[["fid_1"] + [c for c in ("PlotID",) if c in gdf_Agramon]].to_string())
 
-    # # 1. what the left edge of the figure actually contains
-    # v = L[1]
-    # print("mean LAI per column (left→right):", np.nanmean(v, axis=0).round(2))
-    # print("min/max LAI:", np.nanmin(v).round(3), np.nanmax(v).round(3))
-
-    # # 2. NaN in any other month
-    # nan_per_t = np.isnan(L).sum(axis=(1, 2))
-    # print("months with NaN:", [(str(t)[:7], int(n)) for t, n in
-    #                            zip(ds_LAI_raster.time.values, nan_per_t) if n])
-    # print("NaN inside footprint, any month:", int(np.isnan(L[:, valid]).sum()))
-
+        lai_any = ds_LAI["LAI"].notnull().any("time").astype(float)   # LAI exists in ≥1 month
+        lai_all = ds_LAI["LAI"].notnull().all("time").astype(float)   # LAI exists in every month
+        for fid, g in gdf_Agramon.groupby("fid_1"):
+            a = lai_any.rio.clip(g.geometry, all_touched=True, drop=True)
+            b = lai_all.rio.clip(g.geometry, all_touched=True, drop=True)
+            print(f"fid_1={fid:>2}  bounds={[round(v) for v in g.total_bounds]}  "
+                  f"LAI valid in ≥1 month: {np.nanmean(a):.0%} | in all months: {np.nanmean(b):.0%}")
 
     print(f"  ds_LAI_raster shape : {ds_LAI_raster['LAI'].shape}")
     md_log.bullet(f"ds_LAI_raster shape: {ds_LAI_raster['LAI'].shape}")

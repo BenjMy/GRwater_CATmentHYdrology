@@ -85,7 +85,7 @@ Boundaries follow the `[n/9]` banners and numbered comments in the code, so they
 
 Findings from the map:
 - `save_combined_outputs` was a closure over ten names. Each is bound exactly once in `run_pipeline` (lists/dicts mutated in place), so passing them as arguments is behaviour-preserving.
-- The LAI-interpolation block contains leftover debug prints (raw LAI patch shape, NaN counts, a per-`fid_1` loop). They only write to stdout. ❓ delete or keep behind a `--debug` flag.
+- The LAI-interpolation block contains leftover debug prints (raw LAI patch shape, NaN counts, a per-`fid_1` loop). They only write to stdout. ✅ Decided: kept behind a new `--debug` flag (off by default); a commented-out variant of the same checks was removed. Note that `run_scenarii_withETp_withLAI_ALL.sh` does not forward `--debug`; call the Python script directly to use it.
 - The monthly loop assigns/reads ~60 locals; most of the shared state is `simu`, `ds_mesh`, `ETp_nodes`/`rain_nodes`, `t_atmbc`/`net_flux`, `valid_times`, the `*_records` lists and `out_dir`. These are the candidates for the `RunState` dataclass.
 
 Check for step `save_outputs` (closure): the original closure (from the previous commit) and `agramon_outputs.save_combined_outputs` were run on the same synthetic data and produced identical files (`xarray.testing.assert_identical` for the NetCDF files, byte-equal CSV, equal pickle), including the empty-state case. A real simulation was not run.
@@ -120,6 +120,7 @@ Instead isolate the *differences* behind two small interfaces, chosen by CLI/con
 ## 4. Behaviour changes made so far (only these)
 
 1. `apply_forcing_mode("era5")` now emits a `DeprecationWarning`. It does not change the run.
+2. New `--debug` flag (default off). The LAI-interpolation diagnostics (raw LAI patch NaN map, NaN counts inside/outside the DEM footprint, per-`fid_1` LAI coverage) are printed only with `--debug`. Without it they are skipped, so default runs print less. No simulation input or output is affected: no later code reads the variables they computed.
 
 Everything else in Phases 1 and 2 is code moved or removed without changing what runs.
 
