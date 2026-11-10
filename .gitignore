@@ -2,3 +2,7 @@
 * text=auto
 SSHydro_withETp_withLAI
 SSHydro
+
+# Python bytecode
+__pycache__/
+*.pyc
