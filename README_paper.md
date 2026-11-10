@@ -52,7 +52,8 @@ The article has two intertwined goals.
 | `to_run_paper.md` | Scratch file of run recipes (`for` loops of the batch runner), notes and known bugs. |
 | `Agramon_utils.py` | Helpers: plot shapefiles/treatments, DEM loading, EM conductivity sensors and stats, ERT profile extraction, ERA5 point series, notebook plotting helpers. |
 | `results_plotter.py` | Shared plotting module (hydro, ET, LAI, recharge, hydrograph, node maps, fire-window and weekly variants, Fig. 8-style stack). |
-| `agramon_config.py`, `agramon_forcing.py`, `agramon_lai.py`, `agramon_checks.py`, `agramon_runlog.py` | **New modules** split out of the main script (paths/constants, input loaders, LAI → veg → soil, sanity checks + ETa patch, run logs). See `REFACTORING.md`. |
+| `agramon_config.py`, `agramon_forcing.py`, `agramon_lai.py`, `agramon_checks.py`, `agramon_runlog.py`, `agramon_outputs.py` | **New modules** split out of the main script (paths/constants, input loaders, LAI → veg → soil, sanity checks + ETa patch, run logs, running combined NetCDF/CSV outputs). They must sit in the same folder as the main script (`lib/`). See `REFACTORING.md`. |
+| `REFACTORING.md` | Tracker of the code restructuring (what changed, how it was checked, what is left). Work happens on the branch `refactor-agramon-modules`. |
 | `analysis_ET_compare.py` | Compares **EO energy-balance ETa** (TSEB/biophysical pipeline) vs **water-balance (WB) ETa** from CATHY, plus a comparison against the treatments CSV for `etp_ts` runs. |
 
 Referenced in the code but **not in this upload** (check they are in the repo): `withLAI_results.py` (post-processing driver), `geoutils` (`uCATHY`), `plot_fig8_ETa_ETp_vs_psi.py`.
@@ -60,6 +61,8 @@ Referenced in the code but **not in this upload** (check they are in the repo): 
 ---
 
 ## 3. Simulation pipeline (`Agramon_withLAI_withETp.py`)
+
+> **Code structure (work in progress).** `run_pipeline` is being split into steps (`REFACTORING.md` §2.2). So far: steps 1–3 below are in `setup_inputs(args)` (returns a `RunInputs` dataclass) and the running output files are written by `agramon_outputs.save_combined_outputs`. The behaviour is unchanged; the other steps are still inline in `run_pipeline`.
 
 1. Resolve the DEM source (GeoTIFF, `--dem-tif`) and log the simulation parameters (CSV + markdown log).
 2. Load the shapefiles (13 micro-catchments, index = `fid_1`, selected with `--dem-plot 1..13`).
@@ -95,6 +98,7 @@ Scenario folders are self-describing, e.g. `scenario_7_plot2_outlet-free_bottom-
 | `--no-spinup`, `--spinup-cycles`, `--spinup-year` | Spin-up |
 | `--forcing`, `--etp-ts-column` | ETp source / wet-dry bound |
 | `--eta-net-neg-mode {etp,gross,off}` | Handling of the "net = rain − ETp < 0" ETa artefact |
+| `--debug` | Extra stdout diagnostics (LAI interpolation NaN checks, per-catchment LAI coverage). Off by default. Not forwarded by the batch runner. |
 
 ---
 
@@ -249,11 +253,11 @@ Field presets from Thomas et al. 2021 (Table 1, 2016 Fish Fire, loamy sand, mm/h
 ### Bugs
 - 🐞 **`--dem-plot 2` crashes** in `run_pipeline` at `ds_mesh.x.min()`. The error is `ValueError: zero-size array to reduction operation minimum`, i.e. the mesh/DEM is empty for that plot (clip or mask returns no valid cells). Check the footprint, CRS, NaN masking and `--dem-smooth-sigma`.
 - 🐞 pyCATHY `map_prop2mesh` uses `~isinstance(...)` instead of `not isinstance(...)`, so per-node arrays are broadcast as scalars. A related stale-`mesh_pv_attributes` cache can cause node-count mismatches.
-- 🐞 `n_surf = int(simu.grid3d["nnod"])` uses the stale attribute instead of the re-read `grid3d` (~line 1909), giving "SURFACE NODE out of bounds" warnings.
+- 🟡 `n_surf = int(simu.grid3d["nnod"])` used the stale attribute instead of the re-read `grid3d`, giving "SURFACE NODE out of bounds" warnings. The current script reads `grid3d["nnod"]` from the re-read grid, so this looks fixed; confirm with a run (no warning) before closing it.
 
 ### Code hygiene (before releasing the code with the paper)
 - Code-hygiene items are now tracked in `REFACTORING.md` (duplicate definitions and stale docstrings are already cleaned in the refactored copy).
-- The `lai_to_veg_map` docstring still lists the old 0–0.6 LAI thresholds, while the code uses `[1.0, 1.5, 2.0, 2.5]`.
+- ✅ The `lai_to_veg_map` docstring listed the old 0–0.6 LAI thresholds; it now matches the code (`[1.0, 1.5, 2.0, 2.5]`).
 - The CLI defaults (`--start-year 2022 --end-year 2022`) give an empty period. The batch runner overrides them with 2016–2026, but make this consistent.
 - The default `ZROOT_FACTORS` (`0.05 0.25 1.0 1.5 2.0`) differ from the sets used in the recipes (`0.3 0.6 2.0 3.0 5.0`). Pick one as the documented default.
 - Hard-coded machine paths (`Nextcloud/...`) should become a config file or env vars.
