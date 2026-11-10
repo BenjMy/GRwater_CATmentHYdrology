@@ -1,0 +1,162 @@
+# REFACTORING.md — readability / structure tracker
+
+Companion to `README.md`. It records what has been changed in the code, what still has to be done, and how each change was checked.
+
+Legend: ✅ done · 🟡 partly done · ⬜ not started · ❓ decision needed
+
+---
+
+## 0. Rules for this refactoring
+
+1. **Behaviour-preserving first.** Phases 1 and 2 must not change any simulation result. Behaviour changes (Ks wiring, withIrr rain forcing, ERA5 removal) are kept in Phase 3 and are made one at a time.
+2. **Move code verbatim**, then clean. A moved function must be AST-identical to the original unless the change is listed below.
+3. **Acceptance test before adopting** (see §5): rerun one existing scenario with the new code and compare the output NetCDF files with the pre-refactoring run.
+
+---
+
+## 1. Phase 1 — cleanup (no behaviour change)
+
+| # | Change | Status |
+|---|---|---|
+| 1.1 | Removed duplicated definitions in `Agramon_withLAI_withETp.py`: `zroot_factors_from_args`, `add_datetime_col`, `check_monthly_sanity`, `N_VEG_CLASSES`, and the four sanity thresholds (`SW_TOL`, `PSI_SANITY_MIN`, `ETA_TOL`, `WB_RESIDUAL_FRAC`). Python was already using the *second* copy of each function, so the second copy was kept. (`add_datetime_col` differed between the two copies; the effective one was kept.) | ✅ |
+| 1.2 | Rewrote the file header docstring (wrong script name, outdated usage lines, forcing modes) | ✅ |
+| 1.3 | Fixed the `lai_to_veg_map` docstring, which listed the old 0–0.6 LAI thresholds; it now matches `LAI_THRESHOLDS = [1.0, 1.5, 2.0, 2.5]` | ✅ |
+| 1.4 | Removed a commented-out alternative `ZROOT_FACTORS` block and a commented `sys.path` stub | ✅ |
+| 1.5 | Removed unused imports (`os`, `sys`, `mdates`, and the ones that became unused after the split), and `f` prefixes on strings without placeholders | ✅ |
+| 1.6 | Unused local `fig` in `setup_dem` (kept: `plt.figure` is needed for the 3D axes) | ✅ left as is |
+
+---
+
+## 2. Phase 2 — structure
+
+### 2.1 Module extraction ✅
+`Agramon_withLAI_withETp.py` went from **3,901 to 2,683 lines**. Moved verbatim into sibling modules (same folder, imported by name like `Agramon_utils`):
+
+| New module | Contents |
+|---|---|
+| `agramon_config.py` | Machine paths, CRS codes, `LAI_THRESHOLDS`, `N_VEG_CLASSES`, `ZROOT_FACTORS`, `SCF_DEFAULT`, `scf_type`, `scf_label_for`, sanity thresholds, `ETP_TS_COLUMN_DEFAULT` |
+| `agramon_forcing.py` | `load_monthly_lai`, `load_era5` (legacy), `load_spatial_etp`, `load_rain`, `load_agramon_et`, `load_treatments_et`, `load_all`, `build_etp_ds_from_timeseries` and their helpers |
+| `agramon_lai.py` | `lai_to_veg_map`, `smooth_veg_map`, `update_soil_for_active_zones`, `iter_monthly_lai` |
+| `agramon_checks.py` | `apply_eta_artefact_floor`, `add_datetime_col`, `check_monthly_sanity` |
+| `agramon_runlog.py` | `MarkdownLog`, `log_simulation`, `build_scenario_dirname` |
+
+The main script imports these names, so `from Agramon_withLAI_withETp import load_dem_from_tif` (used by `withLAI_results.py`) and the other existing entry points keep working.
+
+### 2.2 Still to do
+| # | Task | Status |
+|---|---|---|
+| 2.2 | **Split `run_pipeline`** (now 1,155 lines) into steps: `setup_inputs`, `setup_mesh_and_dem`, `build_atmbc`, `configure_model`, `run_monthly_loop`, `save_outputs`; pass state in a small dataclass instead of ~100 locals | ⬜ |
+| 2.3 | Move DEM / mesh / BC code (`load_dem_from_tif`, `smooth_dem`, `setup_dem`, `configure_boundary_conditions`, `initialise_project`) to `agramon_mesh.py`. Keep a re-export in the main script because `withLAI_results.py` imports `load_dem_from_tif` from it | ⬜ |
+| 2.4 | Replace machine auto-detection in `agramon_config.py` (home-directory username check, hard-coded Nextcloud paths) with environment variables or a config file | ⬜ |
+| 2.5 | Move `run_spinup` / `pick_default_spinup_year` to `agramon_spinup.py` | ⬜ |
+| 2.6 | Move `save_forcing_diagnostics` (350 lines of plotting) to a diagnostics module | ⬜ |
+| 2.7 | Scenario config files (TOML/YAML) instead of ~40 forwarded CLI flags in the 900-line shell runner. `to_run_paper.md` would become a list of config files | ⬜ |
+| 2.8 | Single source for defaults (CLI default period is empty, shell and Python defaults differ, default `ZROOT_FACTORS` differ from those used in the paper runs) | ❓ choose the defaults |
+| 2.9 | Typed containers (`Forcing`, `BCConfig`, `KsFireConfig`) instead of long tuples/keyword lists; document shapes and units of `ETp_nodes`/`rain_nodes` | ⬜ |
+| 2.10 | Replace `print` banners by `logging` | ⬜ |
+| 2.11 | Split `results_plotter.py` (4,400 lines) by figure family (hydro, ET, LAI, recharge, GIFs) | ⬜ |
+| 2.12 | Unit tests for pure functions (LAI → veg class, Ks recovery, ETa artefact floor, scenario dirname, sanity checks) and a regression test for the `--dem-plot 2` empty-mesh crash | ⬜ |
+| 2.13 | Global mutable state: `FORCING_MODE`, `USE_ETP_FORCING`, `USE_ETP_TS_FORCING` are module globals changed by `apply_forcing_mode`. Replace by a field of the run configuration | ⬜ |
+
+---
+
+## 3. Phase 3 — variants (behaviour changes, one at a time)
+
+### Should the script be split per CATHY version and per input?
+**Recommendation: split by responsibility, not by copy.** Do not keep `Agramon_withLAI_withETp.py`, `..._withIrr.py`, `..._era5.py` as separate full scripts: ~80 % of the pipeline is identical (DEM, mesh, LAI loop, spin-up, outputs, logging), so copies would drift and every bug fix would have to be made several times (the duplicated functions found in Phase 1 are a small example).
+
+Instead isolate the *differences* behind two small interfaces, chosen by CLI/config flag:
+
+1. **Forcing provider** (`--forcing`): returns ETp and rain on the mesh. Candidates: `SatelliteForcing` (`etp`), `CsvEtpForcing` (`etp_ts`, wet/dry bound), and the legacy `Era5Forcing`. Each lives in its own module/file; the pipeline only calls `provider.build(...)`.
+2. **CATHY backend** (`--cathy-version`): wraps what differs between CATHY/pyCATHY builds. The sketch below is based on what is known from the code and your notes; the `withIrr` side has not been read yet.
+
+| Concern | `scf_lai` (new LAI version) | `with_irr` |
+|---|---|---|
+| Atmospheric file | ATMBC with net flux (rain − ETp), plus the ETa artefact patch | ATMBC with **ETp only**; rain goes into the irrigation map file (see README §4.5) |
+| Soil / veg table | LAI classes, `ZROOT`, Feddes, SCF | to be checked |
+| Output reading / ETa | patched ETa | raw ETa (no patch needed) |
+
+| # | Task | Status |
+|---|---|---|
+| 3.1 | Define the `ForcingProvider` interface and move the three modes behind it | ⬜ |
+| 3.2 | Define the `CathyBackend` interface; implement `scf_lai` (current behaviour) first, then `with_irr` (rain via irrigation file, no ETa floor), then A/B test (README §4.5). Read the `CATHY_src_WithIrrigation` / wrapper code before fixing the interface | ⬜ |
+| 3.3 | **ERA5:** deprecated now (a `DeprecationWarning` is raised when `--forcing era5` is used; `etp` stays the default). Removal list: `load_era5`, the `era5` entry of `FORCING_LABELS`/`--forcing`, the `ds_era5` loading and the "ERA5 point time-series" branch in `run_pipeline`, and the ERA5 labels in the plotting code. ERA5 could be kept as a small test fixture instead | 🟡 deprecated, ❓ remove when you confirm |
+| 3.4 | Wire `ks_fire_utils` into the monthly loop (`compute_permx_for_month` → `update_soil_for_active_zones(permx=...)`) and define the Ks scenario list (README §4.6) | ⬜ |
+
+---
+
+## 4. Behaviour changes made so far (only these)
+
+1. `apply_forcing_mode("era5")` now emits a `DeprecationWarning`. It does not change the run.
+
+Everything else in Phases 1 and 2 is code moved or removed without changing what runs.
+
+---
+
+## 5. How the changes were checked, and what was not
+
+**Checked (static, no real run):**
+- All files compile; `pyflakes` reports no undefined names.
+- Every top-level function and class of the original is present exactly once after the split, and its AST is identical to the original (the *effective* definition where duplicates existed). Only three differ, as intended: `apply_forcing_mode` (deprecation warning), `lai_to_veg_map` (docstring), `configure_boundary_conditions` (two `f` prefixes removed).
+- With `pyCATHY`, `geoutils`, `Agramon_utils`, `xarray`, `geopandas` and `rioxarray` stubbed out, the old and new scripts import fine, parse the same CLI arguments to identical results (default and a long example), and expose identical constants and paths.
+
+**Not checked:** a real simulation. The pyCATHY / CATHY executable and the Agramon data are not available here.
+
+**Acceptance test to run on your machine** before replacing the old files:
+1. Pick one short existing scenario (for example one year, `--dem-plot 3`, a fixed `--pmin`/`--permx`).
+2. Run it with the old script and with the refactored one into different `--path2prj` folders, with the same `--force`.
+3. Compare `psi_output.nc`, `sw_output.nc`, `et_output.nc`, `etp_output.nc` and the hydrograph CSV (for example with `xarray.testing.assert_identical`/`assert_allclose`). They should match.
+
+---
+
+## 6. Files
+
+`refactored/` contains the new main script (same file name as before) and the five `agramon_*.py` modules. Copy all six into the same folder as `Agramon_utils.py` (`lib/` in the repository).
+
+---
+
+## 7. Applying the patch (`agramon_refactor_phase1-2.patch`)
+
+The patch is a git patch made against the working copy of `lib/Agramon_withLAI_withETp.py` that was shared for this work. It touches `lib/` (main script changed, five `agramon_*.py` modules added) and adds this `REFACTORING.md` at the repo root.
+
+```bash
+cd /home/ben/Nextcloud/BenCSIC/Codes/Tech4agro_org/GRwater_CATmentHYdrology/
+
+# 0. start from a clean tree, on a new branch, so it is easy to undo
+git status
+git checkout -b refactor-agramon-modules
+
+# 1. if you already copied REFACTORING.md here by hand, remove it first
+#    (the patch creates it, and git refuses to overwrite an existing file)
+rm -f REFACTORING.md
+
+# 2. dry run: changes nothing
+git apply --check /path/to/agramon_refactor_phase1-2.patch
+
+# 3. apply (keep the commit message with 'git am', or just apply the changes)
+git am /path/to/agramon_refactor_phase1-2.patch
+#   or: git apply /path/to/agramon_refactor_phase1-2.patch
+
+# 4. quick checks (the sibling modules must sit next to Agramon_utils.py)
+cd lib
+python -m py_compile Agramon_withLAI_withETp.py agramon_*.py
+python Agramon_withLAI_withETp.py --help
+```
+
+**Undo:**
+```bash
+git reset --hard HEAD~1                      # if applied with 'git am'
+# or, if applied with 'git apply':
+git apply -R /path/to/agramon_refactor_phase1-2.patch
+```
+
+**If `--check` fails:** the main script in your tree is not the version the patch was built against (the GitHub copy, for example, differs by three lines: `MODULE_PATH` vs `EO_PATH` and the shapefile path). Do not force it. Send the current `lib/Agramon_withLAI_withETp.py` and the patch will be rebuilt against it.
+
+**Flat folder without `lib/` (for example a copy of the scripts elsewhere):** run it from the folder that contains `Agramon_withLAI_withETp.py`:
+```bash
+patch -p2 --dry-run < /path/to/agramon_refactor_phase1-2.patch
+patch -p2 < /path/to/agramon_refactor_phase1-2.patch
+```
+`patch` will report one skipped hunk, which is `REFACTORING.md`; copy it to the repo root by hand. (`git apply -p2` does not work for this layout.)
+
+After applying, run the acceptance test in section 5 before relying on the refactored code.

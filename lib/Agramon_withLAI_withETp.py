@@ -1,59 +1,62 @@
 """
-LT_SShydro_run_withLAI_withETp.py — Long-Term Subsurface Hydrology Simulation
-              with LAI + satellite ETp/rain forcing (CATHY)
-================================================================================
+Agramon_withLAI_withETp.py — Long-term subsurface hydrology with LAI + ETp forcing (CATHY)
+==========================================================================================
 GRwater project — Agramon study site
 
-Runs the full pyCATHY pipeline with monthly LAI-driven vegetation updates,
-forcing the ATMBC boundary from satellite ETp and rain (not ERA5).
+Entry point of the pyCATHY pipeline: monthly Earth-Observation LAI updates
+the vegetation / root-depth map during the run, and the ATMBC boundary is
+forced from satellite (or CSV time-series) ETp and rain.
 
-  1.  Load satellite ETp + rain NetCDFs (EPSG:32630 → EPSG:25830)
-  2.  Load monthly LAI dataset
-  3.  Log simulation parameters
-  4.  Load and pre-process the DEM
-  5.  Initialise and mesh the CATHY model
-  6.  Map ETp and rain grids onto mesh nodes; build full ATMBC arrays
-  7.  Configure soil, ICs, BCs, and output settings
-  8.  For each calendar month: update veg map from LAI → run processor
+Pipeline (see ``run_pipeline``)
+-------------------------------
+  1.  Resolve DEM, shapefiles, forcing and LAI inputs      (agramon_forcing)
+  2.  Log the simulation parameters (CSV + markdown)       (agramon_runlog)
+  3.  Load and pre-process the DEM, build the mesh
+  4.  Map ETp and rain onto mesh nodes; build full ATMBC arrays
+  5.  Configure soil, ICs, BCs, and output settings
+  6.  Optional spin-up (pre-2016 equilibration)
+  7.  For each calendar month: update veg map from LAI -> run processor
+                                                           (agramon_lai)
+  8.  Monthly sanity checks / ETa artefact patch           (agramon_checks)
   9.  Aggregate and save outputs (NetCDF)
+
+Related modules (same folder): agramon_config (paths + constants),
+agramon_forcing (input loaders), agramon_lai (LAI -> veg -> soil),
+agramon_checks (sanity checks, ETa patch), agramon_runlog (run logs,
+scenario folder names), ks_fire_utils (post-fire Ks recovery, not yet
+wired in). See REFACTORING.md for the refactoring plan.
 
 Usage
 -----
-    python Agramon_withLAI_withETp_fixed.py
-    python Agramon_withLAI_withETp_fixed.py --start-year 2019 --end-year 2022
-    python Agramon_withLAI_withETp_fixed.py --zroot 0.5 --pmin -10
-    python Agramon_withLAI_withETp_fixed.py --dem-plot 4
-    python Agramon_withLAI_withETp_fixed.py --no-plots
-    python Agramon_withLAI_withETp_fixed.py --zroot-factors 0.1 0.3 1.0 1.5 2.5
-    python Agramon_withLAI_withETp_fixed.py --permx 1e-5 --permy-ratio 1.0 --permz-ratio 0.1
+    python Agramon_withLAI_withETp.py
+    python Agramon_withLAI_withETp.py --start-year 2019 --end-year 2022
+    python Agramon_withLAI_withETp.py --zroot 0.5 --pmin -10
+    python Agramon_withLAI_withETp.py --dem-plot 4
+    python Agramon_withLAI_withETp.py --no-plots
+    python Agramon_withLAI_withETp.py --zroot-factors 0.1 0.3 1.0 1.5 2.5
+    python Agramon_withLAI_withETp.py --permx 1e-5 --permy-ratio 1.0 --permz-ratio 0.1
 
-Forcing switch
---------------
-    Set FORCING_MODE (module constant below) to one of:
-      "era5"   : ERA5 point series (AgUtils.extract_point_timeseries)
+Forcing switch (``--forcing``, default set by FORCING_MODE below)
+-----------------------------------------------------------------
       "etp"    : satellite ETp raster + satellite rain raster (default)
       "etp_ts" : ETp from the Agramon ET CSV time series (one value per day,
                  identical for every pixel; treatment picked from --dem-plot,
-                 column from --etp-ts-column) + satellite rain raster
+                 column from --etp-ts-column: ET_0_wet | ET_0_dry) + satellite rain
+      "era5"   : DEPRECATED, quick-test only (AgUtils.extract_point_timeseries)
 """
 
 import argparse
-import os
 import pickle
-import sys
-from datetime import datetime
+import warnings
 from pathlib import Path
-from typing import Optional
 
 import numpy as np
 import pandas as pd
 import geopandas as gpd
 import xarray as xr
 import matplotlib.pyplot as plt
-import matplotlib.dates as mdates
 import rioxarray as rxr  # noqa: F401  (activates .rio accessor)
-from scipy.ndimage import binary_dilation, label as sp_label, gaussian_filter
-from scipy.stats import mode
+from scipy.ndimage import gaussian_filter
 from pyCATHY import meshtools as mt
 
 
@@ -93,129 +96,63 @@ def apply_forcing_mode(mode: str) -> None:
     global FORCING_MODE, USE_ETP_FORCING, USE_ETP_TS_FORCING
     if mode not in FORCING_LABELS:
         raise ValueError(f"forcing must be one of {list(FORCING_LABELS)}, got {mode!r}")
+    if mode == "era5":
+        warnings.warn(
+            "--forcing era5 is deprecated (quick-test only) and will be "
+            "removed; use 'etp' or 'etp_ts' (see REFACTORING.md, step 3.3).",
+            DeprecationWarning,
+            stacklevel=2,
+        )
     FORCING_MODE = mode
     USE_ETP_FORCING = mode in ("etp", "etp_ts")
     USE_ETP_TS_FORCING = mode == "etp_ts"
 
-# Column of the Agramon CSVs used as ETp (mm/day) in "etp_ts" mode: either
-# "ET_0_wet" or "ET_0_dry" (selectable with --etp-ts-column).
-ETP_TS_COLUMN_DEFAULT = "ET_0_wet"
 
 
-# ── Path setup ────────────────────────────────────────────────────────────────
-
-# Auto-detect the machine from the home directory (no commenting/uncommenting).
-HOME = Path.home()
-if HOME.name == "z0272571a@campus.csic.es":
-    ROOT = HOME / "Nextcloud"
-else:
-    ROOT = Path("/home/ben/Nextcloud")
-
-CODES = ROOT / "BenCSIC" / "Codes" / "Tech4agro_org"
-
-# MODULE_PATH = (CODES / "GRwater_geophy").resolve()
-EO_PATH     = (CODES / "GRwater_CATmentHYdrology").resolve()
-
-LAI_PATH = (
-    ROOT / "BenCSIC" / "Training_Supervision" / "Supervision"
-    / "Xela_Carracedo_Practicas_2026_data" / "301a-biophysical" / "agramon" / "input"
-).resolve()
-
-PathET    = ROOT / "GRwater" / "data" / "satellite" / "Agramon"
-etp_path  = PathET / "20161001_20241231_ET0.nc"
-rain_path = PathET / "20161001_20241231_TP.nc"
-
-# if str(MODULE_PATH) not in sys.path:
-#     sys.path.append(str(MODULE_PATH))
 
 import Agramon_utils as AgUtils
-from geoutils import uCATHY
 from pyCATHY import cathy_tools, cathy_utils
 from pyCATHY.petro import Feddes_litterature  # literature-based Feddes lookup
 
-
-# ── Constants ─────────────────────────────────────────────────────────────────
-
-# All spatial datasets are reprojected to this CRS before any operation.
-# DEM / shapefiles : EPSG:25830 (UTM zone 30N, ETRS89)
-# LAI / ETp / rain : EPSG:32630 (UTM zone 30N, WGS84) — same zone, different datum
-TARGET_CRS = "EPSG:25830"
-NATIVE_CRS = "EPSG:32630"
-
-# LAI class boundaries  [very low | low | moderate | high | very high]
-# Calibrated to the observed LAI range (~1 – 3 m² m⁻²), spaced evenly so each
-# class is actually used: pre-fire canopy mostly in classes 4-5, burnt /
-# post-fire pixels (LAI ~ 1) falling into class 1.
-# (Previous values for a 0 – 0.6 range were [0.1, 0.25, 0.4, 0.55]; with
-# LAI >= 1 those put every pixel in the top class.)
-LAI_THRESHOLDS = [1.0, 1.5, 2.0, 2.5]
-
-# Fixed number of semantic vegetation classes (very low/low/moderate/high/
-# very high). This must stay constant for the whole run and match MAXVEG
-# passed to simu.update_cathyH(), since pyCATHY's SOIL vegetation table has a
-# fixed row count for the whole project — it is NOT allowed to vary month to
-# month with however many classes happen to be spatially present.
-N_VEG_CLASSES = len(LAI_THRESHOLDS) + 1  # = 5
-
-# Fixed number of semantic vegetation classes (bare/sparse/moderate/dense/very
-# dense). This must stay constant for the whole run and match MAXVEG passed
-# to simu.update_cathyH(), since pyCATHY's SOIL vegetation table has a fixed
-# row count for the whole project — it is NOT allowed to vary month to month
-# with however many classes happen to be spatially present.
-N_VEG_CLASSES = len(LAI_THRESHOLDS) + 1  # = 5
-
-# Vegetation zone → root-depth multiplier
-ZROOT_FACTORS = {
-    1: 0.05,   # very low LAI  (LAI <= 1.0; burnt / post-fire)
-    2: 0.25,   # low           (1.0 < LAI <= 1.5)
-    3: 1.0,    # moderate      (1.5 < LAI <= 2.0)
-    4: 1.5,    # high          (2.0 < LAI <= 2.5)
-    5: 2.0,    # very high     (LAI > 2.5)
-}
-
-# Vegetation zone → root-depth multiplier
-# ZROOT_FACTORS = {
-#     1: 2,   # very low LAI  (LAI <= 1.0; burnt / post-fire)
-#     2: 2,   # low           (1.0 < LAI <= 1.5)
-#     3: 2,    # moderate      (1.5 < LAI <= 2.0)
-#     4: 2,    # high          (2.0 < LAI <= 2.5)
-#     5: 2,    # very high     (LAI > 2.5)
-# }
+from agramon_checks import (
+    add_datetime_col,
+    apply_eta_artefact_floor,
+    check_monthly_sanity,
+)
+from agramon_config import (
+    ETP_TS_COLUMN_DEFAULT,
+    EO_PATH,
+    LAI_PATH,
+    N_VEG_CLASSES,
+    NATIVE_CRS,
+    PathET,
+    SCF_DEFAULT,
+    TARGET_CRS,
+    ZROOT_FACTORS,
+    etp_path,
+    rain_path,
+    scf_label_for,
+    scf_type,
+)
+from agramon_forcing import (
+    build_etp_ds_from_timeseries,
+    load_all,
+    load_era5,
+    load_monthly_lai,
+    load_rain,
+    load_spatial_etp,
+)
+from agramon_lai import (
+    iter_monthly_lai,
+    lai_to_veg_map,
+    smooth_veg_map,
+    update_soil_for_active_zones,
+)
+from agramon_runlog import MarkdownLog, build_scenario_dirname, log_simulation
 
 
 
-# CF (root water uptake stress compensation factor) ──────────────────────
-# SCF is a float in [0, 1] blending pyCATHY's two ET-partitioning approaches:
-#   SCF = 1  Feddes approach — assumes ET is essentially all transpiration.
-#            Reasonable when vegetation cover is dense/continuous.
-#   SCF = 0  PMIN-threshold approach — appropriate for sparse-cover, arid
-#            ecosystems where bare soil evaporation is a major part of ET
-#            (also depends on spatial resolution).
-#   0 < SCF < 1  intermediate blend of the two.
-# Set explicitly via --scf. No automatic inference from PMIN or anything
-# else — SCF is just a plain CLI parameter like ZROOT/PMIN.
-SCF_DEFAULT = 1.0
 
-
-def scf_type(raw: str) -> float:
-    """argparse type= for --scf: a float, restricted to [0, 1]."""
-    val = float(raw)
-    if not (0.0 <= val <= 1.0):
-        raise argparse.ArgumentTypeError(
-            f"--scf must be between 0 and 1 (got {raw})"
-        )
-    return val
-
-
-def scf_label_for(scf: float) -> str:
-    """Human-readable label for a given SCF value, used in console/markdown
-    logs. SCF=0/1 are named after pyCATHY's two approaches; anything in
-    between is reported as a blend of the two."""
-    if scf == 1.0:
-        return f"{scf:g} (Feddes)"
-    if scf == 0.0:
-        return f"{scf:g} (PMIN-threshold)"
-    return f"{scf:g} (blend of PMIN-threshold/Feddes)"
 
 
 def zroot_factors_from_args(args: argparse.Namespace) -> dict[int, float]:
@@ -271,128 +208,8 @@ def feddes_params_from_args(args: argparse.Namespace) -> dict[str, float | None]
         "feddes_crop_ref": lit_ref,
     }
 
-# ── Sanity-check thresholds (monthly loop) ─────────────────────────────────
-# Tolerances for the physical-bounds and water-balance checks run after
-# every month (see `check_monthly_sanity`). Not physical hard limits —
-# just flags for "this deserves a look", so kept generous on purpose.
-SW_TOL           = 0.01     # SW allowed slightly outside [0, 1] before flagging
-PSI_SANITY_MIN   = -50.0    # m — PSI below this is flagged as extreme drying
-ETA_TOL          = 1e-8     # m/s — ETa allowed slightly above ETp before flagging
-WB_RESIDUAL_FRAC = 0.5      # flag if |water balance residual| > this fraction of rain_in
 
 
-def zroot_factors_from_args(args: argparse.Namespace) -> dict[int, float]:
-    """
-    Build the semantic-zone → root-depth-multiplier mapping consumed by
-    ``update_soil_for_active_zones`` from ``--zroot-factors`` (5 values,
-    positional order: bare, sparse, moderate, dense, very dense —
-    matching ``ZROOT_FACTORS``' key order 1-5). Centralised here so the
-    spin-up and main-loop call sites build the exact same mapping from
-    the exact same CLI values instead of risking drift between the two.
-    """
-    return {i + 1: v for i, v in enumerate(args.zroot_factors)}
-
-# ── Sanity-check thresholds (monthly loop) ─────────────────────────────────
-# Tolerances for the physical-bounds and water-balance checks run after
-# every month (see `check_monthly_sanity`). Not physical hard limits —
-# just flags for "this deserves a look", so kept generous on purpose.
-SW_TOL           = 0.01     # SW allowed slightly outside [0, 1] before flagging
-PSI_SANITY_MIN   = -50.0    # m — PSI below this is flagged as extreme drying
-ETA_TOL          = 1e-8     # m/s — ETa allowed slightly above ETp before flagging
-WB_RESIDUAL_FRAC = 0.5      # flag if |water balance residual| > this fraction of rain_in
-
-
-# ── Markdown run log ─────────────────────────────────────────────────────────
-
-class MarkdownLog:
-    """
-    Lightweight, append-as-you-go markdown logger for a single simulation
-    run — one narrative file mirroring the console output (run config,
-    per-step progress, spin-up diagnostics, and a per-month LAI/ETp/solver
-    table), so a run can be reviewed later without re-parsing stdout.
-
-    Writes to disk on every call (re-opened in append mode each time)
-    rather than buffering in memory, so a crash mid-run still leaves a
-    readable partial log instead of losing everything unwritten.
-    """
-
-    def __init__(self, path: Path, title: str) -> None:
-        self.path = Path(path)
-        self.path.parent.mkdir(parents=True, exist_ok=True)
-        self._n_warnings = 0
-        self._start_time = datetime.now()
-        self._metrics: dict[str, float] = {}
-        try:
-            with open(self.path, "w") as fh:
-                fh.write(f"# {title}\n\n")
-                fh.write(f"_Started: {datetime.now():%Y-%m-%d %H:%M:%S}_\n\n")
-        except OSError as exc:
-            # Logging failures should never abort the simulation itself.
-            print(f"  WARNING: could not open markdown log at {self.path} ({exc}) "
-                  f"— continuing without it.")
-
-    def _write(self, text: str) -> None:
-        try:
-            with open(self.path, "a") as fh:
-                fh.write(text)
-        except OSError as exc:
-            print(f"  WARNING: markdown log write failed ({exc}).")
-
-    def section(self, title: str) -> None:
-        self._write(f"\n## {title}\n\n")
-
-    def subsection(self, title: str) -> None:
-        self._write(f"\n### {title}\n\n")
-
-    def meta(self, items: dict) -> None:
-        """Key/value bullet list — run parameters, step summaries, etc."""
-        for k, v in items.items():
-            self._write(f"- **{k}**: {v}\n")
-
-    def line(self, text: str = "") -> None:
-        self._write(f"{text}\n")
-
-    def bullet(self, text: str) -> None:
-        self._write(f"- {text}\n")
-
-    def warn(self, text: str) -> None:
-        self._n_warnings += 1
-        self._write(f"- ⚠️ **WARNING**: {text}\n")
-
-    def table_header(self, headers: list) -> None:
-        self._write("\n| " + " | ".join(headers) + " |\n")
-        self._write("|" + "|".join(["---"] * len(headers)) + "|\n")
-
-    def table_row(self, cells: list) -> None:
-        self._write("| " + " | ".join(str(c) for c in cells) + " |\n")
-
-    def fixes_applied(self, fixes: list) -> None:
-        """
-        Document known pipeline patches active for this run — written once,
-        near the top of the log, so a run's markdown self-describes which
-        fixes were in effect without needing to diff the script against git.
-        """
-        self.section("Known fixes applied")
-        for fx in fixes:
-            self.bullet(fx)
-
-    def add_metric(self, name: str, value: float) -> None:
-        """
-        Accumulate a running numeric total across the whole run (e.g. cells
-        patched per month) without the caller needing to track it manually.
-        Automatically rolled into the summary written by close().
-        """
-        self._metrics[name] = self._metrics.get(name, 0) + value
-
-    def close(self, summary: dict | None = None) -> None:
-        elapsed = datetime.now() - self._start_time
-        self.section("Run summary")
-        merged = dict(summary) if summary else {}
-        merged.update(self._metrics)
-        merged["Warnings logged"] = self._n_warnings
-        merged["Elapsed"] = str(elapsed).split(".")[0]  # drop microseconds
-        self.meta(merged)
-        self._write(f"\n---\n\n_Finished: {datetime.now():%Y-%m-%d %H:%M:%S}_\n")
 
 
 # ── CLI ───────────────────────────────────────────────────────────────────────
@@ -816,380 +633,8 @@ def load_dem_from_tif(
     return raster_DEM, raster_DEM_masked, xllcorner, yllcorner, res_x, res_y
 
 
-def load_monthly_lai(lai_input_dir: Path) -> xr.Dataset:
-    """
-    Load monthly LAI dataset, assign its native CRS (EPSG:32630),
-    and reproject to TARGET_CRS.
-    """
-    ds_lai = xr.open_dataset(lai_input_dir / "lai_monthly.nc")
-
-    if ds_lai.rio.crs is None:
-        ds_lai = ds_lai.rio.write_crs("EPSG:32630")
-        print("  LAI CRS assigned : EPSG:32630")
-    print(f"  LAI native CRS   : {ds_lai.rio.crs}")
-
-    if str(ds_lai.rio.crs) != TARGET_CRS:
-        print(f"  Reprojecting LAI {ds_lai.rio.crs} → {TARGET_CRS}")
-        ds_lai = ds_lai.rio.reproject(TARGET_CRS)
-    print(f"  LAI final CRS    : {ds_lai.rio.crs}")
-    print(f"  LAI x range      : {float(ds_lai.x.min()):.1f} – {float(ds_lai.x.max()):.1f}")
-    print(f"  LAI y range      : {float(ds_lai.y.min()):.1f} – {float(ds_lai.y.max()):.1f}")
-    return ds_lai
 
 
-def load_era5(start_year: int, end_year: int) -> xr.Dataset:
-    """Load ERA5 climate forcing."""
-    ds = AgUtils.load_era5_series(root_path=EO_PATH, start_year=start_year, end_year=end_year)
-    if ds is not None:
-        print(f"  Loaded ERA5 : {start_year} – {end_year - 1}")
-    else:
-        print("  No ERA5 datasets loaded — check EO_PATH.")
-    return ds
-
-
-def _finalise_ds(ds: xr.Dataset, label: str) -> xr.Dataset:
-    """Write CRS + spatial dims after load or reproject."""
-    ds = ds.rio.write_crs(TARGET_CRS, inplace=False)
-    ds = ds.rio.set_spatial_dims(x_dim="x", y_dim="y", inplace=False)
-    print(f"  {label} final CRS : {ds.rio.crs}")
-    print(f"  {label} x range   : {float(ds.x.min()):.1f} – {float(ds.x.max()):.1f}")
-    print(f"  {label} y range   : {float(ds.y.min()):.1f} – {float(ds.y.max()):.1f}")
-    return ds
-
-
-def _load_nc(path: Path, label: str) -> xr.Dataset:
-    """Open NetCDF, assign native CRS (EPSG:32630), reproject to TARGET_CRS."""
-    ds = (
-        xr.open_dataset(path, decode_times=True, mask_and_scale=True)
-          .drop_vars("spatial_ref", errors="ignore")
-    )
-    ds = ds.rio.write_crs(NATIVE_CRS, inplace=False)
-    ds = ds.rio.set_spatial_dims(x_dim="x", y_dim="y", inplace=False)
-    print(f"  {label} native CRS : {ds.rio.crs}")
-
-    if str(ds.rio.crs) != TARGET_CRS:
-        print(f"  Reprojecting {label}  {ds.rio.crs} → {TARGET_CRS}")
-        ds = ds.rio.reproject(TARGET_CRS)
-
-    return _finalise_ds(ds, label)
-
-
-def load_spatial_etp(path: Path = etp_path) -> xr.Dataset:
-    """Load ETp dataset and reproject to TARGET_CRS."""
-    return _load_nc(path, "ETp")
-
-
-VALUE_COLS = ["ET", "T", "ET_0_dry", "T_0_dry", "ET_0_wet", "T_0_wet"]
-
-
-def load_agramon_et(filename: Path = "agramon_ET.csv") -> pd.DataFrame:
-    """Load the single-series Agramon ET file.
-
-    Returns
-    -------
-    pd.DataFrame
-        Indexed by a daily DatetimeIndex named ``t``, sorted ascending.
-        Columns: year, month, ET, T, ET_0_dry, T_0_dry, ET_0_wet,
-        T_0_wet, feature_id, ET/ET_dry, ET/ET_wet.
-    """
-    df = pd.read_csv(filename, parse_dates=["t"])
-    df = df.sort_values("t").set_index("t")
-    df.index.name = "t"
-    return df
-
-
-def load_treatments_et(
-    filename: Path = "agramon_treatments_ET.csv",
-    drop_empty: bool = True,
-    add_ratios: bool = True,
-) -> pd.DataFrame:
-    """Load the per-treatment Agramon ET file (long format).
-
-    Parameters
-    ----------
-    filename : str or Path
-        Path to ``agramon_treatments_ET.csv``.
-    drop_empty : bool, default True
-        Drop treatments (feature_id) whose ET is entirely NaN
-        (feature 9 in the current file).
-    add_ratios : bool, default True
-        Add ``ET/ET_dry`` and ``ET/ET_wet`` columns, as in
-        ``agramon_ET.csv`` (NaN where the denominator is 0).
-
-    Returns
-    -------
-    pd.DataFrame
-        MultiIndex (t, feature_id), sorted. The constant ``band`` and
-        ``spatial_ref`` columns are dropped. Columns: ET, T, ET_0_dry,
-        T_0_dry, ET_0_wet, T_0_wet (+ ratios), year, month.
-    """
-    df = pd.read_csv(filename, parse_dates=["t"])
-    df = df.drop(columns=["band", "spatial_ref"], errors="ignore")
-
-    if drop_empty:
-        has_et = df.groupby("feature_id")["ET"].transform(lambda s: s.notna().any())
-        df = df[has_et]
-
-    if add_ratios:
-        df["ET/ET_dry"] = df["ET"] / df["ET_0_dry"].where(df["ET_0_dry"] != 0)
-        df["ET/ET_wet"] = df["ET"] / df["ET_0_wet"].where(df["ET_0_wet"] != 0)
-
-    df["year"] = df["t"].dt.year
-    df["month"] = df["t"].dt.month
-
-    return df.set_index(["t", "feature_id"]).sort_index()
-
-
-def to_wide(df: pd.DataFrame, var: str = "ET") -> pd.DataFrame:
-    """Pivot the long treatments frame to index=date, columns=feature_id."""
-    return df[var].unstack("feature_id")
-
-
-def monthly_mean(df: pd.DataFrame, cols: Optional[list] = None) -> pd.DataFrame:
-    """Monthly mean per feature_id (treatments frame) or overall (single series)."""
-    cols = cols or [c for c in VALUE_COLS if c in df.columns]
-    if isinstance(df.index, pd.MultiIndex):
-        t = df.index.get_level_values("t")
-        fid = df.index.get_level_values("feature_id")
-        return df[cols].groupby([fid, t.to_period("M")]).mean()
-    return df[cols].groupby(df.index.to_period("M")).mean()
-
-
-def load_all(folder: Path = Path("."), **treatment_kwargs) -> pd.DataFrame:
-    """Load both files and stack them into a single flat DataFrame.
-
-    Columns: t, source, feature_id, year, month, ET, T, ET_0_dry, T_0_dry,
-    ET_0_wet, T_0_wet, ET/ET_dry, ET/ET_wet.
-
-    ``source`` is ``"agramon_ET"`` for the single series and
-    ``"treatments"`` for the per-treatment rows. Both use feature_id 0 for
-    their first series, so always filter on ``source`` + ``feature_id``
-    together (they are not the same series).
-    """
-    folder = Path(folder)
-    single = load_agramon_et(folder / "agramon_ET.csv").reset_index()
-    single["source"] = "agramon_ET"
-    treat = load_treatments_et(
-        folder / "agramon_treatments_ET.csv", **treatment_kwargs
-    ).reset_index()
-    treat["source"] = "treatments"
-
-    out = pd.concat([single, treat], ignore_index=True)
-    first = ["t", "source", "feature_id", "year", "month"]
-    out = out[first + [c for c in out.columns if c not in first]]
-    return out.sort_values(["source", "feature_id", "t"]).reset_index(drop=True)
-
-
-def load_rain(path: Path = rain_path) -> xr.Dataset:
-    """Load rain dataset and reproject to TARGET_CRS."""
-    return _load_nc(path, "rain")
-
-
-def build_etp_ds_from_timeseries(
-    df: pd.DataFrame,
-    ds_rain: xr.Dataset,
-    plot_id: int,
-    column: str = ETP_TS_COLUMN_DEFAULT,
-    feature_id: int | None = None,
-    source: str = "treatments",
-    rain_var: str = "TP-DD",
-    etp_var: str = "ET_0-gf",
-) -> xr.Dataset:
-    """
-    Build an ETp dataset with the same (time, y, x) shape, coordinates and
-    CRS as ``ds_rain`` from a single daily time series (``load_all`` output).
-
-    The series is identical for every pixel, so the returned dataset is a
-    drop-in replacement for ``load_spatial_etp()``: same variable name
-    (``etp_var``), same time axis as the rain, units mm/day.
-
-    Parameters
-    ----------
-    df : pd.DataFrame
-        Output of ``load_all`` (columns t, source, feature_id, <column>, ...).
-    ds_rain : xr.Dataset
-        Rain dataset (already reprojected); provides time axis, grid, CRS.
-    plot_id : int
-        ``--dem-plot`` value. Used to pick the treatment when ``feature_id``
-        is None (feature_id = plot_id - 1).
-    column : str
-        Column of ``df`` used as ETp (mm/day).
-    feature_id : int, optional
-        Explicit treatment feature_id (overrides the plot_id rule).
-    source : str
-        ``"treatments"`` or ``"agramon_ET"``.
-    """
-    fid = int(feature_id) if feature_id is not None else int(plot_id) - 1
-
-    sel = df[(df["source"] == source) & (df["feature_id"] == fid)]
-    if sel.empty:
-        avail = sorted(int(v) for v in df.loc[df["source"] == source, "feature_id"].unique())
-        raise ValueError(
-            f"No rows for source={source!r}, feature_id={fid} "
-            f"(plot_id={plot_id}). Available feature_ids: {avail}. "
-            "Pass --etp-ts-feature-id to choose one explicitly."
-        )
-    if column not in sel.columns:
-        raise ValueError(f"Column {column!r} not in df (columns: {list(sel.columns)})")
-
-    series = sel.set_index("t")[column]
-    if series.index.has_duplicates:
-        raise ValueError(f"Duplicate dates for feature_id={fid} in column {column!r}")
-
-    rain_times = pd.DatetimeIndex(ds_rain["time"].values)
-    vals = series.reindex(rain_times.normalize()).to_numpy(dtype=float)
-    n_missing = int(np.isnan(vals).sum())
-    if n_missing:
-        bad = rain_times[np.isnan(vals)]
-        raise ValueError(
-            f"ETp series (feature_id={fid}, column={column!r}) has {n_missing}/"
-            f"{len(vals)} missing/NaN values over the rain time axis "
-            f"({bad[0]:%Y-%m-%d} … {bad[-1]:%Y-%m-%d}). Check feature_id / column."
-        )
-
-    template = ds_rain[rain_var]
-    ts = xr.DataArray(vals, dims="time", coords={"time": ds_rain["time"].values})
-    _, ts_b = xr.broadcast(template, ts)
-    etp_da = ts_b.transpose(*template.dims).astype("float64")
-    # xr.broadcast keeps only the coords of `ts`/dims — restore the rest of the
-    # template's coords (notably the scalar `spatial_ref` carrying the CRS, so
-    # ds_etp.rio.crs / map_grid_to_mesh behave exactly as for the real ETp raster).
-    etp_da = etp_da.assign_coords(
-        {k: v for k, v in template.coords.items() if k not in etp_da.coords}
-    )
-    etp_da.attrs = {"units": "mm/day",
-                    "long_name": f"ETp time series ({source}, feature_id={fid}, {column})"}
-
-    ds_etp = etp_da.to_dataset(name=etp_var)
-    print(f"  ETp time series : source={source}  feature_id={fid} "
-          f"(plot {plot_id})  column={column}  "
-          f"mean={vals.mean():.2f} mm/day  range=[{vals.min():.2f}, {vals.max():.2f}]")
-    return ds_etp
-
-
-def log_simulation(log_path: Path, start_year: int, end_year: int,
-                   zroot: float, pmin: float, watershed_nb: int,
-                   with_lai: int, outlet_flux: float = None,
-                   bottom_flux: float = None, spinup: str = None,
-                   ic_mode: str = None, ic_wtposition: float = None,
-                   ic_pressure_head: float = None,
-                   zroot_factors: list = None,
-                   permx: float = None,
-                   permy_ratio: float = None,
-                   permz_ratio: float = None,
-                   scf: float = None,
-                   pcana: float = None,
-                   pcref: float = None,
-                   pcwlt: float = None,
-                   pz: float = None,
-                   omgc: float = None,
-                   feddes_crop: str = None,
-                   forcing_mode: str = None,
-                   etp_ts_column: str = None,
-                   etp_ts_feature_id: int = None) -> int:
-    """Register parameters in the shared CSV log and return the sim_index.
-
-    outlet_flux / bottom_flux / spinup / ic_* are recorded too (not just
-    used to tag the folder name) so `--list-scenarios` and the CSV itself
-    are enough to compare runs without having to parse folder names — and
-    so batch runners can tell whether a given parameter combination
-    (including initial condition) has already been logged, e.g. to skip
-    re-running scenarios that already completed successfully.
-
-    zroot_factors / permx / permy_ratio / permz_ratio are logged the same
-    way — a run's root-depth mapping and Ks override (incl. anisotropy)
-    are as much a part of its identity as ZROOT or PMIN, so they belong
-    in the CSV rather than only ever showing up in the console/markdown
-    log.
-
-    pcana/pcref/pcwlt/pz/omgc/feddes_crop are the remaining Feddes (FP_map)
-    parameters, logged the same way for the same reason — resolved once via
-    ``feddes_params_from_args(args)`` at the call site, not recomputed here.
-
-    ``scf`` (normally just ``args.scf``) is logged too, since it changes
-    which ET-partitioning approach was actually used.
-
-    ``forcing_mode`` ("era5" | "etp" | "etp_ts") is part of a run's identity
-    too. ``etp_ts_column`` / ``etp_ts_feature_id`` are only logged for
-    "etp_ts" runs (None otherwise). Rows logged before these columns existed
-    were all satellite-ETp runs, i.e. an empty/NaN forcing_mode means "etp".
-    """
-    params = {
-        "start_year":   start_year,
-        "end_year":     end_year,
-        "ZROOT":        zroot,
-        "PMIN":         pmin,
-        "SCF":          scf,
-        "watershed_nb": watershed_nb,
-        "withLAI":      with_lai,
-        "outlet_flux":  outlet_flux,
-        "bottom_flux":  bottom_flux,
-        "spinup":       spinup,
-        "ic_mode":          ic_mode,
-        "ic_wtposition":    ic_wtposition,
-        "ic_pressure_head": ic_pressure_head,
-        "zroot_factors": (",".join(f"{v:g}" for v in zroot_factors)
-                           if zroot_factors is not None else None),
-        "permx":        permx,
-        "permy_ratio":  permy_ratio if permx is not None else None,
-        "permz_ratio":  permz_ratio if permx is not None else None,
-        "PCANA":        pcana,
-        "PCREF":        pcref,
-        "PCWLT":        pcwlt,
-        "PZ":           pz,
-        "OMGC":         omgc,
-        "feddes_crop":  feddes_crop,
-        "forcing_mode":      forcing_mode,
-        "etp_ts_column":     etp_ts_column if forcing_mode == "etp_ts" else None,
-        "etp_ts_feature_id": etp_ts_feature_id if forcing_mode == "etp_ts" else None,
-    }
-    sim_index = uCATHY.log_simulation(log_path, params)
-    print(f"  sim_index = {sim_index}  (withLAI={with_lai})")
-    return sim_index
-
-
-def build_scenario_dirname(sim_index: int, dem_plot: int,
-                           outlet_flux: float, bottom_flux: float,
-                           no_spinup: bool, spinup_cycles: int,
-                           pmin: float, ic_mode: str = "wt",
-                           forcing_tag: str = "") -> str:
-    """
-    Human-readable, self-describing scenario folder name.
-
-    ``scenario_<sim_index>`` stays the root/prefix of the name — every
-    place that keys off the CSV-assigned sim_index (post-processing
-    scripts, --scenario N, log lookups) keeps working unchanged — but a
-    short tag is appended describing the axes that actually differ
-    between batch runs (dem-plot, outlet/bottom BC, spin-up, PMIN,
-    initial condition), so scenarios run with different args can be told
-    apart, and compared, just by reading folder names side by side
-    instead of cross-referencing the CSV log for every one of them.
-
-    ``ic_mode`` is included so runs that only differ by --ic-mode (wt vs
-    pressure) get distinct folders/tags instead of silently colliding —
-    previously two such runs shared the same tag (differing only by the
-    sim_index prefix), which also made them indistinguishable to any
-    "has this combination already run?" check based on the tag alone.
-
-    ``forcing_tag`` is appended only for non-default forcings (currently the
-    "etp_ts" runs, e.g. ``forcing-etpts-wet-fid1``), so legacy satellite-ETp
-    folder names stay exactly as they were.
-
-    e.g. scenario_7_plot2_outlet-free_bottom-closed_spinup-on3c_pmin-3.0_ic-wt
-    """
-    outlet_label = "closed" if outlet_flux == 0 else "free"
-    bottom_label = "closed" if bottom_flux == 0 else "free"
-    spinup_label = "off" if no_spinup else f"on{spinup_cycles}c"
-    pmin_label = f"{pmin:g}".replace("-", "m").replace("+", "").replace(".", "p")
-    tag = (f"plot{dem_plot}"
-           f"_outlet-{outlet_label}"
-           f"_bottom-{bottom_label}"
-           f"_spinup-{spinup_label}"
-           f"_pmin-{pmin_label}"
-           f"_ic-{ic_mode}")
-    if forcing_tag:
-        tag += f"_{forcing_tag}"
-    return f"scenario_{sim_index}_{tag}"
 
 
 def initialise_project(path2prj: str, start_year: int, end_year: int,
@@ -1404,8 +849,8 @@ def configure_boundary_conditions(
 
     outlet_total_area = sum(outlet_areas.values())
     if len(all_nodes) == 0:
-        print(f"  BCs: Dirichlet + seepage-face + Neumann all closed "
-              f"(no_flow) - outlet_flux and bottom_flux both zero.")
+        print("  BCs: Dirichlet + seepage-face + Neumann all closed "
+              "(no_flow) - outlet_flux and bottom_flux both zero.")
     else:
         print(f"  BCs: Dirichlet + seepage-face closed; Neumann outflow on "
               f"outlet side '{resolved_side}': {outlet_flux:.1e} m/s x exact "
@@ -1417,7 +862,7 @@ def configure_boundary_conditions(
               f"area {bottom_nodal_area:.3g} m^2, over {n_bottom_nodes} "
               f"bottom nodes.")
     else:
-        print(f"  Bottom: closed (no-flow).")
+        print("  Bottom: closed (no-flow).")
     return resolved_side, outlet_node_id
 
 
@@ -1433,260 +878,6 @@ def plot_forcing(t_atmbc, net_flux, label="ETp forcing") -> None:
     plt.tight_layout()
 
 
-# ── LAI helpers ───────────────────────────────────────────────────────────────
-
-def lai_to_veg_map(simu, lai_2d: np.ndarray) -> tuple[np.ndarray, dict[int, int]]:
-    """
-    Convert a 2-D LAI field to an integer vegetation-class map with
-    *consecutive* classes starting at 1, as required by pyCATHY.
-
-    Raw semantic classes (calibrated to Agramon observed range 0 – 0.6 m² m⁻²)
-    ---------------------------------------------------------------------------
-    1 : LAI ≤ 0.10           (bare soil)
-    2 : 0.10 < LAI ≤ 0.25   (sparse)
-    3 : 0.25 < LAI ≤ 0.40   (moderate)
-    4 : 0.40 < LAI ≤ 0.55   (dense)
-    5 : LAI > 0.55           (very dense)
-
-    Returns
-    -------
-    veg_remapped : (M, N) int array — consecutive classes 1 … K
-    remap        : {original_semantic_class → remapped_class}
-    """
-    N = int(simu.hapin["N"])
-    M = int(simu.hapin["M"])
-    veg = np.ones((M, N), dtype=int)
-    for i, thresh in enumerate(LAI_THRESHOLDS, start=2):
-        veg[lai_2d > thresh] = i
-
-    # NOTE: remap is intentionally the IDENTITY mapping over the fixed set of
-    # semantic classes 1..N_VEG_CLASSES — NOT derived from np.unique(veg).
-    # Re-deriving it per month (as before) renumbered whichever classes were
-    # spatially present that month to consecutive 1..K, so the same veg-index
-    # meant a different semantic class from one month to the next, and the
-    # SOIL table size (and MAXVEG) mismatched whenever fewer than 5 classes
-    # were present. Keeping it fixed means the soil table always has
-    # N_VEG_CLASSES rows and row i always corresponds to semantic class i,
-    # whether or not that class actually appears in the DEM this month.
-    remap: dict[int, int] = {c: c for c in range(1, N_VEG_CLASSES + 1)}
-    veg_remapped = veg  # already using the fixed semantic classes 1..N_VEG_CLASSES
-    return veg_remapped, remap
-
-
-def smooth_veg_map(
-    veg: np.ndarray,
-    min_patch_pixels: int = 4,
-    n_classes: int | None = None,
-) -> np.ndarray:
-    """
-    Remove isolated / salt-and-pepper pixels from a vegetation-class map
-    using connected-component minimum-patch removal.
-    """
-    if n_classes is None:
-        n_classes = int(veg.max())
-
-    out = veg.copy()
-
-    for cls in range(1, n_classes + 1):
-        binary = out == cls
-        labeled, n_features = sp_label(binary)
-
-        for feat_id in range(1, n_features + 1):
-            patch = labeled == feat_id
-            if patch.sum() >= min_patch_pixels:
-                continue
-
-            border = binary_dilation(patch, iterations=1) & ~patch
-            if not border.any():
-                continue
-
-            neighbour_vals = out[border]
-            replacement = int(mode(neighbour_vals, keepdims=True).mode[0])
-            out[patch] = replacement
-
-    return out
-
-
-def update_soil_for_active_zones(
-    simu,
-    active_zones: set[int],
-    remap: dict[int, int],
-    base_zroot: float,
-    pmin: float,
-    scf: float,
-    zroot_factors: dict[int, float] | None = None,
-    permx: float | None = None,
-    permy_ratio: float = 1.0,
-    permz_ratio: float = 1.0,
-    vgncell: float | None = None,
-    vgrmccell: float | None = None,
-    vgpsatcell: float | None = None,
-    pcana: float | None = None,
-    pcref: float | None = None,
-    pcwlt: float | None = None,
-    pz: float | None = None,
-    omgc: float | None = None,
-    feddes_crop: str | None = None,
-) -> None:
-    """
-    ``zroot_factors`` overrides the module-level ZROOT_FACTORS mapping
-    (semantic veg class 1-5 → root-depth multiplier) when given —
-    normally built from ``--zroot-factors`` — falling back to
-    ZROOT_FACTORS itself when None, so existing callers that don't pass
-    it keep the original hardcoded behaviour.
-
-    ``permx`` (m/s), when given — normally from ``--permx`` — overrides
-    PERMX uniformly across every row of the SPP_map returned by
-    ``simu.set_SOIL_defaults(SPP_map_default=True)``; PERMY/PERMZ follow
-    via ``permy_ratio``/``permz_ratio`` (anisotropy). Left untouched
-    (pyCATHY's own SPP default) when permx is None.
-
-    ``scf`` is the root water uptake stress compensation factor, a float
-    in [0, 1]: 1 = Feddes approach (ET ~ all transpiration), 0 =
-    PMIN-threshold approach (sparse/arid cover), values in between blend
-    the two. Passed straight through to ``simu.update_soil(SCF=scf)``
-    alongside PMIN — normally just ``args.scf`` at the call site.
-
-    ``vgncell`` / ``vgrmccell`` / ``vgpsatcell``, when given, override the
-    van Genuchten retention-curve columns (VGNCELL = n, VGRMCCELL =
-    residual water content θr, VGPSATCELL = 1/alpha) uniformly across
-    every row of df_spp, same broadcast pattern as permx above. Each is
-    left at pyCATHY's own SPP default when None. Note VGRMCCELL must
-    stay below POROS — simu.update_soil() itself warns (doesn't raise)
-    if VGRMCCELL >= POROS for any row.
-
-    ``pcana`` / ``pcref`` / ``pcwlt`` / ``pz`` / ``omgc``, when given,
-    override the remaining Feddes (FP_map) columns — PCANA = anaerobiosis
-    point h2, PCREF = field capacity h3, PCWLT = wilting point h4, PZ =
-    empirical root-water-uptake exponent, OMGC = compensatory mechanism
-    for root water uptake (0 < OMGC < 1) — uniformly across every row of
-    df_fp, same broadcast pattern as the VG* overrides above. ZROOT (also
-    part of FP_map) is handled separately by ``base_zroot``/``zroot_factors``,
-    not here. Normally resolved once via ``feddes_params_from_args(args)``
-    rather than being hardcoded at each call site — see that helper for how
-    ``feddes_crop`` (pyCATHY's own literature lookup,
-    ``pyCATHY.petro.Feddes_litterature``) feeds pcana/pcref/pcwlt when those
-    are not explicitly overridden. ``feddes_crop`` itself is accepted here
-    only for the run-log label below; the actual value resolution already
-    happened in the caller.
-    """
-    inv_remap: dict[int, int] = {v: k for k, v in remap.items()}
-    if zroot_factors is None:
-        zroot_factors = ZROOT_FACTORS
-
-    # Always build the SOIL vegetation table for the FULL fixed set of
-    # N_VEG_CLASSES zones — matching MAXVEG — regardless of how many of
-    # them are spatially present in the DEM this particular month. Zones
-    # not currently active still get a physically-meaningful ZROOT (their
-    # fixed zroot_factors value), they just aren't occupying any pixels
-    # this month; they must not be dropped from the table, or the row
-    # count stops matching MAXVEG and/or rows shift relative to the
-    # semantic class each veg-index in the raster refers to.
-    n_zones = N_VEG_CLASSES
-
-    df_fp  = simu.set_SOIL_defaults(FP_map_default=True, nveg=n_zones)
-    df_spp = simu.set_SOIL_defaults(SPP_map_default=True)
-
-    template = df_fp.iloc[[0]]
-    df_fp = pd.concat([template] * n_zones, ignore_index=True)
-    # pd.concat(..., ignore_index=True) resets the index to a plain 0-based
-    # RangeIndex(0, n_zones). But set_SOIL_defaults()/init_soil_FP_map_df()
-    # index this table 1..n_zones ("Veg nb"), and cathy_tools.py's
-    # _prepare_SOIL_vegetation_tb() reads it back with
-    # FP_map[sfp].loc[iveg] for iveg in range(1, MAXVEG + 1) — so losing
-    # the 1-based labels here means the last class (iveg == n_zones) is
-    # never found, raising KeyError: n_zones. Re-attach the expected
-    # labels; row order is already class 1..n_zones, so this is just
-    # restoring the index, not reordering anything.
-    df_fp.index = pd.RangeIndex(1, n_zones + 1)
-    df_fp.index.name = "Veg nb"
-    for key in df_fp.columns:
-        if key == "ZROOT":
-            df_fp[key] = [
-                base_zroot * zroot_factors.get(inv_remap.get(z, z), 1.0)
-                for z in range(1, n_zones + 1)
-            ]
-
-    permx_label = "pyCATHY default"
-    if permx is not None:
-        overrides = {
-            "PERMX": permx,
-            "PERMY": permx * permy_ratio,
-            "PERMZ": permx * permz_ratio,
-        }
-        for col, val in overrides.items():
-            if col in df_spp.columns:
-                df_spp[col] = val
-            else:
-                print(f"    WARNING: SPP_map has no '{col}' column — "
-                      f"--permx/--permy-ratio/--permz-ratio ignored for it.")
-        permx_label = (f"PERMX={permx:.3e}, PERMY={overrides['PERMY']:.3e}, "
-                       f"PERMZ={overrides['PERMZ']:.3e} m/s")
-
-    # Retention curve (van Genuchten) overrides — VGNCELL/VGRMCCELL/
-    # VGPSATCELL — same broadcast-to-every-row pattern as permx above.
-    vg_overrides = {
-        "VGNCELL": vgncell,
-        "VGRMCCELL": vgrmccell,
-        "VGPSATCELL": vgpsatcell,
-    }
-    vg_label_parts = []
-    for col, val in vg_overrides.items():
-        if val is None:
-            continue
-        if col in df_spp.columns:
-            df_spp[col] = val
-            vg_label_parts.append(f"{col}={val:.4g}")
-        else:
-            print(f"    WARNING: SPP_map has no '{col}' column — override ignored for it.")
-    if (df_spp["VGRMCCELL"] >= df_spp["POROS"]).any():
-        print("    WARNING: VGRMCCELL >= POROS for at least one zone — "
-              "residual water content exceeds porosity, fix before running.")
-    vg_label = ", ".join(vg_label_parts) if vg_label_parts else "pyCATHY default"
-
-    # Feddes (FP_map) overrides — PCANA/PCREF/PCWLT/PZ/OMGC — same
-    # broadcast-to-every-row pattern as the VG* overrides above. ZROOT is
-    # already handled per-zone by the loop earlier in this function.
-    fp_overrides = {
-        "PCANA": pcana,
-        "PCREF": pcref,
-        "PCWLT": pcwlt,
-        "PZ": pz,
-        "OMGC": omgc,
-    }
-    fp_label_parts = []
-    for col, val in fp_overrides.items():
-        if val is None:
-            continue
-        if col in df_fp.columns:
-            df_fp[col] = val
-            fp_label_parts.append(f"{col}={val:.4g}")
-        else:
-            print(f"    WARNING: FP_map has no '{col}' column — override ignored for it.")
-    if feddes_crop is not None:
-        fp_label_parts.append(f"crop={feddes_crop} (literature)")
-    fp_label = ", ".join(fp_label_parts) if fp_label_parts else "pyCATHY default"
-
-    simu.update_soil(FP_map=df_fp, SPP_map=df_spp, PMIN=pmin, SCF=scf)
-    semantic_active = sorted(inv_remap.get(z, z) for z in active_zones)
-    scf_label = scf_label_for(scf)
-    print(f"    → Soil updated | table rows: {n_zones} (all zones, fixed) "
-          f"| spatially active this month: {sorted(active_zones)} "
-          f"(semantic: {semantic_active}) | PMIN: {pmin:g} m | SCF: {scf_label} | "
-          f"Ks: {permx_label} | retention curve: {vg_label} | "
-          f"Feddes: {fp_label}")
-
-
-def iter_monthly_lai(lai_ds: xr.Dataset):
-    """Yield the first (datetime, lai_2d) of each calendar month."""
-    seen = set()
-    for t in lai_ds["time"].values:
-        dt  = pd.Timestamp(t).to_pydatetime()
-        key = (dt.year, dt.month)
-        if key in seen:
-            continue
-        seen.add(key)
-        yield dt, lai_ds["LAI"].sel(time=t).values
 
 
 def subset_atmbc_for_month(t_atmbc, net_flux: np.ndarray,
@@ -2062,417 +1253,8 @@ def save_forcing_diagnostics(
             plt.close(fig)
 
 
-# ── ETa "net-forcing" artefact patch ────────────────────────────────────────
-# Known issue: netValue = rain - ETp is passed to CATHY as a single combined
-# flux (HSPATM=1, IETO=1). CATHY has no way to separate "net infiltration"
-# from "ET still happening at the same time" — so on any day/node where
-# rain >= ETp, the reported ACT. ETRA collapses to 0, even though real ET was
-# likely still occurring near the potential rate. This floors ONLY those
-# artefact cells (ACT. ETRA ~ 0 AND rain >= ETp) at ETp; genuinely
-# soil-moisture-limited zero-ETa days (dry soil, no rain) are left untouched.
-def apply_eta_artefact_floor(
-    df_et: pd.DataFrame,
-    t_month: list,
-    ETp_nodes: np.ndarray,
-    rain_nodes: np.ndarray,
-    idx_month: np.ndarray,
-    eta_eps: float = 1e-9,
-    net_neg_mode: str = "etp",
-) -> tuple[pd.DataFrame, int, int]:
-    """
-    Add an 'ACT. ETRA_patched' column to df_et, flooring the net-forcing
-    artefact at ETp. The original 'ACT. ETRA' column is left untouched.
-
-    Parameters
-    ----------
-    df_et : DataFrame from simu.read_outputs("ET") for one month, with
-        columns 'time_sec', 'SURFACE NODE', 'ACT. ETRA'.
-    t_month : time axis (seconds from month start) passed to
-        simu.update_atmbc() for this month.
-    ETp_nodes, rain_nodes : ndarray (n_time_full, n_surf_nodes), m/s —
-        the full-run forcing arrays built in step 9.
-    idx_month : ndarray
-        Indices into ETp_nodes/rain_nodes' time axis for this month
-        (same mask used to build t_month/nv_month via
-        subset_atmbc_for_month).
-    eta_eps : float
-        ACT. ETRA magnitude (m/s) at/below which a value is treated as
-        CATHY's "collapsed to 0" artefact rather than a real reading.
-    net_neg_mode : {"etp", "gross", "off"}
-        Treatment of cells where net = rain - ETp < 0 (ETp exceeds rain).
-        CATHY only receives the net flux, so there its ACT. ETRA is the
-        *net* evaporation (~ ETp - rain at best), i.e. it under-reports the
-        gross ET by the rain that evaporated first.
-          "etp"   (default) patched ETa = ETp on every net < 0 cell.
-          "gross" patched ETa = min(ETp, ACT. ETRA + rain): equals ETp
-                  whenever the solver met the net demand, but keeps
-                  genuinely soil-limited cells below ETp.
-          "off"   leave net < 0 cells at the raw ACT. ETRA.
-        Cells with net >= 0 are always handled by the artefact rule above.
-
-    Returns
-    -------
-    (df_et, n_artefact, n_net_neg) : patched copy of df_et, the number of
-    net >= 0 artefact cells patched, and the number of net < 0 cells whose
-    value was changed by *net_neg_mode*.
-    """
-    if net_neg_mode not in ("etp", "gross", "off"):
-        raise ValueError(f"net_neg_mode must be etp|gross|off, got {net_neg_mode!r}")
-    if len(df_et) == 0 or len(t_month) == 0:
-        df_et = df_et.copy()
-        df_et["ACT. ETRA_patched"] = df_et.get("ACT. ETRA", pd.Series(dtype=float))
-        return df_et, 0, 0
-
-    t_month_arr = np.asarray(t_month, dtype=float)
-    tsec        = df_et["time_sec"].to_numpy(dtype=float)
-
-    # Nearest-time match (defensive against float round-trip through CATHY I/O)
-    i_right  = np.clip(np.searchsorted(t_month_arr, tsec), 0, len(t_month_arr) - 1)
-    i_left   = np.clip(i_right - 1, 0, len(t_month_arr) - 1)
-    use_left = np.abs(t_month_arr[i_left] - tsec) < np.abs(t_month_arr[i_right] - tsec)
-    i_time   = np.where(use_left, i_left, i_right)
-
-    node_idx = df_et["SURFACE NODE"].to_numpy(dtype=int)
-    n_surf   = ETp_nodes.shape[1]
-    # CATHY node numbering is 1-based (Fortran) — auto-detect and correct
-    if node_idx.max() == n_surf:
-        node_idx = node_idx - 1
-    assert node_idx.min() >= 0 and node_idx.max() < n_surf, (
-        f"SURFACE NODE out of bounds for ETp_nodes (n_surf={n_surf}); "
-        f"got range [{node_idx.min()}, {node_idx.max()}]"
-    )
-
-    rows      = idx_month[i_time]
-    etp_vals  = ETp_nodes[rows, node_idx]    # m/s
-    rain_vals = rain_nodes[rows, node_idx]   # m/s
-    net_vals  = rain_vals - etp_vals
-
-    eta_raw     = df_et["ACT. ETRA"].to_numpy(dtype=float)
-    is_artefact = (np.abs(eta_raw) <= eta_eps) & (net_vals >= 0)
-    eta_patched = np.where(is_artefact, etp_vals, eta_raw)
-
-    # net < 0 (ETp > rain): patched ETa must equal ETp (see net_neg_mode).
-    net_neg = net_vals < 0
-    if net_neg_mode == "etp":
-        eta_patched = np.where(net_neg, etp_vals, eta_patched)
-    elif net_neg_mode == "gross":
-        gross = np.minimum(np.abs(eta_raw) + rain_vals, etp_vals)
-        eta_patched = np.where(net_neg, gross, eta_patched)
-    n_net_neg = int((net_neg & ~np.isclose(eta_patched, eta_raw, rtol=0, atol=1e-15)).sum())
-
-    df_et = df_et.copy()
-    df_et["ACT. ETRA_patched"] = eta_patched
-    return df_et, int(is_artefact.sum()), n_net_neg
 
 
-def add_datetime_col(df: pd.DataFrame, base_dt) -> pd.DataFrame:
-    """
-    Add a 'datetime' column as base_dt + time_sec (returns df).
-
-    Guards against a pyCATHY output-reading quirk where 'time_sec' is
-    sometimes already a Timedelta-typed column (instead of a plain float
-    number of seconds) — e.g. because the same DataFrame already went
-    through a time_sec → 'time' Timedelta conversion upstream (see
-    read_spatial_format's own "time" column) and something re-fed that
-    into this column. Calling pd.to_timedelta(..., unit="s") on data
-    that's already Timedelta-like can make pandas attempt Timedelta+
-    float arithmetic internally and raise "unsupported operand type(s)
-    for +: 'Timedelta' and 'float'" (pandas version dependent).
-
-    To dodge every variant of that failure mode, we always reduce
-    time_sec down to a plain float number of seconds first (via
-    .dt.total_seconds() when it's already timedelta-like, otherwise via
-    pd.to_numeric), then build the Timedelta exactly once from that
-    float. pd.to_timedelta(..., unit="s") is therefore never called on
-    an input that could already be Timedelta.
-    """
-    ts = df["time_sec"]
-    if pd.api.types.is_timedelta64_dtype(ts):
-        secs = ts.dt.total_seconds()
-    else:
-        secs = pd.to_numeric(ts, errors="coerce")
-    df["datetime"] = base_dt + pd.to_timedelta(secs, unit="s")
-    return df
-
-
-def check_monthly_sanity(
-    dt,
-    month_stats: dict,
-    psi_month_df,
-    sw_month_df,
-    df_et,
-    df_rec,
-    t_month,
-    idx_month,
-    ETp_nodes,
-    rain_nodes,
-    sw_tol: float = SW_TOL,
-    psi_sanity_min: float = PSI_SANITY_MIN,
-    eta_tol: float = ETA_TOL,
-    wb_residual_frac: float = WB_RESIDUAL_FRAC,
-) -> list[str]:
-    """
-    Run cheap physical-bounds and (approximate) water-balance sanity
-    checks on one month's outputs. Fills diagnostic fields into
-    `month_stats` in place and returns a list of human-readable warning
-    strings (empty if nothing looked off). Never raises — a check that
-    can't be computed for this month (missing data, unexpected columns)
-    is silently skipped rather than aborting the run.
-
-    Water-balance note
-    -------------------
-    The residual is rain_in − ETa_out − recharge_out only: it does NOT
-    account for the change in subsurface storage (ΔS), because that
-    would require per-node porosity and control-volume information not
-    readily available here. So this is not a strict mass-balance
-    closure — treat a large residual as "worth checking the psi/sw
-    trend for this month", not as proof of a bug on its own. It also
-    assumes the 'recharge' output column(s) are in the same units
-    (m/s) as ETa/rain; if your CATHY build reports recharge in
-    different units, `recharge_out_mm` below will be wrong and should
-    be ignored.
-    """
-    warnings: list[str] = []
-
-    # ── Physical bounds: SW should stay within [0, 1] ──
-    if sw_month_df is not None and len(sw_month_df):
-        sw_vals = sw_month_df["sw"].to_numpy(dtype=float)
-        n_bad = int(((sw_vals < -sw_tol) | (sw_vals > 1 + sw_tol)).sum())
-        month_stats["sw_out_of_bounds_n"] = n_bad
-        if n_bad:
-            warnings.append(
-                f"{dt:%Y-%m}: {n_bad} SW value(s) outside [0,1] "
-                f"(range [{sw_vals.min():.3f}, {sw_vals.max():.3f}])."
-            )
-
-    # ── Physical bounds: PSI shouldn't be sitting at extreme drying values ──
-    if psi_month_df is not None and len(psi_month_df):
-        psi_vals = psi_month_df["psi"].to_numpy(dtype=float)
-        n_extreme = int((psi_vals < psi_sanity_min).sum())
-        month_stats["psi_extreme_n"] = n_extreme
-        if n_extreme:
-            warnings.append(
-                f"{dt:%Y-%m}: {n_extreme} PSI value(s) below sanity threshold "
-                f"{psi_sanity_min:.0f} m (min {psi_vals.min():.2f} m)."
-            )
-
-    # ── Physical bounds: ETa should not exceed ETp ──
-    if (df_et is not None and len(df_et) and t_month is not None and len(t_month)
-            and ETp_nodes is not None and idx_month is not None and len(idx_month)):
-        try:
-            t_month_arr = np.asarray(t_month, dtype=float)
-            tsec = df_et["time_sec"].to_numpy(dtype=float)
-            i_right  = np.clip(np.searchsorted(t_month_arr, tsec), 0, len(t_month_arr) - 1)
-            i_left   = np.clip(i_right - 1, 0, len(t_month_arr) - 1)
-            use_left = np.abs(t_month_arr[i_left] - tsec) < np.abs(t_month_arr[i_right] - tsec)
-            i_time   = np.where(use_left, i_left, i_right)
-
-            node_idx = df_et["SURFACE NODE"].to_numpy(dtype=int)
-            n_surf   = ETp_nodes.shape[1]
-            if node_idx.max() == n_surf:
-                node_idx = node_idx - 1
-
-            rows     = idx_month[i_time]
-            etp_vals = ETp_nodes[rows, node_idx]
-            eta_col  = "ACT. ETRA_patched" if "ACT. ETRA_patched" in df_et.columns else "ACT. ETRA"
-            eta_vals = df_et[eta_col].to_numpy(dtype=float)
-
-            n_exceed = int((eta_vals > etp_vals + eta_tol).sum())
-            month_stats["eta_exceeds_etp_n"] = n_exceed
-            if n_exceed:
-                max_excess = float((eta_vals - etp_vals).max())
-                warnings.append(
-                    f"{dt:%Y-%m}: {n_exceed} ETa value(s) exceed ETp "
-                    f"(max excess {max_excess:.3e} m/s)."
-                )
-        except Exception:
-            pass  # sanity check itself must never break the run
-
-    # ── Water balance: rain_in vs ETa_out vs recharge_out (flux-only) ──
-    rain_in_mm = eta_out_mm = recharge_out_mm = None
-
-    if rain_nodes is not None and idx_month is not None and len(idx_month):
-        rain_in_mm = float((rain_nodes[idx_month].mean(axis=1) * 86400 * 1000).sum())
-        month_stats["rain_in_mm"] = rain_in_mm
-
-    if df_et is not None and len(df_et):
-        eta_col = "ACT. ETRA_patched" if "ACT. ETRA_patched" in df_et.columns else "ACT. ETRA"
-        if eta_col in df_et.columns:
-            eta_by_time = df_et.groupby("time_sec")[eta_col].mean()
-            eta_out_mm = float((eta_by_time * 86400 * 1000).sum())
-            month_stats["eta_out_mm"] = eta_out_mm
-
-    if df_rec is not None and len(df_rec):
-        rec_value_cols = [c for c in df_rec.select_dtypes(include=[np.number]).columns
-                           if c not in ("X", "Y", "time_sec")]
-        if rec_value_cols:
-            rec_by_time = df_rec.groupby("time_sec")[rec_value_cols].mean().mean(axis=1)
-            recharge_out_mm = float((rec_by_time * 86400 * 1000).sum())
-            month_stats["recharge_out_mm"] = recharge_out_mm
-
-    if rain_in_mm is not None and eta_out_mm is not None and recharge_out_mm is not None:
-        residual_mm = rain_in_mm - eta_out_mm - recharge_out_mm
-        month_stats["water_balance_residual_mm"] = residual_mm
-        if rain_in_mm > 1e-6 and abs(residual_mm) > wb_residual_frac * rain_in_mm:
-            warnings.append(
-                f"{dt:%Y-%m}: water balance residual {residual_mm:.1f} mm "
-                f"(rain {rain_in_mm:.1f}, ETa {eta_out_mm:.1f}, "
-                f"recharge {recharge_out_mm:.1f}) — large relative to rain "
-                f"input. Excludes storage change (ΔS); also check the "
-                f"psi/sw trend for this month before assuming a bug."
-            )
-
-    return warnings
-
-
-def add_datetime_col(df: pd.DataFrame, base_dt) -> pd.DataFrame:
-    """
-    Add a 'datetime' column as base_dt + time_sec (returns df).
-
-    Guards against a pyCATHY output-reading quirk where 'time_sec' is
-    sometimes already a Timedelta dtype (instead of a plain float number
-    of seconds) — calling pd.to_timedelta(..., unit="s") on data that's
-    already Timedelta makes pandas try Timedelta+float arithmetic
-    internally and raises "unsupported operand type(s) for +: 'Timedelta'
-    and 'float'". When time_sec is already a Timedelta we use it as-is;
-    otherwise we coerce to float first and apply unit="s" as before.
-    """
-    ts = df["time_sec"]
-    if pd.api.types.is_timedelta64_dtype(ts):
-        df["datetime"] = base_dt + ts
-    else:
-        df["datetime"] = base_dt + pd.to_timedelta(ts.astype(float), unit="s")
-    return df
-
-
-def check_monthly_sanity(
-    dt,
-    month_stats: dict,
-    psi_month_df,
-    sw_month_df,
-    df_et,
-    df_rec,
-    t_month,
-    idx_month,
-    ETp_nodes,
-    rain_nodes,
-    sw_tol: float = SW_TOL,
-    psi_sanity_min: float = PSI_SANITY_MIN,
-    eta_tol: float = ETA_TOL,
-    wb_residual_frac: float = WB_RESIDUAL_FRAC,
-) -> list[str]:
-    """
-    Run cheap physical-bounds and (approximate) water-balance sanity
-    checks on one month's outputs. Fills diagnostic fields into
-    `month_stats` in place and returns a list of human-readable warning
-    strings (empty if nothing looked off). Never raises — a check that
-    can't be computed for this month (missing data, unexpected columns)
-    is silently skipped rather than aborting the run.
-
-    Water-balance note
-    -------------------
-    The residual is rain_in − ETa_out − recharge_out only: it does NOT
-    account for the change in subsurface storage (ΔS), because that
-    would require per-node porosity and control-volume information not
-    readily available here. So this is not a strict mass-balance
-    closure — treat a large residual as "worth checking the psi/sw
-    trend for this month", not as proof of a bug on its own. It also
-    assumes the 'recharge' output column(s) are in the same units
-    (m/s) as ETa/rain; if your CATHY build reports recharge in
-    different units, `recharge_out_mm` below will be wrong and should
-    be ignored.
-    """
-    warnings: list[str] = []
-
-    # ── Physical bounds: SW should stay within [0, 1] ──
-    if sw_month_df is not None and len(sw_month_df):
-        sw_vals = sw_month_df["sw"].to_numpy(dtype=float)
-        n_bad = int(((sw_vals < -sw_tol) | (sw_vals > 1 + sw_tol)).sum())
-        month_stats["sw_out_of_bounds_n"] = n_bad
-        if n_bad:
-            warnings.append(
-                f"{dt:%Y-%m}: {n_bad} SW value(s) outside [0,1] "
-                f"(range [{sw_vals.min():.3f}, {sw_vals.max():.3f}])."
-            )
-
-    # ── Physical bounds: PSI shouldn't be sitting at extreme drying values ──
-    if psi_month_df is not None and len(psi_month_df):
-        psi_vals = psi_month_df["psi"].to_numpy(dtype=float)
-        n_extreme = int((psi_vals < psi_sanity_min).sum())
-        month_stats["psi_extreme_n"] = n_extreme
-        if n_extreme:
-            warnings.append(
-                f"{dt:%Y-%m}: {n_extreme} PSI value(s) below sanity threshold "
-                f"{psi_sanity_min:.0f} m (min {psi_vals.min():.2f} m)."
-            )
-
-    # ── Physical bounds: ETa should not exceed ETp ──
-    if (df_et is not None and len(df_et) and t_month is not None and len(t_month)
-            and ETp_nodes is not None and idx_month is not None and len(idx_month)):
-        try:
-            t_month_arr = np.asarray(t_month, dtype=float)
-            tsec = df_et["time_sec"].to_numpy(dtype=float)
-            i_right  = np.clip(np.searchsorted(t_month_arr, tsec), 0, len(t_month_arr) - 1)
-            i_left   = np.clip(i_right - 1, 0, len(t_month_arr) - 1)
-            use_left = np.abs(t_month_arr[i_left] - tsec) < np.abs(t_month_arr[i_right] - tsec)
-            i_time   = np.where(use_left, i_left, i_right)
-
-            node_idx = df_et["SURFACE NODE"].to_numpy(dtype=int)
-            n_surf   = ETp_nodes.shape[1]
-            if node_idx.max() == n_surf:
-                node_idx = node_idx - 1
-
-            rows     = idx_month[i_time]
-            etp_vals = ETp_nodes[rows, node_idx]
-            eta_col  = "ACT. ETRA_patched" if "ACT. ETRA_patched" in df_et.columns else "ACT. ETRA"
-            eta_vals = df_et[eta_col].to_numpy(dtype=float)
-
-            n_exceed = int((eta_vals > etp_vals + eta_tol).sum())
-            month_stats["eta_exceeds_etp_n"] = n_exceed
-            if n_exceed:
-                max_excess = float((eta_vals - etp_vals).max())
-                warnings.append(
-                    f"{dt:%Y-%m}: {n_exceed} ETa value(s) exceed ETp "
-                    f"(max excess {max_excess:.3e} m/s)."
-                )
-        except Exception:
-            pass  # sanity check itself must never break the run
-
-    # ── Water balance: rain_in vs ETa_out vs recharge_out (flux-only) ──
-    rain_in_mm = eta_out_mm = recharge_out_mm = None
-
-    if rain_nodes is not None and idx_month is not None and len(idx_month):
-        rain_in_mm = float((rain_nodes[idx_month].mean(axis=1) * 86400 * 1000).sum())
-        month_stats["rain_in_mm"] = rain_in_mm
-
-    if df_et is not None and len(df_et):
-        eta_col = "ACT. ETRA_patched" if "ACT. ETRA_patched" in df_et.columns else "ACT. ETRA"
-        if eta_col in df_et.columns:
-            eta_by_time = df_et.groupby("time_sec")[eta_col].mean()
-            eta_out_mm = float((eta_by_time * 86400 * 1000).sum())
-            month_stats["eta_out_mm"] = eta_out_mm
-
-    if df_rec is not None and len(df_rec):
-        rec_value_cols = [c for c in df_rec.select_dtypes(include=[np.number]).columns
-                           if c not in ("X", "Y", "time_sec")]
-        if rec_value_cols:
-            rec_by_time = df_rec.groupby("time_sec")[rec_value_cols].mean().mean(axis=1)
-            recharge_out_mm = float((rec_by_time * 86400 * 1000).sum())
-            month_stats["recharge_out_mm"] = recharge_out_mm
-
-    if rain_in_mm is not None and eta_out_mm is not None and recharge_out_mm is not None:
-        residual_mm = rain_in_mm - eta_out_mm - recharge_out_mm
-        month_stats["water_balance_residual_mm"] = residual_mm
-        if rain_in_mm > 1e-6 and abs(residual_mm) > wb_residual_frac * rain_in_mm:
-            warnings.append(
-                f"{dt:%Y-%m}: water balance residual {residual_mm:.1f} mm "
-                f"(rain {rain_in_mm:.1f}, ETa {eta_out_mm:.1f}, "
-                f"recharge {recharge_out_mm:.1f}) — large relative to rain "
-                f"input. Excludes storage change (ΔS); also check the "
-                f"psi/sw trend for this month before assuming a bug."
-            )
-
-    return warnings
 
 
 # ── Spin-up (pre-2016 equilibration) ────────────────────────────────────────
