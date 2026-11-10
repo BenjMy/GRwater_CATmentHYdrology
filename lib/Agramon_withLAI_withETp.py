@@ -47,7 +47,9 @@ Forcing switch (``--forcing``, default set by FORCING_MODE below)
 
 import argparse
 import warnings
+from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -1522,11 +1524,33 @@ def run_spinup(
 
 # ── Main pipeline ─────────────────────────────────────────────────────────────
 
-def run_pipeline(args: argparse.Namespace) -> None:
-    """Execute the full pyCATHY + LAI + ETp simulation pipeline."""
+@dataclass(frozen=True)
+class RunInputs:
+    """Everything ``run_pipeline`` needs from ``setup_inputs``."""
+    show_plots: bool
+    dem_tif_path: Path
+    feddes: dict
+    gdf_Agramon: Any        # GeoDataFrame, micro-catchment polygons
+    ds_LAI: Any             # xarray.Dataset, monthly LAI
+    ds_rain: Any            # xarray.Dataset or None (ERA5 mode)
+    ds_etp: Any             # xarray.Dataset or None (ERA5 mode)
+    ds_era5: Any            # xarray.Dataset or None (ETp modes)
+    etp_ts_fid: Any         # treatment id used in "etp_ts" mode
+    scenario_dirname: str
+    md_log: MarkdownLog
 
-    apply_forcing_mode(args.forcing)
 
+def setup_inputs(args: argparse.Namespace) -> RunInputs:
+
+    """
+    Steps [1/9]-[3/9] of the pipeline: resolve labels and the run banner,
+    load shapefiles, forcing and LAI, log the simulation (CSV + markdown).
+
+    Moved verbatim out of ``run_pipeline``. It stays in this module (not in
+    ``agramon_*.py``) because it reads ``FORCING_MODE`` / ``USE_ETP_*``,
+    which ``apply_forcing_mode`` sets as globals of this module (see
+    REFACTORING.md 2.13). ``apply_forcing_mode`` must be called first.
+    """
     show_plots = not args.no_plots
 
     # ── 1. Resolve DEM source ─────────────────────────────────
@@ -1706,6 +1730,39 @@ def run_pipeline(args: argparse.Namespace) -> None:
         "CSV run registry": str(log_path),
         "sim_index": sim_index,
     })
+
+    return RunInputs(
+        show_plots=show_plots,
+        dem_tif_path=dem_tif_path,
+        feddes=feddes,
+        gdf_Agramon=gdf_Agramon,
+        ds_LAI=ds_LAI,
+        ds_rain=ds_rain,
+        ds_etp=ds_etp,
+        ds_era5=ds_era5,
+        etp_ts_fid=etp_ts_fid,
+        scenario_dirname=scenario_dirname,
+        md_log=md_log,
+    )
+
+
+def run_pipeline(args: argparse.Namespace) -> None:
+    """Execute the full pyCATHY + LAI + ETp simulation pipeline."""
+
+    apply_forcing_mode(args.forcing)
+
+    inp = setup_inputs(args)
+    show_plots       = inp.show_plots
+    dem_tif_path     = inp.dem_tif_path
+    feddes           = inp.feddes
+    gdf_Agramon      = inp.gdf_Agramon
+    ds_LAI           = inp.ds_LAI
+    ds_rain          = inp.ds_rain
+    ds_etp           = inp.ds_etp
+    ds_era5          = inp.ds_era5
+    etp_ts_fid       = inp.etp_ts_fid
+    scenario_dirname = inp.scenario_dirname
+    md_log           = inp.md_log
 
     # ── 5. DEM ────────────────────────────────────────────────
     print("\n[4/9] Loading and masking DEM …")

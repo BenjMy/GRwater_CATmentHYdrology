@@ -42,7 +42,7 @@ If the branch tip is not the commit the user expects, ask before continuing. The
 ## 2. Phase 2 — structure
 
 ### 2.1 Module extraction ✅
-`Agramon_withLAI_withETp.py` went from **3,901 to 2,610 lines** (2,683 after the first module split). Moved verbatim into sibling modules (same folder, imported by name like `Agramon_utils`):
+`Agramon_withLAI_withETp.py` went from **3,901 to 2,656 lines** (2,683 after the first module split; 2,610 after the outputs extraction; the +46 since then is the new `setup_inputs`/`RunInputs` wrapper code and docstrings). Moved verbatim into sibling modules (same folder, imported by name like `Agramon_utils`):
 
 | New module | Contents |
 |---|---|
@@ -58,7 +58,7 @@ The main script imports these names, so `from Agramon_withLAI_withETp import loa
 ### 2.2 Still to do
 | # | Task | Status |
 |---|---|---|
-| 2.2 | **Split `run_pipeline`** (was 1,155 lines, now ~1,075) into steps: `setup_inputs`, `setup_mesh_and_dem`, `build_atmbc`, `configure_model`, `run_monthly_loop`, `save_outputs`; pass state in a small dataclass instead of ~160 locals. See "2.2 progress" below | 🟡 map done, step 1 of 6 extracted |
+| 2.2 | **Split `run_pipeline`** (was 1,155 lines, now ~900) into steps: `setup_inputs`, `setup_mesh_and_dem`, `build_atmbc`, `configure_model`, `run_monthly_loop`, `save_outputs`; pass state in a small dataclass instead of ~160 locals. See "2.2 progress" below | 🟡 map done, 2 of 6 steps extracted (`save_outputs` closure, `setup_inputs`) |
 | 2.3 | Move DEM / mesh / BC code (`load_dem_from_tif`, `smooth_dem`, `setup_dem`, `configure_boundary_conditions`, `initialise_project`) to `agramon_mesh.py`. Keep a re-export in the main script because `withLAI_results.py` imports `load_dem_from_tif` from it | ⬜ |
 | 2.4 | Replace machine auto-detection in `agramon_config.py` (home-directory username check, hard-coded Nextcloud paths) with environment variables or a config file | ⬜ |
 | 2.5 | Move `run_spinup` / `pick_default_spinup_year` to `agramon_spinup.py` | ⬜ |
@@ -76,7 +76,7 @@ Boundaries follow the `[n/9]` banners and numbered comments in the code, so they
 
 | Step | Covers | Status |
 |---|---|---|
-| `setup_inputs` | config/banner, `[1/9]`–`[3/9]`: shapefiles, forcing + LAI loading, run logging | ⬜ |
+| `setup_inputs` | config/banner, `[1/9]`–`[3/9]`: shapefiles, forcing + LAI loading, run logging. Returns a frozen `RunInputs` dataclass (11 fields). Stays in the main script for now: it reads `FORCING_MODE`/`USE_ETP_*`, module globals set by `apply_forcing_mode` (see 2.13) | ✅ |
 | `setup_mesh_and_dem` | `[4/9]`–`[7/9]`: DEM load/mask/smooth, project init, mesh, preprocessor | ⬜ |
 | `build_atmbc` | `[8/9]`: ETp/rain mapped to surface nodes, net flux, forcing diagnostics (~130 lines) | ⬜ |
 | `configure_model` | BCs and IC, LAI interpolation to the DEM grid, spin-up | ⬜ |
@@ -87,6 +87,8 @@ Findings from the map:
 - `save_combined_outputs` was a closure over ten names. Each is bound exactly once in `run_pipeline` (lists/dicts mutated in place), so passing them as arguments is behaviour-preserving.
 - The LAI-interpolation block contains leftover debug prints (raw LAI patch shape, NaN counts, a per-`fid_1` loop). They only write to stdout. ✅ Decided: kept behind a new `--debug` flag (off by default); a commented-out variant of the same checks was removed. Note that `run_scenarii_withETp_withLAI_ALL.sh` does not forward `--debug`; call the Python script directly to use it.
 - The monthly loop assigns/reads ~60 locals; most of the shared state is `simu`, `ds_mesh`, `ETp_nodes`/`rain_nodes`, `t_atmbc`/`net_flux`, `valid_times`, the `*_records` lists and `out_dir`. These are the candidates for the `RunState` dataclass.
+
+Check for step `setup_inputs`: the moved block (38 statements) is AST-identical to the original, and so is the rest of `run_pipeline` (79 statements); the only additions are `setup_inputs`/`RunInputs` and 12 lines in `run_pipeline` (`inp = setup_inputs(args)` plus 11 aliases, so the rest of the function stays verbatim). `setup_inputs` was also run with the loaders stubbed in the three forcing modes (`etp`, `etp_ts`, `era5`): `RunInputs` is filled as expected (ERA5 mode has `ds_etp`/`ds_rain` = None, ETp modes have `ds_era5` = None). `df_et` stays local to `setup_inputs`: later code reassigns it before reading it. A real simulation was not run.
 
 Check for step `save_outputs` (closure): the original closure (from the previous commit) and `agramon_outputs.save_combined_outputs` were run on the same synthetic data and produced identical files (`xarray.testing.assert_identical` for the NetCDF files, byte-equal CSV, equal pickle), including the empty-state case. A real simulation was not run.
 
