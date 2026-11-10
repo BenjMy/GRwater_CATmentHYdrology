@@ -6,7 +6,19 @@ Legend: ✅ done · 🟡 partly done · ⬜ not started · ❓ decision needed
 
 ---
 
-## 0. Rules for this refactoring
+## 0. Branch and rules for this refactoring
+
+**Working branch:** `refactor-agramon-modules` of `https://github.com/BenjMy/GRwater_CATmentHYdrology` (not `main`; `main` still has the 3,901-line original). It holds the WIP baseline commit and the Phase 1–2 refactor commit.
+
+**Rule for Claude, every conversation:** at the start of every conversation about this repository, before reading or editing any code, clone the repository and check out the working branch. Do not rely on `main`, on files from earlier chats, or on memory of the code.
+
+```bash
+GIT_LFS_SKIP_SMUDGE=1 git clone --depth 1 --branch refactor-agramon-modules \
+    https://github.com/BenjMy/GRwater_CATmentHYdrology
+git log --oneline -3     # confirm the expected tip before working
+```
+
+If the branch tip is not the commit the user expects, ask before continuing. The session clone is read-only: changes are delivered as patches (`git am`), one commit per step. `Agramon_utils.py` must be committed on the branch for Claude to import and smoke-test the main script.
 
 1. **Behaviour-preserving first.** Phases 1 and 2 must not change any simulation result. Behaviour changes (Ks wiring, withIrr rain forcing, ERA5 removal) are kept in Phase 3 and are made one at a time.
 2. **Move code verbatim**, then clean. A moved function must be AST-identical to the original unless the change is listed below.
