@@ -1,0 +1,2 @@
+period,eta_mm,recharge_mm,rain_mm,etp_mm,start,phase,eta_over_etp,recharge_over_rain
+2020-H1,477.3304052307026,0.0,283.045416675508,477.3303784132004,2020-01-01,pre,1.0000000561822657,0.0

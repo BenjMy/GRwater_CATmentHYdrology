@@ -62,7 +62,7 @@ Referenced in the code but **not in this upload** (check they are in the repo): 
 
 ## 3. Simulation pipeline (`Agramon_withLAI_withETp.py`)
 
-> **Code structure (work in progress).** `run_pipeline` is being split into steps (`REFACTORING.md` §2.2). So far: steps 1–3 below are in `setup_inputs(args)` (returns a `RunInputs` dataclass) and the running output files are written by `agramon_outputs.save_combined_outputs`. The behaviour is unchanged; the other steps are still inline in `run_pipeline`.
+> **Code structure (work in progress).** `run_pipeline` is being split into steps (`REFACTORING.md` §2.2). So far: steps 1–3 below are in `setup_inputs(args)` (returns a `RunInputs` dataclass), step 4 (DEM, project, mesh, preprocessor) is in `setup_mesh_and_dem(args, inp)` (returns a `MeshSetup` dataclass), step 5 (ATMBC forcing arrays) is in `build_atmbc(args, inp, ms)` (returns an `AtmbcSetup` dataclass), and the running output files are written by `agramon_outputs.save_combined_outputs`. The behaviour is unchanged; the other steps are still inline in `run_pipeline`.
 
 1. Resolve the DEM source (GeoTIFF, `--dem-tif`) and log the simulation parameters (CSV + markdown log).
 2. Load the shapefiles (13 micro-catchments, index = `fid_1`, selected with `--dem-plot 1..13`).

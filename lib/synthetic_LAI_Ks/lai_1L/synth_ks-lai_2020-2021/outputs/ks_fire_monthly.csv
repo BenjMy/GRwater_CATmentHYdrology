@@ -1,4 +1,0 @@
-month,lai_mean,lai_driver,lai_min,lai_max,permx_m_s,permx_mm_hr,permx_deep_m_s,permx_deep_mm_hr,ks_changed,ks_delta_pct,veg_zones,veg_zones_changed,readback_permx_m_s,readback_top_m_s,readback_deep_m_s
-2020-01-01,1.65,1.0,1.4849999999999999,1.815,1.2166666666666665e-05,43.8,,,True,,"[2, 3]",False,1.2166666666666667e-05,,
-2020-02-01,2.0,1.0,1.8,2.2,1.2166666666666665e-05,43.8,,,False,0.0,"[3, 4]",True,1.2166666666666667e-05,,
-2020-03-01,2.35,1.0,2.1149999999999998,2.585,1.2166666666666665e-05,43.8,,,False,0.0,"[4, 5]",True,1.2166666666666667e-05,,

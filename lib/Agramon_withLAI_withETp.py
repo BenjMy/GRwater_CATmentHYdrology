@@ -1746,21 +1746,35 @@ def setup_inputs(args: argparse.Namespace) -> RunInputs:
     )
 
 
-def run_pipeline(args: argparse.Namespace) -> None:
-    """Execute the full pyCATHY + LAI + ETp simulation pipeline."""
+@dataclass(frozen=True)
+class MeshSetup:
+    """Everything ``run_pipeline`` needs from ``setup_mesh_and_dem``."""
+    simu: Any               # pyCATHY.CATHY project (preprocessor already run)
+    raster_DEM: Any         # xarray.DataArray, DEM clipped to the catchment bbox
+    raster_DEM_masked: Any  # np.ndarray, DEM with NaN outside the catchment
+    xllcorner: float
+    yllcorner: float
+    res_x: float
+    res_y: float
+    grid3d: dict            # freshly read grid3d (see the n_surf note in the ATMBC step)
+    N: int                  # grid rows
+    M: int                  # grid columns
 
-    apply_forcing_mode(args.forcing)
 
-    inp = setup_inputs(args)
+def setup_mesh_and_dem(args: argparse.Namespace, inp: RunInputs) -> MeshSetup:
+    """
+    Steps [4/9]-[7/9] of the pipeline: load/mask/smooth the DEM, check CRS
+    alignment, initialise the CATHY project, feed the DEM into it, and run
+    the CATHY preprocessor.
+
+    Moved verbatim out of ``run_pipeline``. It stays in this module because
+    ``setup_dem`` / ``initialise_project`` / ``load_dem_from_tif`` live here
+    until step 2.3 (``agramon_mesh.py``).
+    """
     show_plots       = inp.show_plots
     dem_tif_path     = inp.dem_tif_path
-    feddes           = inp.feddes
     gdf_Agramon      = inp.gdf_Agramon
     ds_LAI           = inp.ds_LAI
-    ds_rain          = inp.ds_rain
-    ds_etp           = inp.ds_etp
-    ds_era5          = inp.ds_era5
-    etp_ts_fid       = inp.etp_ts_fid
     scenario_dirname = inp.scenario_dirname
     md_log           = inp.md_log
 
@@ -1831,6 +1845,64 @@ def run_pipeline(args: argparse.Namespace) -> None:
     M = int(simu.hapin["M"])
     print(f"  Grid : {N} rows × {M} cols")
     md_log.bullet(f"Grid: {N} rows × {M} cols")
+
+    return MeshSetup(
+        simu=simu,
+        raster_DEM=raster_DEM,
+        raster_DEM_masked=raster_DEM_masked,
+        xllcorner=xllcorner,
+        yllcorner=yllcorner,
+        res_x=res_x,
+        res_y=res_y,
+        grid3d=grid3d,
+        N=N,
+        M=M,
+    )
+
+
+@dataclass(frozen=True)
+class AtmbcSetup:
+    """Everything ``run_pipeline`` needs from ``build_atmbc``."""
+    ds_mesh: Any            # xarray.Dataset, mesh nodes (x, y, z) built from the DEM
+    n_surf: Any             # int, surface node count; None in ERA5 mode
+    ETp_nodes: Any          # ndarray (time, n_surf) in m/s; None in ERA5 mode
+    rain_nodes: Any         # ndarray (time, n_surf) in m/s; None in ERA5 mode
+    net_flux: Any           # ndarray (time,) scalar mean net flux (rain - ETp)
+    t_atmbc: Any            # seconds since the first forcing step
+    valid_times: Any        # datetime64 time axis of the forcing
+
+
+def build_atmbc(args: argparse.Namespace, inp: RunInputs,
+                ms: MeshSetup) -> AtmbcSetup:
+    """
+    Step [8/9] of the pipeline: build the mesh dataset, map ETp and rain to
+    the surface nodes (or read the ERA5 point series), and build the ATMBC
+    forcing arrays.
+
+    Moved verbatim out of ``run_pipeline``. It stays in this module because
+    it reads ``USE_ETP_FORCING`` / ``USE_ETP_TS_FORCING`` (module globals set
+    by ``apply_forcing_mode``, see REFACTORING.md 2.13) and calls
+    ``save_forcing_diagnostics``.
+
+    ``ETp_nodes``, ``rain_nodes`` and ``n_surf`` are only bound by the ETp
+    branch. In ERA5 mode the original code left them unbound (and every later
+    read is guarded by ``USE_ETP_FORCING``); here they are ``None`` so they
+    can be returned.
+    """
+    show_plots        = inp.show_plots
+    gdf_Agramon       = inp.gdf_Agramon
+    ds_rain           = inp.ds_rain
+    ds_etp            = inp.ds_etp
+    ds_era5           = inp.ds_era5
+    etp_ts_fid        = inp.etp_ts_fid
+    md_log            = inp.md_log
+    simu              = ms.simu
+    grid3d            = ms.grid3d
+    raster_DEM_masked = ms.raster_DEM_masked
+
+    ETp_nodes  = None
+    rain_nodes = None
+    n_surf     = None
 
     # ── 9. Build ATMBC forcing arrays ─────────────────────────
     print("\n[8/9] Building ATMBC forcing arrays …")
@@ -1973,6 +2045,52 @@ def run_pipeline(args: argparse.Namespace) -> None:
             "ATMBC steps (ERA5)": len(t_atmbc),
             "Net flux range (m)": f"[{net_flux.min():.2e}, {net_flux.max():.2e}]",
         })
+
+    return AtmbcSetup(
+        ds_mesh=ds_mesh,
+        n_surf=n_surf,
+        ETp_nodes=ETp_nodes,
+        rain_nodes=rain_nodes,
+        net_flux=net_flux,
+        t_atmbc=t_atmbc,
+        valid_times=valid_times,
+    )
+
+
+def run_pipeline(args: argparse.Namespace) -> None:
+    """Execute the full pyCATHY + LAI + ETp simulation pipeline."""
+
+    apply_forcing_mode(args.forcing)
+
+    inp = setup_inputs(args)
+    feddes           = inp.feddes
+    gdf_Agramon      = inp.gdf_Agramon
+    ds_LAI           = inp.ds_LAI
+    ds_rain          = inp.ds_rain
+    ds_etp           = inp.ds_etp
+    scenario_dirname = inp.scenario_dirname
+    md_log           = inp.md_log
+
+    # ── [4/9]–[7/9] DEM, CATHY project, mesh, preprocessor ────
+    ms = setup_mesh_and_dem(args, inp)
+    simu              = ms.simu
+    raster_DEM        = ms.raster_DEM
+    raster_DEM_masked = ms.raster_DEM_masked
+    res_x             = ms.res_x
+    res_y             = ms.res_y
+    grid3d            = ms.grid3d
+    N                 = ms.N
+    M                 = ms.M
+
+    # ── [8/9] ATMBC forcing arrays ────────────────────────────
+    atm = build_atmbc(args, inp, ms)
+    ds_mesh     = atm.ds_mesh
+    n_surf      = atm.n_surf
+    ETp_nodes   = atm.ETp_nodes
+    rain_nodes  = atm.rain_nodes
+    net_flux    = atm.net_flux
+    t_atmbc     = atm.t_atmbc
+    valid_times = atm.valid_times
 
     # ── 10. ICs, BCs ──────────────────────────────────────────
     # FIX: set ICs once here; BCs are built once, up front.

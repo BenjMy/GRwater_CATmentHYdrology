@@ -1,0 +1,16 @@
+{
+  "scenario": "synth_ks-off_2020-2021",
+  "mode": "off",
+  "two_layers": false,
+  "failed_months": [],
+  "complete": false,
+  "months_simulated": 9,
+  "months_planned": 24,
+  "fire_date": "2020-07-01 00:00:00",
+  "rech_var": "recharge",
+  "depth_actual_m": {
+    "0": 0.0,
+    "1": 1.1403787954648525,
+    "2": 1.7405781956916095
+  }
+}
