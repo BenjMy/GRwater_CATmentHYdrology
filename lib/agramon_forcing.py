@@ -19,7 +19,7 @@ import numpy as np
 import pandas as pd
 import xarray as xr
 
-import Agramon_utils as AgUtils
+from utils import Agramon_utils as AgUtils
 from agramon_config import (
     EO_PATH,
     ETP_TS_COLUMN_DEFAULT,

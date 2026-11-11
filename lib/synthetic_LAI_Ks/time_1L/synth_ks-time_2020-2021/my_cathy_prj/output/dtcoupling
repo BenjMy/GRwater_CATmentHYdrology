@@ -1,0 +1,4 @@
+#                  ***** Surface vs subsurface diagnostics ***** 
+#NNOD    (# of surface nodes)            =    441
+#NCELL   (# of DEM cells)                =    400
+#AREATOT (total catchment surface area)  =     4.00000E+02

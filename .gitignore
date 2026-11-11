@@ -2,6 +2,7 @@
 * text=auto
 SSHydro_withETp_withLAI
 SSHydro
+lib/test_validation_tomas/*.nc
 
 # Python bytecode
 __pycache__/

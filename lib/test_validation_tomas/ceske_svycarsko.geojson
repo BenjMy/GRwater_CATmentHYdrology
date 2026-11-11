@@ -1,0 +1,25 @@
+{
+    "crs": { "type": "name", "properties": { "name": "urn:ogc:def:crs:EPSG::32633" } },
+    "type": "Feature", 
+    "properties": {
+        "name": "CeskeSvycarsko",
+        "output_dir": "./tseb",
+        "time_start": "2016-01-01",
+        "time_end": "2025-12-31",
+        "parallel_jobs": 13,
+        "compositing_period": 10,
+        "use_CAMS_forecasts": false,
+        "use_CorineLandCover": true,
+        "output_crs": "EPSG:32633"
+        },
+    "geometry": { 
+        "type": "Polygon", 
+        "coordinates":  [ [ 
+            [ 443925.0, 5631855.0 ], 
+            [ 443925.0, 5641875.0 ], 
+            [ 456165.0, 5641875.0 ], 
+            [ 456165.0, 5631855.0 ], 
+            [ 443925.0, 5631855.0 ] ] ]  
+        } 
+    }
+

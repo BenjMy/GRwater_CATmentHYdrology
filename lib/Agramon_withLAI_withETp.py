@@ -111,7 +111,7 @@ def apply_forcing_mode(mode: str) -> None:
 
 
 
-import Agramon_utils as AgUtils
+from utils import Agramon_utils as AgUtils
 from pyCATHY import cathy_tools, cathy_utils
 from pyCATHY.petro import Feddes_litterature  # literature-based Feddes lookup
 
