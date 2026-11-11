@@ -135,6 +135,28 @@ python scenario.py --compare-only
 python scenario.py --compare-only --compare-exclude lai_2L_wetIC deep_wt
 ```
 
+### Wetter forcing and initial condition (`--wet`)
+
+With the default forcing (rain ~1-3 mm/day against ETp 1-4.5 mm/day) and a uniform initial
+head of -15 m, the soil stays dry and Ks has almost nothing to act on. `--wet` appends
+
+```
+--rain-scale 3 --ic-head -1 --pmin -15 --eta-net-neg-mode gross
+```
+
+to every run (before the scenario's own arguments and `--extra`, so both can override it) and
+writes to its own root, `../synthetic_LAI_Ks_wet`, so the controls match. Never mix wet and
+normal runs in the same root.
+
+```bash
+python scenario.py --wet --only control control_2L lai_2L time_2L
+python scenario.py --wet --extra --rain-scale 5 --ic-head -0.5     # even wetter
+```
+
+`--rain-scale X` / `--etp-scale X` (single-run script) multiply the daily forcing; the run
+prints the resulting annual rain and ETp. The default period is now 2020-2023
+(`--end-year 2024`, 3.5 years after the 2020-07-01 fire).
+
 ### Arguments for every run (`--extra`)
 
 Everything after `--extra` is appended to the command of **every** scenario. It goes last,

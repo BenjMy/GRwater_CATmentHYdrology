@@ -728,6 +728,10 @@ def _parse_args(argv=None) -> argparse.Namespace:
     p.add_argument("--eta-net-neg-mode", choices=["etp", "gross", "off"], default="etp")
     p.add_argument("--etp-file", default=str(PATH_ET / "20161001_20241231_ET0.nc"))
     p.add_argument("--rain-file", default=str(PATH_ET / "20161001_20241231_TP.nc"))
+    p.add_argument("--rain-scale", type=float, default=1.0, metavar="X",
+                   help="multiply the daily rain forcing by X (wetter/drier test; 1 = as read)")
+    p.add_argument("--etp-scale", type=float, default=1.0, metavar="X",
+                   help="multiply the daily ETp forcing by X (1 = as read)")
     p.add_argument("--dtmin", type=float, default=1e-3)
     p.add_argument("--dtmax", type=float, default=1e3)
     p.add_argument("--deltat", type=float, default=1e2)
@@ -1002,6 +1006,11 @@ def run_pipeline(args: argparse.Namespace) -> None:
     print("[1/6] Forcing …")
     etp_mmd, rain_mmd = load_forcing_series(
         args.start_year, args.end_year, args.etp_file, args.rain_file)
+    etp_mmd, rain_mmd = etp_mmd * args.etp_scale, rain_mmd * args.rain_scale
+    _yrs = max((etp_mmd.index[-1] - etp_mmd.index[0]).days + 1, 1) / 365.25
+    print(f"  Forcing: {len(etp_mmd)} days | rain x{args.rain_scale:g} = "
+          f"{rain_mmd.sum() / _yrs:.0f} mm/yr | ETp x{args.etp_scale:g} = "
+          f"{etp_mmd.sum() / _yrs:.0f} mm/yr | max daily rain {rain_mmd.max():.1f} mm/d")
     valid_times = etp_mmd.index.to_numpy()
     t_atmbc = ((valid_times - valid_times[0]) / np.timedelta64(1, "s")).astype(float)
     etp_ms = etp_mmd.to_numpy() * 1e-3 / 86400

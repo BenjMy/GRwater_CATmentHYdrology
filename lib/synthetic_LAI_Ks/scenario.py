@@ -29,6 +29,7 @@ Usage
     python scenario.py --no-plots --extra --dtmin 1e-4 --deltat 10
     python scenario.py --config my_scenarios.toml    # add/override scenarios (see below)
     python scenario.py --compare-only                # skip the runs, only compare
+    python scenario.py --wet --only control control_2L lai_2L   # wetter forcing + IC
 
 Custom scenarios (--config, .toml or .json)
 -------------------------------------------
@@ -57,6 +58,14 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 RUN_SCRIPT = HERE / "synthetic_ksfire_LAI.py"
 ANALYSIS_SCRIPT = HERE / "synthetic_ksfire_analysis.py"
+
+# "wetter world" preset (--wet): wetter forcing and initial condition, so that rain
+# actually reaches the soil and ETa can be limited by soil water. Applied BEFORE the
+# scenario's own args and --extra, so both can override it.
+WET_ARGS = ["--rain-scale", "3", "--ic-head", "-1", "--pmin", "-15",
+            "--eta-net-neg-mode", "gross"]
+WET_ROOT = Path("../synthetic_LAI_Ks_wet")
+DEFAULT_ROOT = Path("../synthetic_LAI_Ks")
 
 EXIT_PARTIAL = 3     # same codes as synthetic_ksfire_LAI.py
 EXIT_NO_OUTPUT = 2
@@ -183,6 +192,8 @@ def build_command(sc: Scenario, root: Path, a: argparse.Namespace) -> list[str]:
         cmd.append("--no-resume")
     if a.debug:
         cmd.append("--debug")
+    if a.wet:
+        cmd += WET_ARGS     # wetter forcing + IC (scenario args and --extra can override)
     cmd += sc.args          # scenario-specific
     cmd += a.extra          # global overrides last, so they win (argparse: last value wins)
     return cmd
@@ -253,10 +264,16 @@ def _parse_args(argv=None) -> argparse.Namespace:
     p.add_argument("--dry-run", action="store_true", help="print the commands, run nothing")
     p.add_argument("--config", type=Path, default=None,
                    help=".toml/.json file with extra or overriding scenarios")
-    p.add_argument("--root", type=Path, default=Path("../synthetic_LAI_Ks"),
-                   help="root folder: one sub-folder per scenario, plus _comparison/")
+    p.add_argument("--root", type=Path, default=None,
+                   help=f"root folder: one sub-folder per scenario, plus _comparison/ "
+                        f"(default {DEFAULT_ROOT}, or {WET_ROOT} with --wet)")
+    p.add_argument("--wet", action="store_true",
+                   help="wetter forcing and initial condition: "
+                        + " ".join(WET_ARGS) + ". Uses its own root so the controls "
+                        "match (never mix wet and normal runs in one root)")
     p.add_argument("--start-year", type=int, default=2020)
-    p.add_argument("--end-year", type=int, default=2022, help="exclusive")
+    p.add_argument("--end-year", type=int, default=2024,
+                   help="exclusive (2024 -> simulates 2020-2023, 3.5 yr after the fire)")
     p.add_argument("--dpi", type=int, default=150)
     p.add_argument("--no-plots", action="store_true")
     p.add_argument("--no-resume", action="store_true",
@@ -291,7 +308,7 @@ def main(argv=None) -> int:
             print(f"{'':<20}args: {' '.join(s.args)}")
         return 0
 
-    root = a.root.expanduser().resolve()
+    root = (a.root or (WET_ROOT if a.wet else DEFAULT_ROOT)).expanduser().resolve()
 
     if a.compare_only:
         return compare(root, a)
