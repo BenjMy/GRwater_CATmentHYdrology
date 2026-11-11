@@ -1007,7 +1007,6 @@ def run_pipeline(args: argparse.Namespace) -> None:
     etp_ms = etp_mmd.to_numpy() * 1e-3 / 86400
     rain_ms = rain_mmd.to_numpy() * 1e-3 / 86400
     net_flux = rain_ms - etp_ms
-    net_flux = np.zeros(len(net_flux))
 
     # 2. Synthetic LAI + Ks config -------------------------------------------
     shape = (args.n, args.n)
