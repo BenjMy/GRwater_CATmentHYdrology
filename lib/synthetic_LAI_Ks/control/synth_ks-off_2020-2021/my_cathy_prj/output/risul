@@ -5,7 +5,7 @@
      PONDH_MIN (MIN. PONDING HEAD)           =     0.00000E+00
      IPRT1  (FOR OUTPUT OF INPUT DATA)       =      2
      IPRT   (FOR ELEM VEL & DET NODAL OUTPUT)=      4
-     NPRT   (# OF TIME VALUES FOR DET OUTPUT)=     30
+     NPRT   (# OF TIME VALUES FOR DET OUTPUT)=     31
      NUMVP  (# OF SURF NODES FOR VP OUTPUT)  =      1
      NR     (# OF NODES FOR PARTIAL OUTPUT)  =      0
 
@@ -42,7 +42,7 @@
      DELTAT (INITIAL TIME STEP SIZE)         =     1.00000E+02
      DTMIN  (MINIMUM TIME STEP SIZE)         =     1.00000E-03
      DTMAX  (MAXIMUM TIME STEP SIZE)         =     1.00000E+03
-     TMAX   (TIME AT END OF SIMULATION)      =     2.50560E+06
+     TMAX   (TIME AT END OF SIMULATION)      =     2.59200E+06
      DTMAGA (MAG. FACTOR FOR DELTAT, ADD.)   =     0.00000E+00
      DTMAGM (MAG. FACTOR FOR DELTAT, MULT.)  =     1.10000E+00
      DTREDS (RED. FACTOR FOR DELTAT, SUB.)   =     0.00000E+00
@@ -65016,18 +65016,18 @@
    0.000E+00    0.000E+00   -1.39258E-15 |   1.39257662E-15     0.0000000000E+00
 
 
-      TIME STEP:     2520    DELTAT:   8.8265E+02    TIME:   2.5047E+06
+      TIME STEP:     2520    DELTAT:   1.0000E+03    TIME:   2.5048E+06
      ******************************************************************
 
 
       LINEAR SOLVER CONVERGENCE BEHAVIOR
  iter       residual  real residual
-    1   4.245143E-32   8.268678E-17  <<SYMMETRIC SOLVER>>
+    1   4.107390E-32   6.471146E-17  <<SYMMETRIC SOLVER>>
 
                      NONLINEAR CONVERGENCE BEHAVIOR 
  iter- convergence error norms  node    PNEW at    POLD at  residual error norms
  ation         PL2      PIKMAX IKMAX      IKMAX      IKMAX        FL2       FINF
-     1  1.9089E-05 -1.0129E-06   274  -1.50E+01  -1.50E+01  1.021E-13  4.326E-15
+     1  2.1627E-05 -1.1475E-06   274  -1.50E+01  -1.50E+01  1.021E-13  4.326E-15
  CONVERGENCE ACHIEVED IN    1 ITERATIONS
 
   INFLOW (I) AND OUTFLOW (O) FROM ATM (A) AND NON-ATM, NON-SEEP FACE (N) BC'S;
@@ -65038,21 +65038,27 @@
  VOL   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
 
  TOTAL I VOL  TOTAL O VOL  STOR CHNG VOL | ABS MASS BAL ERR   REL MASS BAL ERR,%
-   0.000E+00    0.000E+00   -1.22912E-15 |   1.22911877E-15     0.0000000000E+00
+   0.000E+00    0.000E+00   -1.39282E-15 |   1.39282337E-15     0.0000000000E+00
+
+     NATM, NSF DIRICHLET BCs INPUT AT TIME:   2.5056E+06
+
+       NATM, NSF NEUMANN BCs INPUT AT TIME:   2.5056E+06
+
+     nsf  (# of seepage faces)               =      0
 
 
-      TIME STEP:     2521    DELTAT:   8.8265E+02    TIME:   2.5056E+06
+      TIME STEP:     2521    DELTAT:   1.0000E+03    TIME:   2.5058E+06
      ******************************************************************
 
 
       LINEAR SOLVER CONVERGENCE BEHAVIOR
  iter       residual  real residual
-    1   3.815260E-32   8.046440E-17  <<SYMMETRIC SOLVER>>
+    1   9.837655E-32   6.192606E-17  <<SYMMETRIC SOLVER>>
 
                      NONLINEAR CONVERGENCE BEHAVIOR 
  iter- convergence error norms  node    PNEW at    POLD at  residual error norms
  ation         PL2      PIKMAX IKMAX      IKMAX      IKMAX        FL2       FINF
-     1  1.9086E-05 -1.0126E-06   274  -1.50E+01  -1.50E+01  1.021E-13  4.326E-15
+     1  2.1623E-05 -1.1472E-06   274  -1.50E+01  -1.50E+01  1.021E-13  4.326E-15
  CONVERGENCE ACHIEVED IN    1 ITERATIONS
 
   INFLOW (I) AND OUTFLOW (O) FROM ATM (A) AND NON-ATM, NON-SEEP FACE (N) BC'S;
@@ -65063,7 +65069,2182 @@
  VOL   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
 
  TOTAL I VOL  TOTAL O VOL  STOR CHNG VOL | ABS MASS BAL ERR   REL MASS BAL ERR,%
-   0.000E+00    0.000E+00   -1.22929E-15 |   1.22929144E-15     0.0000000000E+00
+   0.000E+00    0.000E+00   -1.39306E-15 |   1.39305802E-15     0.0000000000E+00
+
+
+      TIME STEP:     2522    DELTAT:   1.0000E+03    TIME:   2.5068E+06
+     ******************************************************************
+
+
+      LINEAR SOLVER CONVERGENCE BEHAVIOR
+ iter       residual  real residual
+    1   4.618213E-32   6.113142E-17  <<SYMMETRIC SOLVER>>
+
+                     NONLINEAR CONVERGENCE BEHAVIOR 
+ iter- convergence error norms  node    PNEW at    POLD at  residual error norms
+ ation         PL2      PIKMAX IKMAX      IKMAX      IKMAX        FL2       FINF
+     1  2.1619E-05 -1.1469E-06   274  -1.50E+01  -1.50E+01  1.021E-13  4.326E-15
+ CONVERGENCE ACHIEVED IN    1 ITERATIONS
+
+  INFLOW (I) AND OUTFLOW (O) FROM ATM (A) AND NON-ATM, NON-SEEP FACE (N) BC'S;
+  'C F' CURRENT FLUX; 'P F' PREVIOUS FLUX; 'VOL' VOLUME
+      IA DIRIC OA DIRIC IN DIRIC ON DIRIC IA NEUMN OA NEUMN IN NEUMN ON NEUMN
+ C F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ P F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ VOL   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+
+ TOTAL I VOL  TOTAL O VOL  STOR CHNG VOL | ABS MASS BAL ERR   REL MASS BAL ERR,%
+   0.000E+00    0.000E+00   -1.39310E-15 |   1.39310120E-15     0.0000000000E+00
+
+
+      TIME STEP:     2523    DELTAT:   1.0000E+03    TIME:   2.5078E+06
+     ******************************************************************
+
+
+      LINEAR SOLVER CONVERGENCE BEHAVIOR
+ iter       residual  real residual
+    1   3.923039E-32   6.652925E-17  <<SYMMETRIC SOLVER>>
+
+                     NONLINEAR CONVERGENCE BEHAVIOR 
+ iter- convergence error norms  node    PNEW at    POLD at  residual error norms
+ ation         PL2      PIKMAX IKMAX      IKMAX      IKMAX        FL2       FINF
+     1  2.1614E-05 -1.1466E-06   274  -1.50E+01  -1.50E+01  1.021E-13  4.326E-15
+ CONVERGENCE ACHIEVED IN    1 ITERATIONS
+
+  INFLOW (I) AND OUTFLOW (O) FROM ATM (A) AND NON-ATM, NON-SEEP FACE (N) BC'S;
+  'C F' CURRENT FLUX; 'P F' PREVIOUS FLUX; 'VOL' VOLUME
+      IA DIRIC OA DIRIC IN DIRIC ON DIRIC IA NEUMN OA NEUMN IN NEUMN ON NEUMN
+ C F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ P F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ VOL   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+
+ TOTAL I VOL  TOTAL O VOL  STOR CHNG VOL | ABS MASS BAL ERR   REL MASS BAL ERR,%
+   0.000E+00    0.000E+00   -1.39322E-15 |   1.39322427E-15     0.0000000000E+00
+
+
+      TIME STEP:     2524    DELTAT:   1.0000E+03    TIME:   2.5088E+06
+     ******************************************************************
+
+
+      LINEAR SOLVER CONVERGENCE BEHAVIOR
+ iter       residual  real residual
+    1   3.987877E-32   6.432835E-17  <<SYMMETRIC SOLVER>>
+
+                     NONLINEAR CONVERGENCE BEHAVIOR 
+ iter- convergence error norms  node    PNEW at    POLD at  residual error norms
+ ation         PL2      PIKMAX IKMAX      IKMAX      IKMAX        FL2       FINF
+     1  2.1610E-05 -1.1462E-06   274  -1.50E+01  -1.50E+01  1.021E-13  4.326E-15
+ CONVERGENCE ACHIEVED IN    1 ITERATIONS
+
+  INFLOW (I) AND OUTFLOW (O) FROM ATM (A) AND NON-ATM, NON-SEEP FACE (N) BC'S;
+  'C F' CURRENT FLUX; 'P F' PREVIOUS FLUX; 'VOL' VOLUME
+      IA DIRIC OA DIRIC IN DIRIC ON DIRIC IA NEUMN OA NEUMN IN NEUMN ON NEUMN
+ C F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ P F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ VOL   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+
+ TOTAL I VOL  TOTAL O VOL  STOR CHNG VOL | ABS MASS BAL ERR   REL MASS BAL ERR,%
+   0.000E+00    0.000E+00   -1.39342E-15 |   1.39341597E-15     0.0000000000E+00
+
+
+      TIME STEP:     2525    DELTAT:   1.0000E+03    TIME:   2.5098E+06
+     ******************************************************************
+
+
+      LINEAR SOLVER CONVERGENCE BEHAVIOR
+ iter       residual  real residual
+    1   3.898554E-32   6.503372E-17  <<SYMMETRIC SOLVER>>
+
+                     NONLINEAR CONVERGENCE BEHAVIOR 
+ iter- convergence error norms  node    PNEW at    POLD at  residual error norms
+ ation         PL2      PIKMAX IKMAX      IKMAX      IKMAX        FL2       FINF
+     1  2.1606E-05 -1.1459E-06   274  -1.50E+01  -1.50E+01  1.021E-13  4.326E-15
+ CONVERGENCE ACHIEVED IN    1 ITERATIONS
+
+  INFLOW (I) AND OUTFLOW (O) FROM ATM (A) AND NON-ATM, NON-SEEP FACE (N) BC'S;
+  'C F' CURRENT FLUX; 'P F' PREVIOUS FLUX; 'VOL' VOLUME
+      IA DIRIC OA DIRIC IN DIRIC ON DIRIC IA NEUMN OA NEUMN IN NEUMN ON NEUMN
+ C F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ P F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ VOL   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+
+ TOTAL I VOL  TOTAL O VOL  STOR CHNG VOL | ABS MASS BAL ERR   REL MASS BAL ERR,%
+   0.000E+00    0.000E+00   -1.39366E-15 |   1.39366270E-15     0.0000000000E+00
+
+
+      TIME STEP:     2526    DELTAT:   1.0000E+03    TIME:   2.5108E+06
+     ******************************************************************
+
+
+      LINEAR SOLVER CONVERGENCE BEHAVIOR
+ iter       residual  real residual
+    1   3.644166E-32   6.766329E-17  <<SYMMETRIC SOLVER>>
+
+                     NONLINEAR CONVERGENCE BEHAVIOR 
+ iter- convergence error norms  node    PNEW at    POLD at  residual error norms
+ ation         PL2      PIKMAX IKMAX      IKMAX      IKMAX        FL2       FINF
+     1  2.1602E-05 -1.1456E-06   274  -1.50E+01  -1.50E+01  1.021E-13  4.326E-15
+ CONVERGENCE ACHIEVED IN    1 ITERATIONS
+
+  INFLOW (I) AND OUTFLOW (O) FROM ATM (A) AND NON-ATM, NON-SEEP FACE (N) BC'S;
+  'C F' CURRENT FLUX; 'P F' PREVIOUS FLUX; 'VOL' VOLUME
+      IA DIRIC OA DIRIC IN DIRIC ON DIRIC IA NEUMN OA NEUMN IN NEUMN ON NEUMN
+ C F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ P F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ VOL   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+
+ TOTAL I VOL  TOTAL O VOL  STOR CHNG VOL | ABS MASS BAL ERR   REL MASS BAL ERR,%
+   0.000E+00    0.000E+00   -1.39396E-15 |   1.39396161E-15     0.0000000000E+00
+
+
+      TIME STEP:     2527    DELTAT:   1.0000E+03    TIME:   2.5118E+06
+     ******************************************************************
+
+
+      LINEAR SOLVER CONVERGENCE BEHAVIOR
+ iter       residual  real residual
+    1   4.248300E-32   6.135853E-17  <<SYMMETRIC SOLVER>>
+
+                     NONLINEAR CONVERGENCE BEHAVIOR 
+ iter- convergence error norms  node    PNEW at    POLD at  residual error norms
+ ation         PL2      PIKMAX IKMAX      IKMAX      IKMAX        FL2       FINF
+     1  2.1598E-05 -1.1453E-06   274  -1.50E+01  -1.50E+01  1.021E-13  4.326E-15
+ CONVERGENCE ACHIEVED IN    1 ITERATIONS
+
+  INFLOW (I) AND OUTFLOW (O) FROM ATM (A) AND NON-ATM, NON-SEEP FACE (N) BC'S;
+  'C F' CURRENT FLUX; 'P F' PREVIOUS FLUX; 'VOL' VOLUME
+      IA DIRIC OA DIRIC IN DIRIC ON DIRIC IA NEUMN OA NEUMN IN NEUMN ON NEUMN
+ C F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ P F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ VOL   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+
+ TOTAL I VOL  TOTAL O VOL  STOR CHNG VOL | ABS MASS BAL ERR   REL MASS BAL ERR,%
+   0.000E+00    0.000E+00   -1.39428E-15 |   1.39428073E-15     0.0000000000E+00
+
+
+      TIME STEP:     2528    DELTAT:   1.0000E+03    TIME:   2.5128E+06
+     ******************************************************************
+
+
+      LINEAR SOLVER CONVERGENCE BEHAVIOR
+ iter       residual  real residual
+    1   4.785897E-32   6.471952E-17  <<SYMMETRIC SOLVER>>
+
+                     NONLINEAR CONVERGENCE BEHAVIOR 
+ iter- convergence error norms  node    PNEW at    POLD at  residual error norms
+ ation         PL2      PIKMAX IKMAX      IKMAX      IKMAX        FL2       FINF
+     1  2.1594E-05 -1.1450E-06   274  -1.50E+01  -1.50E+01  1.021E-13  4.326E-15
+ CONVERGENCE ACHIEVED IN    1 ITERATIONS
+
+  INFLOW (I) AND OUTFLOW (O) FROM ATM (A) AND NON-ATM, NON-SEEP FACE (N) BC'S;
+  'C F' CURRENT FLUX; 'P F' PREVIOUS FLUX; 'VOL' VOLUME
+      IA DIRIC OA DIRIC IN DIRIC ON DIRIC IA NEUMN OA NEUMN IN NEUMN ON NEUMN
+ C F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ P F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ VOL   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+
+ TOTAL I VOL  TOTAL O VOL  STOR CHNG VOL | ABS MASS BAL ERR   REL MASS BAL ERR,%
+   0.000E+00    0.000E+00   -1.39451E-15 |   1.39450706E-15     0.0000000000E+00
+
+
+      TIME STEP:     2529    DELTAT:   1.0000E+03    TIME:   2.5138E+06
+     ******************************************************************
+
+
+      LINEAR SOLVER CONVERGENCE BEHAVIOR
+ iter       residual  real residual
+    1   4.071246E-32   6.437566E-17  <<SYMMETRIC SOLVER>>
+
+                     NONLINEAR CONVERGENCE BEHAVIOR 
+ iter- convergence error norms  node    PNEW at    POLD at  residual error norms
+ ation         PL2      PIKMAX IKMAX      IKMAX      IKMAX        FL2       FINF
+     1  2.1589E-05 -1.1446E-06   274  -1.50E+01  -1.50E+01  1.021E-13  4.326E-15
+ CONVERGENCE ACHIEVED IN    1 ITERATIONS
+
+  INFLOW (I) AND OUTFLOW (O) FROM ATM (A) AND NON-ATM, NON-SEEP FACE (N) BC'S;
+  'C F' CURRENT FLUX; 'P F' PREVIOUS FLUX; 'VOL' VOLUME
+      IA DIRIC OA DIRIC IN DIRIC ON DIRIC IA NEUMN OA NEUMN IN NEUMN ON NEUMN
+ C F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ P F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ VOL   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+
+ TOTAL I VOL  TOTAL O VOL  STOR CHNG VOL | ABS MASS BAL ERR   REL MASS BAL ERR,%
+   0.000E+00    0.000E+00   -1.39455E-15 |   1.39455091E-15     0.0000000000E+00
+
+
+      TIME STEP:     2530    DELTAT:   1.0000E+03    TIME:   2.5148E+06
+     ******************************************************************
+
+
+      LINEAR SOLVER CONVERGENCE BEHAVIOR
+ iter       residual  real residual
+    1   6.420478E-32   6.227899E-17  <<SYMMETRIC SOLVER>>
+
+                     NONLINEAR CONVERGENCE BEHAVIOR 
+ iter- convergence error norms  node    PNEW at    POLD at  residual error norms
+ ation         PL2      PIKMAX IKMAX      IKMAX      IKMAX        FL2       FINF
+     1  2.1585E-05 -1.1443E-06   274  -1.50E+01  -1.50E+01  1.021E-13  4.326E-15
+ CONVERGENCE ACHIEVED IN    1 ITERATIONS
+
+  INFLOW (I) AND OUTFLOW (O) FROM ATM (A) AND NON-ATM, NON-SEEP FACE (N) BC'S;
+  'C F' CURRENT FLUX; 'P F' PREVIOUS FLUX; 'VOL' VOLUME
+      IA DIRIC OA DIRIC IN DIRIC ON DIRIC IA NEUMN OA NEUMN IN NEUMN ON NEUMN
+ C F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ P F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ VOL   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+
+ TOTAL I VOL  TOTAL O VOL  STOR CHNG VOL | ABS MASS BAL ERR   REL MASS BAL ERR,%
+   0.000E+00    0.000E+00   -1.39470E-15 |   1.39469554E-15     0.0000000000E+00
+
+
+      TIME STEP:     2531    DELTAT:   1.0000E+03    TIME:   2.5158E+06
+     ******************************************************************
+
+
+      LINEAR SOLVER CONVERGENCE BEHAVIOR
+ iter       residual  real residual
+    1   4.115595E-32   6.501906E-17  <<SYMMETRIC SOLVER>>
+
+                     NONLINEAR CONVERGENCE BEHAVIOR 
+ iter- convergence error norms  node    PNEW at    POLD at  residual error norms
+ ation         PL2      PIKMAX IKMAX      IKMAX      IKMAX        FL2       FINF
+     1  2.1581E-05 -1.1440E-06   274  -1.50E+01  -1.50E+01  1.021E-13  4.326E-15
+ CONVERGENCE ACHIEVED IN    1 ITERATIONS
+
+  INFLOW (I) AND OUTFLOW (O) FROM ATM (A) AND NON-ATM, NON-SEEP FACE (N) BC'S;
+  'C F' CURRENT FLUX; 'P F' PREVIOUS FLUX; 'VOL' VOLUME
+      IA DIRIC OA DIRIC IN DIRIC ON DIRIC IA NEUMN OA NEUMN IN NEUMN ON NEUMN
+ C F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ P F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ VOL   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+
+ TOTAL I VOL  TOTAL O VOL  STOR CHNG VOL | ABS MASS BAL ERR   REL MASS BAL ERR,%
+   0.000E+00    0.000E+00   -1.39483E-15 |   1.39483429E-15     0.0000000000E+00
+
+
+      TIME STEP:     2532    DELTAT:   1.0000E+03    TIME:   2.5168E+06
+     ******************************************************************
+
+
+      LINEAR SOLVER CONVERGENCE BEHAVIOR
+ iter       residual  real residual
+    1   4.940032E-32   6.351288E-17  <<SYMMETRIC SOLVER>>
+
+                     NONLINEAR CONVERGENCE BEHAVIOR 
+ iter- convergence error norms  node    PNEW at    POLD at  residual error norms
+ ation         PL2      PIKMAX IKMAX      IKMAX      IKMAX        FL2       FINF
+     1  2.1577E-05 -1.1437E-06   274  -1.50E+01  -1.50E+01  1.021E-13  4.326E-15
+ CONVERGENCE ACHIEVED IN    1 ITERATIONS
+
+  INFLOW (I) AND OUTFLOW (O) FROM ATM (A) AND NON-ATM, NON-SEEP FACE (N) BC'S;
+  'C F' CURRENT FLUX; 'P F' PREVIOUS FLUX; 'VOL' VOLUME
+      IA DIRIC OA DIRIC IN DIRIC ON DIRIC IA NEUMN OA NEUMN IN NEUMN ON NEUMN
+ C F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ P F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ VOL   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+
+ TOTAL I VOL  TOTAL O VOL  STOR CHNG VOL | ABS MASS BAL ERR   REL MASS BAL ERR,%
+   0.000E+00    0.000E+00   -1.39511E-15 |   1.39511051E-15     0.0000000000E+00
+
+
+      TIME STEP:     2533    DELTAT:   1.0000E+03    TIME:   2.5178E+06
+     ******************************************************************
+
+
+      LINEAR SOLVER CONVERGENCE BEHAVIOR
+ iter       residual  real residual
+    1   4.795085E-32   6.702296E-17  <<SYMMETRIC SOLVER>>
+
+                     NONLINEAR CONVERGENCE BEHAVIOR 
+ iter- convergence error norms  node    PNEW at    POLD at  residual error norms
+ ation         PL2      PIKMAX IKMAX      IKMAX      IKMAX        FL2       FINF
+     1  2.1573E-05 -1.1434E-06   274  -1.50E+01  -1.50E+01  1.021E-13  4.326E-15
+ CONVERGENCE ACHIEVED IN    1 ITERATIONS
+
+  INFLOW (I) AND OUTFLOW (O) FROM ATM (A) AND NON-ATM, NON-SEEP FACE (N) BC'S;
+  'C F' CURRENT FLUX; 'P F' PREVIOUS FLUX; 'VOL' VOLUME
+      IA DIRIC OA DIRIC IN DIRIC ON DIRIC IA NEUMN OA NEUMN IN NEUMN ON NEUMN
+ C F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ P F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ VOL   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+
+ TOTAL I VOL  TOTAL O VOL  STOR CHNG VOL | ABS MASS BAL ERR   REL MASS BAL ERR,%
+   0.000E+00    0.000E+00   -1.39541E-15 |   1.39541160E-15     0.0000000000E+00
+
+
+      TIME STEP:     2534    DELTAT:   1.0000E+03    TIME:   2.5188E+06
+     ******************************************************************
+
+
+      LINEAR SOLVER CONVERGENCE BEHAVIOR
+ iter       residual  real residual
+    1   3.921827E-32   6.604746E-17  <<SYMMETRIC SOLVER>>
+
+                     NONLINEAR CONVERGENCE BEHAVIOR 
+ iter- convergence error norms  node    PNEW at    POLD at  residual error norms
+ ation         PL2      PIKMAX IKMAX      IKMAX      IKMAX        FL2       FINF
+     1  2.1569E-05 -1.1431E-06   274  -1.50E+01  -1.50E+01  1.021E-13  4.326E-15
+ CONVERGENCE ACHIEVED IN    1 ITERATIONS
+
+  INFLOW (I) AND OUTFLOW (O) FROM ATM (A) AND NON-ATM, NON-SEEP FACE (N) BC'S;
+  'C F' CURRENT FLUX; 'P F' PREVIOUS FLUX; 'VOL' VOLUME
+      IA DIRIC OA DIRIC IN DIRIC ON DIRIC IA NEUMN OA NEUMN IN NEUMN ON NEUMN
+ C F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ P F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ VOL   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+
+ TOTAL I VOL  TOTAL O VOL  STOR CHNG VOL | ABS MASS BAL ERR   REL MASS BAL ERR,%
+   0.000E+00    0.000E+00   -1.39568E-15 |   1.39568389E-15     0.0000000000E+00
+
+
+      TIME STEP:     2535    DELTAT:   1.0000E+03    TIME:   2.5198E+06
+     ******************************************************************
+
+
+      LINEAR SOLVER CONVERGENCE BEHAVIOR
+ iter       residual  real residual
+    1   4.867855E-32   6.399715E-17  <<SYMMETRIC SOLVER>>
+
+                     NONLINEAR CONVERGENCE BEHAVIOR 
+ iter- convergence error norms  node    PNEW at    POLD at  residual error norms
+ ation         PL2      PIKMAX IKMAX      IKMAX      IKMAX        FL2       FINF
+     1  2.1565E-05 -1.1427E-06   274  -1.50E+01  -1.50E+01  1.021E-13  4.326E-15
+ CONVERGENCE ACHIEVED IN    1 ITERATIONS
+
+  INFLOW (I) AND OUTFLOW (O) FROM ATM (A) AND NON-ATM, NON-SEEP FACE (N) BC'S;
+  'C F' CURRENT FLUX; 'P F' PREVIOUS FLUX; 'VOL' VOLUME
+      IA DIRIC OA DIRIC IN DIRIC ON DIRIC IA NEUMN OA NEUMN IN NEUMN ON NEUMN
+ C F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ P F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ VOL   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+
+ TOTAL I VOL  TOTAL O VOL  STOR CHNG VOL | ABS MASS BAL ERR   REL MASS BAL ERR,%
+   0.000E+00    0.000E+00   -1.39596E-15 |   1.39595839E-15     0.0000000000E+00
+
+
+      TIME STEP:     2536    DELTAT:   1.0000E+03    TIME:   2.5208E+06
+     ******************************************************************
+
+
+      LINEAR SOLVER CONVERGENCE BEHAVIOR
+ iter       residual  real residual
+    1   7.812820E-32   6.172735E-17  <<SYMMETRIC SOLVER>>
+
+                     NONLINEAR CONVERGENCE BEHAVIOR 
+ iter- convergence error norms  node    PNEW at    POLD at  residual error norms
+ ation         PL2      PIKMAX IKMAX      IKMAX      IKMAX        FL2       FINF
+     1  2.1560E-05 -1.1424E-06   274  -1.50E+01  -1.50E+01  1.021E-13  4.326E-15
+ CONVERGENCE ACHIEVED IN    1 ITERATIONS
+
+  INFLOW (I) AND OUTFLOW (O) FROM ATM (A) AND NON-ATM, NON-SEEP FACE (N) BC'S;
+  'C F' CURRENT FLUX; 'P F' PREVIOUS FLUX; 'VOL' VOLUME
+      IA DIRIC OA DIRIC IN DIRIC ON DIRIC IA NEUMN OA NEUMN IN NEUMN ON NEUMN
+ C F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ P F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ VOL   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+
+ TOTAL I VOL  TOTAL O VOL  STOR CHNG VOL | ABS MASS BAL ERR   REL MASS BAL ERR,%
+   0.000E+00    0.000E+00   -1.39606E-15 |   1.39605828E-15     0.0000000000E+00
+
+
+      TIME STEP:     2537    DELTAT:   1.0000E+03    TIME:   2.5218E+06
+     ******************************************************************
+
+
+      LINEAR SOLVER CONVERGENCE BEHAVIOR
+ iter       residual  real residual
+    1   4.129046E-32   6.720446E-17  <<SYMMETRIC SOLVER>>
+
+                     NONLINEAR CONVERGENCE BEHAVIOR 
+ iter- convergence error norms  node    PNEW at    POLD at  residual error norms
+ ation         PL2      PIKMAX IKMAX      IKMAX      IKMAX        FL2       FINF
+     1  2.1556E-05 -1.1421E-06   274  -1.50E+01  -1.50E+01  1.021E-13  4.326E-15
+ CONVERGENCE ACHIEVED IN    1 ITERATIONS
+
+  INFLOW (I) AND OUTFLOW (O) FROM ATM (A) AND NON-ATM, NON-SEEP FACE (N) BC'S;
+  'C F' CURRENT FLUX; 'P F' PREVIOUS FLUX; 'VOL' VOLUME
+      IA DIRIC OA DIRIC IN DIRIC ON DIRIC IA NEUMN OA NEUMN IN NEUMN ON NEUMN
+ C F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ P F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ VOL   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+
+ TOTAL I VOL  TOTAL O VOL  STOR CHNG VOL | ABS MASS BAL ERR   REL MASS BAL ERR,%
+   0.000E+00    0.000E+00   -1.39620E-15 |   1.39620490E-15     0.0000000000E+00
+
+
+      TIME STEP:     2538    DELTAT:   1.0000E+03    TIME:   2.5228E+06
+     ******************************************************************
+
+
+      LINEAR SOLVER CONVERGENCE BEHAVIOR
+ iter       residual  real residual
+    1   3.932894E-32   6.184887E-17  <<SYMMETRIC SOLVER>>
+
+                     NONLINEAR CONVERGENCE BEHAVIOR 
+ iter- convergence error norms  node    PNEW at    POLD at  residual error norms
+ ation         PL2      PIKMAX IKMAX      IKMAX      IKMAX        FL2       FINF
+     1  2.1552E-05 -1.1418E-06   274  -1.50E+01  -1.50E+01  1.021E-13  4.326E-15
+ CONVERGENCE ACHIEVED IN    1 ITERATIONS
+
+  INFLOW (I) AND OUTFLOW (O) FROM ATM (A) AND NON-ATM, NON-SEEP FACE (N) BC'S;
+  'C F' CURRENT FLUX; 'P F' PREVIOUS FLUX; 'VOL' VOLUME
+      IA DIRIC OA DIRIC IN DIRIC ON DIRIC IA NEUMN OA NEUMN IN NEUMN ON NEUMN
+ C F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ P F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ VOL   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+
+ TOTAL I VOL  TOTAL O VOL  STOR CHNG VOL | ABS MASS BAL ERR   REL MASS BAL ERR,%
+   0.000E+00    0.000E+00   -1.39627E-15 |   1.39627168E-15     0.0000000000E+00
+
+
+      TIME STEP:     2539    DELTAT:   1.0000E+03    TIME:   2.5238E+06
+     ******************************************************************
+
+
+      LINEAR SOLVER CONVERGENCE BEHAVIOR
+ iter       residual  real residual
+    1   4.048318E-32   6.444210E-17  <<SYMMETRIC SOLVER>>
+
+                     NONLINEAR CONVERGENCE BEHAVIOR 
+ iter- convergence error norms  node    PNEW at    POLD at  residual error norms
+ ation         PL2      PIKMAX IKMAX      IKMAX      IKMAX        FL2       FINF
+     1  2.1548E-05 -1.1415E-06   274  -1.50E+01  -1.50E+01  1.021E-13  4.326E-15
+ CONVERGENCE ACHIEVED IN    1 ITERATIONS
+
+  INFLOW (I) AND OUTFLOW (O) FROM ATM (A) AND NON-ATM, NON-SEEP FACE (N) BC'S;
+  'C F' CURRENT FLUX; 'P F' PREVIOUS FLUX; 'VOL' VOLUME
+      IA DIRIC OA DIRIC IN DIRIC ON DIRIC IA NEUMN OA NEUMN IN NEUMN ON NEUMN
+ C F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ P F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ VOL   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+
+ TOTAL I VOL  TOTAL O VOL  STOR CHNG VOL | ABS MASS BAL ERR   REL MASS BAL ERR,%
+   0.000E+00    0.000E+00   -1.39657E-15 |   1.39657367E-15     0.0000000000E+00
+
+
+      TIME STEP:     2540    DELTAT:   1.0000E+03    TIME:   2.5248E+06
+     ******************************************************************
+
+
+      LINEAR SOLVER CONVERGENCE BEHAVIOR
+ iter       residual  real residual
+    1   4.566296E-32   6.784411E-17  <<SYMMETRIC SOLVER>>
+
+                     NONLINEAR CONVERGENCE BEHAVIOR 
+ iter- convergence error norms  node    PNEW at    POLD at  residual error norms
+ ation         PL2      PIKMAX IKMAX      IKMAX      IKMAX        FL2       FINF
+     1  2.1544E-05 -1.1412E-06   274  -1.50E+01  -1.50E+01  1.021E-13  4.326E-15
+ CONVERGENCE ACHIEVED IN    1 ITERATIONS
+
+  INFLOW (I) AND OUTFLOW (O) FROM ATM (A) AND NON-ATM, NON-SEEP FACE (N) BC'S;
+  'C F' CURRENT FLUX; 'P F' PREVIOUS FLUX; 'VOL' VOLUME
+      IA DIRIC OA DIRIC IN DIRIC ON DIRIC IA NEUMN OA NEUMN IN NEUMN ON NEUMN
+ C F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ P F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ VOL   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+
+ TOTAL I VOL  TOTAL O VOL  STOR CHNG VOL | ABS MASS BAL ERR   REL MASS BAL ERR,%
+   0.000E+00    0.000E+00   -1.39681E-15 |   1.39680600E-15     0.0000000000E+00
+
+
+      TIME STEP:     2541    DELTAT:   1.0000E+03    TIME:   2.5258E+06
+     ******************************************************************
+
+
+      LINEAR SOLVER CONVERGENCE BEHAVIOR
+ iter       residual  real residual
+    1   4.250069E-32   6.321611E-17  <<SYMMETRIC SOLVER>>
+
+                     NONLINEAR CONVERGENCE BEHAVIOR 
+ iter- convergence error norms  node    PNEW at    POLD at  residual error norms
+ ation         PL2      PIKMAX IKMAX      IKMAX      IKMAX        FL2       FINF
+     1  2.1540E-05 -1.1408E-06   274  -1.50E+01  -1.50E+01  1.021E-13  4.326E-15
+ CONVERGENCE ACHIEVED IN    1 ITERATIONS
+
+  INFLOW (I) AND OUTFLOW (O) FROM ATM (A) AND NON-ATM, NON-SEEP FACE (N) BC'S;
+  'C F' CURRENT FLUX; 'P F' PREVIOUS FLUX; 'VOL' VOLUME
+      IA DIRIC OA DIRIC IN DIRIC ON DIRIC IA NEUMN OA NEUMN IN NEUMN ON NEUMN
+ C F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ P F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ VOL   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+
+ TOTAL I VOL  TOTAL O VOL  STOR CHNG VOL | ABS MASS BAL ERR   REL MASS BAL ERR,%
+   0.000E+00    0.000E+00   -1.39710E-15 |   1.39709548E-15     0.0000000000E+00
+
+
+      TIME STEP:     2542    DELTAT:   1.0000E+03    TIME:   2.5268E+06
+     ******************************************************************
+
+
+      LINEAR SOLVER CONVERGENCE BEHAVIOR
+ iter       residual  real residual
+    1   4.512848E-32   6.494728E-17  <<SYMMETRIC SOLVER>>
+
+                     NONLINEAR CONVERGENCE BEHAVIOR 
+ iter- convergence error norms  node    PNEW at    POLD at  residual error norms
+ ation         PL2      PIKMAX IKMAX      IKMAX      IKMAX        FL2       FINF
+     1  2.1536E-05 -1.1405E-06   274  -1.50E+01  -1.50E+01  1.021E-13  4.326E-15
+ CONVERGENCE ACHIEVED IN    1 ITERATIONS
+
+  INFLOW (I) AND OUTFLOW (O) FROM ATM (A) AND NON-ATM, NON-SEEP FACE (N) BC'S;
+  'C F' CURRENT FLUX; 'P F' PREVIOUS FLUX; 'VOL' VOLUME
+      IA DIRIC OA DIRIC IN DIRIC ON DIRIC IA NEUMN OA NEUMN IN NEUMN ON NEUMN
+ C F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ P F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ VOL   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+
+ TOTAL I VOL  TOTAL O VOL  STOR CHNG VOL | ABS MASS BAL ERR   REL MASS BAL ERR,%
+   0.000E+00    0.000E+00   -1.39741E-15 |   1.39740668E-15     0.0000000000E+00
+
+
+      TIME STEP:     2543    DELTAT:   1.0000E+03    TIME:   2.5278E+06
+     ******************************************************************
+
+
+      LINEAR SOLVER CONVERGENCE BEHAVIOR
+ iter       residual  real residual
+    1   8.233376E-32   6.545815E-17  <<SYMMETRIC SOLVER>>
+
+                     NONLINEAR CONVERGENCE BEHAVIOR 
+ iter- convergence error norms  node    PNEW at    POLD at  residual error norms
+ ation         PL2      PIKMAX IKMAX      IKMAX      IKMAX        FL2       FINF
+     1  2.1531E-05 -1.1402E-06   274  -1.50E+01  -1.50E+01  1.021E-13  4.326E-15
+ CONVERGENCE ACHIEVED IN    1 ITERATIONS
+
+  INFLOW (I) AND OUTFLOW (O) FROM ATM (A) AND NON-ATM, NON-SEEP FACE (N) BC'S;
+  'C F' CURRENT FLUX; 'P F' PREVIOUS FLUX; 'VOL' VOLUME
+      IA DIRIC OA DIRIC IN DIRIC ON DIRIC IA NEUMN OA NEUMN IN NEUMN ON NEUMN
+ C F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ P F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ VOL   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+
+ TOTAL I VOL  TOTAL O VOL  STOR CHNG VOL | ABS MASS BAL ERR   REL MASS BAL ERR,%
+   0.000E+00    0.000E+00   -1.39760E-15 |   1.39760072E-15     0.0000000000E+00
+
+
+      TIME STEP:     2544    DELTAT:   1.0000E+03    TIME:   2.5288E+06
+     ******************************************************************
+
+
+      LINEAR SOLVER CONVERGENCE BEHAVIOR
+ iter       residual  real residual
+    1   4.757836E-32   6.269405E-17  <<SYMMETRIC SOLVER>>
+
+                     NONLINEAR CONVERGENCE BEHAVIOR 
+ iter- convergence error norms  node    PNEW at    POLD at  residual error norms
+ ation         PL2      PIKMAX IKMAX      IKMAX      IKMAX        FL2       FINF
+     1  2.1527E-05 -1.1399E-06   274  -1.50E+01  -1.50E+01  1.021E-13  4.326E-15
+ CONVERGENCE ACHIEVED IN    1 ITERATIONS
+
+  INFLOW (I) AND OUTFLOW (O) FROM ATM (A) AND NON-ATM, NON-SEEP FACE (N) BC'S;
+  'C F' CURRENT FLUX; 'P F' PREVIOUS FLUX; 'VOL' VOLUME
+      IA DIRIC OA DIRIC IN DIRIC ON DIRIC IA NEUMN OA NEUMN IN NEUMN ON NEUMN
+ C F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ P F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ VOL   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+
+ TOTAL I VOL  TOTAL O VOL  STOR CHNG VOL | ABS MASS BAL ERR   REL MASS BAL ERR,%
+   0.000E+00    0.000E+00   -1.39770E-15 |   1.39769500E-15     0.0000000000E+00
+
+
+      TIME STEP:     2545    DELTAT:   1.0000E+03    TIME:   2.5298E+06
+     ******************************************************************
+
+
+      LINEAR SOLVER CONVERGENCE BEHAVIOR
+ iter       residual  real residual
+    1   4.224807E-32   6.435998E-17  <<SYMMETRIC SOLVER>>
+
+                     NONLINEAR CONVERGENCE BEHAVIOR 
+ iter- convergence error norms  node    PNEW at    POLD at  residual error norms
+ ation         PL2      PIKMAX IKMAX      IKMAX      IKMAX        FL2       FINF
+     1  2.1523E-05 -1.1396E-06   274  -1.50E+01  -1.50E+01  1.021E-13  4.326E-15
+ CONVERGENCE ACHIEVED IN    1 ITERATIONS
+
+  INFLOW (I) AND OUTFLOW (O) FROM ATM (A) AND NON-ATM, NON-SEEP FACE (N) BC'S;
+  'C F' CURRENT FLUX; 'P F' PREVIOUS FLUX; 'VOL' VOLUME
+      IA DIRIC OA DIRIC IN DIRIC ON DIRIC IA NEUMN OA NEUMN IN NEUMN ON NEUMN
+ C F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ P F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ VOL   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+
+ TOTAL I VOL  TOTAL O VOL  STOR CHNG VOL | ABS MASS BAL ERR   REL MASS BAL ERR,%
+   0.000E+00    0.000E+00   -1.39771E-15 |   1.39771331E-15     0.0000000000E+00
+
+
+      TIME STEP:     2546    DELTAT:   1.0000E+03    TIME:   2.5308E+06
+     ******************************************************************
+
+
+      LINEAR SOLVER CONVERGENCE BEHAVIOR
+ iter       residual  real residual
+    1   3.805033E-32   6.457357E-17  <<SYMMETRIC SOLVER>>
+
+                     NONLINEAR CONVERGENCE BEHAVIOR 
+ iter- convergence error norms  node    PNEW at    POLD at  residual error norms
+ ation         PL2      PIKMAX IKMAX      IKMAX      IKMAX        FL2       FINF
+     1  2.1519E-05 -1.1393E-06   274  -1.50E+01  -1.50E+01  1.021E-13  4.326E-15
+ CONVERGENCE ACHIEVED IN    1 ITERATIONS
+
+  INFLOW (I) AND OUTFLOW (O) FROM ATM (A) AND NON-ATM, NON-SEEP FACE (N) BC'S;
+  'C F' CURRENT FLUX; 'P F' PREVIOUS FLUX; 'VOL' VOLUME
+      IA DIRIC OA DIRIC IN DIRIC ON DIRIC IA NEUMN OA NEUMN IN NEUMN ON NEUMN
+ C F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ P F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ VOL   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+
+ TOTAL I VOL  TOTAL O VOL  STOR CHNG VOL | ABS MASS BAL ERR   REL MASS BAL ERR,%
+   0.000E+00    0.000E+00   -1.39795E-15 |   1.39794654E-15     0.0000000000E+00
+
+
+      TIME STEP:     2547    DELTAT:   1.0000E+03    TIME:   2.5318E+06
+     ******************************************************************
+
+
+      LINEAR SOLVER CONVERGENCE BEHAVIOR
+ iter       residual  real residual
+    1   4.548082E-32   6.316789E-17  <<SYMMETRIC SOLVER>>
+
+                     NONLINEAR CONVERGENCE BEHAVIOR 
+ iter- convergence error norms  node    PNEW at    POLD at  residual error norms
+ ation         PL2      PIKMAX IKMAX      IKMAX      IKMAX        FL2       FINF
+     1  2.1515E-05 -1.1390E-06   274  -1.50E+01  -1.50E+01  1.021E-13  4.326E-15
+ CONVERGENCE ACHIEVED IN    1 ITERATIONS
+
+  INFLOW (I) AND OUTFLOW (O) FROM ATM (A) AND NON-ATM, NON-SEEP FACE (N) BC'S;
+  'C F' CURRENT FLUX; 'P F' PREVIOUS FLUX; 'VOL' VOLUME
+      IA DIRIC OA DIRIC IN DIRIC ON DIRIC IA NEUMN OA NEUMN IN NEUMN ON NEUMN
+ C F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ P F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ VOL   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+
+ TOTAL I VOL  TOTAL O VOL  STOR CHNG VOL | ABS MASS BAL ERR   REL MASS BAL ERR,%
+   0.000E+00    0.000E+00   -1.39823E-15 |   1.39823192E-15     0.0000000000E+00
+
+
+      TIME STEP:     2548    DELTAT:   1.0000E+03    TIME:   2.5328E+06
+     ******************************************************************
+
+
+      LINEAR SOLVER CONVERGENCE BEHAVIOR
+ iter       residual  real residual
+    1   4.148717E-32   6.807895E-17  <<SYMMETRIC SOLVER>>
+
+                     NONLINEAR CONVERGENCE BEHAVIOR 
+ iter- convergence error norms  node    PNEW at    POLD at  residual error norms
+ ation         PL2      PIKMAX IKMAX      IKMAX      IKMAX        FL2       FINF
+     1  2.1511E-05 -1.1386E-06   274  -1.50E+01  -1.50E+01  1.021E-13  4.326E-15
+ CONVERGENCE ACHIEVED IN    1 ITERATIONS
+
+  INFLOW (I) AND OUTFLOW (O) FROM ATM (A) AND NON-ATM, NON-SEEP FACE (N) BC'S;
+  'C F' CURRENT FLUX; 'P F' PREVIOUS FLUX; 'VOL' VOLUME
+      IA DIRIC OA DIRIC IN DIRIC ON DIRIC IA NEUMN OA NEUMN IN NEUMN ON NEUMN
+ C F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ P F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ VOL   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+
+ TOTAL I VOL  TOTAL O VOL  STOR CHNG VOL | ABS MASS BAL ERR   REL MASS BAL ERR,%
+   0.000E+00    0.000E+00   -1.39853E-15 |   1.39852936E-15     0.0000000000E+00
+
+
+      TIME STEP:     2549    DELTAT:   1.0000E+03    TIME:   2.5338E+06
+     ******************************************************************
+
+
+      LINEAR SOLVER CONVERGENCE BEHAVIOR
+ iter       residual  real residual
+    1   4.930621E-32   6.227452E-17  <<SYMMETRIC SOLVER>>
+
+                     NONLINEAR CONVERGENCE BEHAVIOR 
+ iter- convergence error norms  node    PNEW at    POLD at  residual error norms
+ ation         PL2      PIKMAX IKMAX      IKMAX      IKMAX        FL2       FINF
+     1  2.1507E-05 -1.1383E-06   274  -1.50E+01  -1.50E+01  1.021E-13  4.326E-15
+ CONVERGENCE ACHIEVED IN    1 ITERATIONS
+
+  INFLOW (I) AND OUTFLOW (O) FROM ATM (A) AND NON-ATM, NON-SEEP FACE (N) BC'S;
+  'C F' CURRENT FLUX; 'P F' PREVIOUS FLUX; 'VOL' VOLUME
+      IA DIRIC OA DIRIC IN DIRIC ON DIRIC IA NEUMN OA NEUMN IN NEUMN ON NEUMN
+ C F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ P F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ VOL   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+
+ TOTAL I VOL  TOTAL O VOL  STOR CHNG VOL | ABS MASS BAL ERR   REL MASS BAL ERR,%
+   0.000E+00    0.000E+00   -1.39885E-15 |   1.39885041E-15     0.0000000000E+00
+
+
+      TIME STEP:     2550    DELTAT:   1.0000E+03    TIME:   2.5348E+06
+     ******************************************************************
+
+
+      LINEAR SOLVER CONVERGENCE BEHAVIOR
+ iter       residual  real residual
+    1   4.157214E-32   6.525242E-17  <<SYMMETRIC SOLVER>>
+
+                     NONLINEAR CONVERGENCE BEHAVIOR 
+ iter- convergence error norms  node    PNEW at    POLD at  residual error norms
+ ation         PL2      PIKMAX IKMAX      IKMAX      IKMAX        FL2       FINF
+     1  2.1503E-05 -1.1380E-06   274  -1.50E+01  -1.50E+01  1.021E-13  4.326E-15
+ CONVERGENCE ACHIEVED IN    1 ITERATIONS
+
+  INFLOW (I) AND OUTFLOW (O) FROM ATM (A) AND NON-ATM, NON-SEEP FACE (N) BC'S;
+  'C F' CURRENT FLUX; 'P F' PREVIOUS FLUX; 'VOL' VOLUME
+      IA DIRIC OA DIRIC IN DIRIC ON DIRIC IA NEUMN OA NEUMN IN NEUMN ON NEUMN
+ C F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ P F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ VOL   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+
+ TOTAL I VOL  TOTAL O VOL  STOR CHNG VOL | ABS MASS BAL ERR   REL MASS BAL ERR,%
+   0.000E+00    0.000E+00   -1.39899E-15 |   1.39899425E-15     0.0000000000E+00
+
+
+      TIME STEP:     2551    DELTAT:   1.0000E+03    TIME:   2.5358E+06
+     ******************************************************************
+
+
+      LINEAR SOLVER CONVERGENCE BEHAVIOR
+ iter       residual  real residual
+    1   4.721772E-32   6.600803E-17  <<SYMMETRIC SOLVER>>
+
+                     NONLINEAR CONVERGENCE BEHAVIOR 
+ iter- convergence error norms  node    PNEW at    POLD at  residual error norms
+ ation         PL2      PIKMAX IKMAX      IKMAX      IKMAX        FL2       FINF
+     1  2.1498E-05 -1.1377E-06   274  -1.50E+01  -1.50E+01  1.021E-13  4.326E-15
+ CONVERGENCE ACHIEVED IN    1 ITERATIONS
+
+  INFLOW (I) AND OUTFLOW (O) FROM ATM (A) AND NON-ATM, NON-SEEP FACE (N) BC'S;
+  'C F' CURRENT FLUX; 'P F' PREVIOUS FLUX; 'VOL' VOLUME
+      IA DIRIC OA DIRIC IN DIRIC ON DIRIC IA NEUMN OA NEUMN IN NEUMN ON NEUMN
+ C F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ P F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ VOL   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+
+ TOTAL I VOL  TOTAL O VOL  STOR CHNG VOL | ABS MASS BAL ERR   REL MASS BAL ERR,%
+   0.000E+00    0.000E+00   -1.39910E-15 |   1.39909888E-15     0.0000000000E+00
+
+
+      TIME STEP:     2552    DELTAT:   1.0000E+03    TIME:   2.5368E+06
+     ******************************************************************
+
+
+      LINEAR SOLVER CONVERGENCE BEHAVIOR
+ iter       residual  real residual
+    1   4.071812E-32   6.384199E-17  <<SYMMETRIC SOLVER>>
+
+                     NONLINEAR CONVERGENCE BEHAVIOR 
+ iter- convergence error norms  node    PNEW at    POLD at  residual error norms
+ ation         PL2      PIKMAX IKMAX      IKMAX      IKMAX        FL2       FINF
+     1  2.1494E-05 -1.1374E-06   274  -1.50E+01  -1.50E+01  1.021E-13  4.326E-15
+ CONVERGENCE ACHIEVED IN    1 ITERATIONS
+
+  INFLOW (I) AND OUTFLOW (O) FROM ATM (A) AND NON-ATM, NON-SEEP FACE (N) BC'S;
+  'C F' CURRENT FLUX; 'P F' PREVIOUS FLUX; 'VOL' VOLUME
+      IA DIRIC OA DIRIC IN DIRIC ON DIRIC IA NEUMN OA NEUMN IN NEUMN ON NEUMN
+ C F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ P F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ VOL   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+
+ TOTAL I VOL  TOTAL O VOL  STOR CHNG VOL | ABS MASS BAL ERR   REL MASS BAL ERR,%
+   0.000E+00    0.000E+00   -1.39922E-15 |   1.39922420E-15     0.0000000000E+00
+
+
+      TIME STEP:     2553    DELTAT:   1.0000E+03    TIME:   2.5378E+06
+     ******************************************************************
+
+
+      LINEAR SOLVER CONVERGENCE BEHAVIOR
+ iter       residual  real residual
+    1   3.989810E-32   6.193575E-17  <<SYMMETRIC SOLVER>>
+
+                     NONLINEAR CONVERGENCE BEHAVIOR 
+ iter- convergence error norms  node    PNEW at    POLD at  residual error norms
+ ation         PL2      PIKMAX IKMAX      IKMAX      IKMAX        FL2       FINF
+     1  2.1490E-05 -1.1371E-06   274  -1.50E+01  -1.50E+01  1.021E-13  4.326E-15
+ CONVERGENCE ACHIEVED IN    1 ITERATIONS
+
+  INFLOW (I) AND OUTFLOW (O) FROM ATM (A) AND NON-ATM, NON-SEEP FACE (N) BC'S;
+  'C F' CURRENT FLUX; 'P F' PREVIOUS FLUX; 'VOL' VOLUME
+      IA DIRIC OA DIRIC IN DIRIC ON DIRIC IA NEUMN OA NEUMN IN NEUMN ON NEUMN
+ C F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ P F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ VOL   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+
+ TOTAL I VOL  TOTAL O VOL  STOR CHNG VOL | ABS MASS BAL ERR   REL MASS BAL ERR,%
+   0.000E+00    0.000E+00   -1.39939E-15 |   1.39939323E-15     0.0000000000E+00
+
+
+      TIME STEP:     2554    DELTAT:   1.0000E+03    TIME:   2.5388E+06
+     ******************************************************************
+
+
+      LINEAR SOLVER CONVERGENCE BEHAVIOR
+ iter       residual  real residual
+    1   4.154477E-32   6.446042E-17  <<SYMMETRIC SOLVER>>
+
+                     NONLINEAR CONVERGENCE BEHAVIOR 
+ iter- convergence error norms  node    PNEW at    POLD at  residual error norms
+ ation         PL2      PIKMAX IKMAX      IKMAX      IKMAX        FL2       FINF
+     1  2.1486E-05 -1.1368E-06   274  -1.50E+01  -1.50E+01  1.021E-13  4.326E-15
+ CONVERGENCE ACHIEVED IN    1 ITERATIONS
+
+  INFLOW (I) AND OUTFLOW (O) FROM ATM (A) AND NON-ATM, NON-SEEP FACE (N) BC'S;
+  'C F' CURRENT FLUX; 'P F' PREVIOUS FLUX; 'VOL' VOLUME
+      IA DIRIC OA DIRIC IN DIRIC ON DIRIC IA NEUMN OA NEUMN IN NEUMN ON NEUMN
+ C F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ P F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ VOL   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+
+ TOTAL I VOL  TOTAL O VOL  STOR CHNG VOL | ABS MASS BAL ERR   REL MASS BAL ERR,%
+   0.000E+00    0.000E+00   -1.39965E-15 |   1.39964971E-15     0.0000000000E+00
+
+
+      TIME STEP:     2555    DELTAT:   1.0000E+03    TIME:   2.5398E+06
+     ******************************************************************
+
+
+      LINEAR SOLVER CONVERGENCE BEHAVIOR
+ iter       residual  real residual
+    1   4.694681E-32   6.333124E-17  <<SYMMETRIC SOLVER>>
+
+                     NONLINEAR CONVERGENCE BEHAVIOR 
+ iter- convergence error norms  node    PNEW at    POLD at  residual error norms
+ ation         PL2      PIKMAX IKMAX      IKMAX      IKMAX        FL2       FINF
+     1  2.1482E-05 -1.1364E-06   274  -1.50E+01  -1.50E+01  1.021E-13  4.326E-15
+ CONVERGENCE ACHIEVED IN    1 ITERATIONS
+
+  INFLOW (I) AND OUTFLOW (O) FROM ATM (A) AND NON-ATM, NON-SEEP FACE (N) BC'S;
+  'C F' CURRENT FLUX; 'P F' PREVIOUS FLUX; 'VOL' VOLUME
+      IA DIRIC OA DIRIC IN DIRIC ON DIRIC IA NEUMN OA NEUMN IN NEUMN ON NEUMN
+ C F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ P F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ VOL   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+
+ TOTAL I VOL  TOTAL O VOL  STOR CHNG VOL | ABS MASS BAL ERR   REL MASS BAL ERR,%
+   0.000E+00    0.000E+00   -1.39993E-15 |   1.39992721E-15     0.0000000000E+00
+
+
+      TIME STEP:     2556    DELTAT:   1.0000E+03    TIME:   2.5408E+06
+     ******************************************************************
+
+
+      LINEAR SOLVER CONVERGENCE BEHAVIOR
+ iter       residual  real residual
+    1   4.751723E-32   6.464196E-17  <<SYMMETRIC SOLVER>>
+
+                     NONLINEAR CONVERGENCE BEHAVIOR 
+ iter- convergence error norms  node    PNEW at    POLD at  residual error norms
+ ation         PL2      PIKMAX IKMAX      IKMAX      IKMAX        FL2       FINF
+     1  2.1478E-05 -1.1361E-06   274  -1.50E+01  -1.50E+01  1.021E-13  4.326E-15
+ CONVERGENCE ACHIEVED IN    1 ITERATIONS
+
+  INFLOW (I) AND OUTFLOW (O) FROM ATM (A) AND NON-ATM, NON-SEEP FACE (N) BC'S;
+  'C F' CURRENT FLUX; 'P F' PREVIOUS FLUX; 'VOL' VOLUME
+      IA DIRIC OA DIRIC IN DIRIC ON DIRIC IA NEUMN OA NEUMN IN NEUMN ON NEUMN
+ C F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ P F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ VOL   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+
+ TOTAL I VOL  TOTAL O VOL  STOR CHNG VOL | ABS MASS BAL ERR   REL MASS BAL ERR,%
+   0.000E+00    0.000E+00   -1.40026E-15 |   1.40026053E-15     0.0000000000E+00
+
+
+      TIME STEP:     2557    DELTAT:   1.0000E+03    TIME:   2.5418E+06
+     ******************************************************************
+
+
+      LINEAR SOLVER CONVERGENCE BEHAVIOR
+ iter       residual  real residual
+    1   3.818492E-32   6.591148E-17  <<SYMMETRIC SOLVER>>
+
+                     NONLINEAR CONVERGENCE BEHAVIOR 
+ iter- convergence error norms  node    PNEW at    POLD at  residual error norms
+ ation         PL2      PIKMAX IKMAX      IKMAX      IKMAX        FL2       FINF
+     1  2.1474E-05 -1.1358E-06   274  -1.50E+01  -1.50E+01  1.021E-13  4.326E-15
+ CONVERGENCE ACHIEVED IN    1 ITERATIONS
+
+  INFLOW (I) AND OUTFLOW (O) FROM ATM (A) AND NON-ATM, NON-SEEP FACE (N) BC'S;
+  'C F' CURRENT FLUX; 'P F' PREVIOUS FLUX; 'VOL' VOLUME
+      IA DIRIC OA DIRIC IN DIRIC ON DIRIC IA NEUMN OA NEUMN IN NEUMN ON NEUMN
+ C F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ P F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ VOL   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+
+ TOTAL I VOL  TOTAL O VOL  STOR CHNG VOL | ABS MASS BAL ERR   REL MASS BAL ERR,%
+   0.000E+00    0.000E+00   -1.40045E-15 |   1.40045165E-15     0.0000000000E+00
+
+
+      TIME STEP:     2558    DELTAT:   1.0000E+03    TIME:   2.5428E+06
+     ******************************************************************
+
+
+      LINEAR SOLVER CONVERGENCE BEHAVIOR
+ iter       residual  real residual
+    1   3.996153E-32   6.298797E-17  <<SYMMETRIC SOLVER>>
+
+                     NONLINEAR CONVERGENCE BEHAVIOR 
+ iter- convergence error norms  node    PNEW at    POLD at  residual error norms
+ ation         PL2      PIKMAX IKMAX      IKMAX      IKMAX        FL2       FINF
+     1  2.1470E-05 -1.1355E-06   274  -1.50E+01  -1.50E+01  1.021E-13  4.326E-15
+ CONVERGENCE ACHIEVED IN    1 ITERATIONS
+
+  INFLOW (I) AND OUTFLOW (O) FROM ATM (A) AND NON-ATM, NON-SEEP FACE (N) BC'S;
+  'C F' CURRENT FLUX; 'P F' PREVIOUS FLUX; 'VOL' VOLUME
+      IA DIRIC OA DIRIC IN DIRIC ON DIRIC IA NEUMN OA NEUMN IN NEUMN ON NEUMN
+ C F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ P F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ VOL   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+
+ TOTAL I VOL  TOTAL O VOL  STOR CHNG VOL | ABS MASS BAL ERR   REL MASS BAL ERR,%
+   0.000E+00    0.000E+00   -1.40052E-15 |   1.40051874E-15     0.0000000000E+00
+
+
+      TIME STEP:     2559    DELTAT:   1.0000E+03    TIME:   2.5438E+06
+     ******************************************************************
+
+
+      LINEAR SOLVER CONVERGENCE BEHAVIOR
+ iter       residual  real residual
+    1   4.787268E-32   6.572277E-17  <<SYMMETRIC SOLVER>>
+
+                     NONLINEAR CONVERGENCE BEHAVIOR 
+ iter- convergence error norms  node    PNEW at    POLD at  residual error norms
+ ation         PL2      PIKMAX IKMAX      IKMAX      IKMAX        FL2       FINF
+     1  2.1466E-05 -1.1352E-06   274  -1.50E+01  -1.50E+01  1.021E-13  4.326E-15
+ CONVERGENCE ACHIEVED IN    1 ITERATIONS
+
+  INFLOW (I) AND OUTFLOW (O) FROM ATM (A) AND NON-ATM, NON-SEEP FACE (N) BC'S;
+  'C F' CURRENT FLUX; 'P F' PREVIOUS FLUX; 'VOL' VOLUME
+      IA DIRIC OA DIRIC IN DIRIC ON DIRIC IA NEUMN OA NEUMN IN NEUMN ON NEUMN
+ C F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ P F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ VOL   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+
+ TOTAL I VOL  TOTAL O VOL  STOR CHNG VOL | ABS MASS BAL ERR   REL MASS BAL ERR,%
+   0.000E+00    0.000E+00   -1.40074E-15 |   1.40073676E-15     0.0000000000E+00
+
+
+      TIME STEP:     2560    DELTAT:   1.0000E+03    TIME:   2.5448E+06
+     ******************************************************************
+
+
+      LINEAR SOLVER CONVERGENCE BEHAVIOR
+ iter       residual  real residual
+    1   3.893919E-32   6.184947E-17  <<SYMMETRIC SOLVER>>
+
+                     NONLINEAR CONVERGENCE BEHAVIOR 
+ iter- convergence error norms  node    PNEW at    POLD at  residual error norms
+ ation         PL2      PIKMAX IKMAX      IKMAX      IKMAX        FL2       FINF
+     1  2.1462E-05 -1.1349E-06   274  -1.50E+01  -1.50E+01  1.021E-13  4.326E-15
+ CONVERGENCE ACHIEVED IN    1 ITERATIONS
+
+  INFLOW (I) AND OUTFLOW (O) FROM ATM (A) AND NON-ATM, NON-SEEP FACE (N) BC'S;
+  'C F' CURRENT FLUX; 'P F' PREVIOUS FLUX; 'VOL' VOLUME
+      IA DIRIC OA DIRIC IN DIRIC ON DIRIC IA NEUMN OA NEUMN IN NEUMN ON NEUMN
+ C F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ P F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ VOL   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+
+ TOTAL I VOL  TOTAL O VOL  STOR CHNG VOL | ABS MASS BAL ERR   REL MASS BAL ERR,%
+   0.000E+00    0.000E+00   -1.40077E-15 |   1.40076874E-15     0.0000000000E+00
+
+
+      TIME STEP:     2561    DELTAT:   1.0000E+03    TIME:   2.5458E+06
+     ******************************************************************
+
+
+      LINEAR SOLVER CONVERGENCE BEHAVIOR
+ iter       residual  real residual
+    1   8.378524E-32   6.236874E-17  <<SYMMETRIC SOLVER>>
+
+                     NONLINEAR CONVERGENCE BEHAVIOR 
+ iter- convergence error norms  node    PNEW at    POLD at  residual error norms
+ ation         PL2      PIKMAX IKMAX      IKMAX      IKMAX        FL2       FINF
+     1  2.1457E-05 -1.1346E-06   274  -1.50E+01  -1.50E+01  1.021E-13  4.326E-15
+ CONVERGENCE ACHIEVED IN    1 ITERATIONS
+
+  INFLOW (I) AND OUTFLOW (O) FROM ATM (A) AND NON-ATM, NON-SEEP FACE (N) BC'S;
+  'C F' CURRENT FLUX; 'P F' PREVIOUS FLUX; 'VOL' VOLUME
+      IA DIRIC OA DIRIC IN DIRIC ON DIRIC IA NEUMN OA NEUMN IN NEUMN ON NEUMN
+ C F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ P F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ VOL   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+
+ TOTAL I VOL  TOTAL O VOL  STOR CHNG VOL | ABS MASS BAL ERR   REL MASS BAL ERR,%
+   0.000E+00    0.000E+00   -1.40103E-15 |   1.40103438E-15     0.0000000000E+00
+
+
+      TIME STEP:     2562    DELTAT:   1.0000E+03    TIME:   2.5468E+06
+     ******************************************************************
+
+
+      LINEAR SOLVER CONVERGENCE BEHAVIOR
+ iter       residual  real residual
+    1   4.808949E-32   6.699855E-17  <<SYMMETRIC SOLVER>>
+
+                     NONLINEAR CONVERGENCE BEHAVIOR 
+ iter- convergence error norms  node    PNEW at    POLD at  residual error norms
+ ation         PL2      PIKMAX IKMAX      IKMAX      IKMAX        FL2       FINF
+     1  2.1453E-05 -1.1342E-06   274  -1.50E+01  -1.50E+01  1.021E-13  4.326E-15
+ CONVERGENCE ACHIEVED IN    1 ITERATIONS
+
+  INFLOW (I) AND OUTFLOW (O) FROM ATM (A) AND NON-ATM, NON-SEEP FACE (N) BC'S;
+  'C F' CURRENT FLUX; 'P F' PREVIOUS FLUX; 'VOL' VOLUME
+      IA DIRIC OA DIRIC IN DIRIC ON DIRIC IA NEUMN OA NEUMN IN NEUMN ON NEUMN
+ C F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ P F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ VOL   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+
+ TOTAL I VOL  TOTAL O VOL  STOR CHNG VOL | ABS MASS BAL ERR   REL MASS BAL ERR,%
+   0.000E+00    0.000E+00   -1.40134E-15 |   1.40133592E-15     0.0000000000E+00
+
+
+      TIME STEP:     2563    DELTAT:   1.0000E+03    TIME:   2.5478E+06
+     ******************************************************************
+
+
+      LINEAR SOLVER CONVERGENCE BEHAVIOR
+ iter       residual  real residual
+    1   4.292380E-32   6.423399E-17  <<SYMMETRIC SOLVER>>
+
+                     NONLINEAR CONVERGENCE BEHAVIOR 
+ iter- convergence error norms  node    PNEW at    POLD at  residual error norms
+ ation         PL2      PIKMAX IKMAX      IKMAX      IKMAX        FL2       FINF
+     1  2.1449E-05 -1.1339E-06   274  -1.50E+01  -1.50E+01  1.021E-13  4.326E-15
+ CONVERGENCE ACHIEVED IN    1 ITERATIONS
+
+  INFLOW (I) AND OUTFLOW (O) FROM ATM (A) AND NON-ATM, NON-SEEP FACE (N) BC'S;
+  'C F' CURRENT FLUX; 'P F' PREVIOUS FLUX; 'VOL' VOLUME
+      IA DIRIC OA DIRIC IN DIRIC ON DIRIC IA NEUMN OA NEUMN IN NEUMN ON NEUMN
+ C F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ P F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ VOL   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+
+ TOTAL I VOL  TOTAL O VOL  STOR CHNG VOL | ABS MASS BAL ERR   REL MASS BAL ERR,%
+   0.000E+00    0.000E+00   -1.40171E-15 |   1.40170997E-15     0.0000000000E+00
+
+
+      TIME STEP:     2564    DELTAT:   1.0000E+03    TIME:   2.5488E+06
+     ******************************************************************
+
+
+      LINEAR SOLVER CONVERGENCE BEHAVIOR
+ iter       residual  real residual
+    1   4.222129E-32   6.439652E-17  <<SYMMETRIC SOLVER>>
+
+                     NONLINEAR CONVERGENCE BEHAVIOR 
+ iter- convergence error norms  node    PNEW at    POLD at  residual error norms
+ ation         PL2      PIKMAX IKMAX      IKMAX      IKMAX        FL2       FINF
+     1  2.1445E-05 -1.1336E-06   274  -1.50E+01  -1.50E+01  1.021E-13  4.326E-15
+ CONVERGENCE ACHIEVED IN    1 ITERATIONS
+
+  INFLOW (I) AND OUTFLOW (O) FROM ATM (A) AND NON-ATM, NON-SEEP FACE (N) BC'S;
+  'C F' CURRENT FLUX; 'P F' PREVIOUS FLUX; 'VOL' VOLUME
+      IA DIRIC OA DIRIC IN DIRIC ON DIRIC IA NEUMN OA NEUMN IN NEUMN ON NEUMN
+ C F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ P F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ VOL   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+
+ TOTAL I VOL  TOTAL O VOL  STOR CHNG VOL | ABS MASS BAL ERR   REL MASS BAL ERR,%
+   0.000E+00    0.000E+00   -1.40191E-15 |   1.40190808E-15     0.0000000000E+00
+
+
+      TIME STEP:     2565    DELTAT:   1.0000E+03    TIME:   2.5498E+06
+     ******************************************************************
+
+
+      LINEAR SOLVER CONVERGENCE BEHAVIOR
+ iter       residual  real residual
+    1   4.180499E-32   6.762917E-17  <<SYMMETRIC SOLVER>>
+
+                     NONLINEAR CONVERGENCE BEHAVIOR 
+ iter- convergence error norms  node    PNEW at    POLD at  residual error norms
+ ation         PL2      PIKMAX IKMAX      IKMAX      IKMAX        FL2       FINF
+     1  2.1441E-05 -1.1333E-06   274  -1.50E+01  -1.50E+01  1.021E-13  4.326E-15
+ CONVERGENCE ACHIEVED IN    1 ITERATIONS
+
+  INFLOW (I) AND OUTFLOW (O) FROM ATM (A) AND NON-ATM, NON-SEEP FACE (N) BC'S;
+  'C F' CURRENT FLUX; 'P F' PREVIOUS FLUX; 'VOL' VOLUME
+      IA DIRIC OA DIRIC IN DIRIC ON DIRIC IA NEUMN OA NEUMN IN NEUMN ON NEUMN
+ C F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ P F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ VOL   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+
+ TOTAL I VOL  TOTAL O VOL  STOR CHNG VOL | ABS MASS BAL ERR   REL MASS BAL ERR,%
+   0.000E+00    0.000E+00   -1.40201E-15 |   1.40201394E-15     0.0000000000E+00
+
+
+      TIME STEP:     2566    DELTAT:   1.0000E+03    TIME:   2.5508E+06
+     ******************************************************************
+
+
+      LINEAR SOLVER CONVERGENCE BEHAVIOR
+ iter       residual  real residual
+    1   3.925519E-32   6.327436E-17  <<SYMMETRIC SOLVER>>
+
+                     NONLINEAR CONVERGENCE BEHAVIOR 
+ iter- convergence error norms  node    PNEW at    POLD at  residual error norms
+ ation         PL2      PIKMAX IKMAX      IKMAX      IKMAX        FL2       FINF
+     1  2.1437E-05 -1.1330E-06   274  -1.50E+01  -1.50E+01  1.021E-13  4.326E-15
+ CONVERGENCE ACHIEVED IN    1 ITERATIONS
+
+  INFLOW (I) AND OUTFLOW (O) FROM ATM (A) AND NON-ATM, NON-SEEP FACE (N) BC'S;
+  'C F' CURRENT FLUX; 'P F' PREVIOUS FLUX; 'VOL' VOLUME
+      IA DIRIC OA DIRIC IN DIRIC ON DIRIC IA NEUMN OA NEUMN IN NEUMN ON NEUMN
+ C F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ P F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ VOL   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+
+ TOTAL I VOL  TOTAL O VOL  STOR CHNG VOL | ABS MASS BAL ERR   REL MASS BAL ERR,%
+   0.000E+00    0.000E+00   -1.40214E-15 |   1.40213516E-15     0.0000000000E+00
+
+
+      TIME STEP:     2567    DELTAT:   1.0000E+03    TIME:   2.5518E+06
+     ******************************************************************
+
+
+      LINEAR SOLVER CONVERGENCE BEHAVIOR
+ iter       residual  real residual
+    1   3.982337E-32   6.312278E-17  <<SYMMETRIC SOLVER>>
+
+                     NONLINEAR CONVERGENCE BEHAVIOR 
+ iter- convergence error norms  node    PNEW at    POLD at  residual error norms
+ ation         PL2      PIKMAX IKMAX      IKMAX      IKMAX        FL2       FINF
+     1  2.1433E-05 -1.1327E-06   274  -1.50E+01  -1.50E+01  1.021E-13  4.326E-15
+ CONVERGENCE ACHIEVED IN    1 ITERATIONS
+
+  INFLOW (I) AND OUTFLOW (O) FROM ATM (A) AND NON-ATM, NON-SEEP FACE (N) BC'S;
+  'C F' CURRENT FLUX; 'P F' PREVIOUS FLUX; 'VOL' VOLUME
+      IA DIRIC OA DIRIC IN DIRIC ON DIRIC IA NEUMN OA NEUMN IN NEUMN ON NEUMN
+ C F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ P F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ VOL   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+
+ TOTAL I VOL  TOTAL O VOL  STOR CHNG VOL | ABS MASS BAL ERR   REL MASS BAL ERR,%
+   0.000E+00    0.000E+00   -1.40225E-15 |   1.40224510E-15     0.0000000000E+00
+
+
+      TIME STEP:     2568    DELTAT:   1.0000E+03    TIME:   2.5528E+06
+     ******************************************************************
+
+
+      LINEAR SOLVER CONVERGENCE BEHAVIOR
+ iter       residual  real residual
+    1   4.168283E-32   6.339792E-17  <<SYMMETRIC SOLVER>>
+
+                     NONLINEAR CONVERGENCE BEHAVIOR 
+ iter- convergence error norms  node    PNEW at    POLD at  residual error norms
+ ation         PL2      PIKMAX IKMAX      IKMAX      IKMAX        FL2       FINF
+     1  2.1429E-05 -1.1324E-06   274  -1.50E+01  -1.50E+01  1.021E-13  4.326E-15
+ CONVERGENCE ACHIEVED IN    1 ITERATIONS
+
+  INFLOW (I) AND OUTFLOW (O) FROM ATM (A) AND NON-ATM, NON-SEEP FACE (N) BC'S;
+  'C F' CURRENT FLUX; 'P F' PREVIOUS FLUX; 'VOL' VOLUME
+      IA DIRIC OA DIRIC IN DIRIC ON DIRIC IA NEUMN OA NEUMN IN NEUMN ON NEUMN
+ C F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ P F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ VOL   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+
+ TOTAL I VOL  TOTAL O VOL  STOR CHNG VOL | ABS MASS BAL ERR   REL MASS BAL ERR,%
+   0.000E+00    0.000E+00   -1.40248E-15 |   1.40247928E-15     0.0000000000E+00
+
+
+      TIME STEP:     2569    DELTAT:   1.0000E+03    TIME:   2.5538E+06
+     ******************************************************************
+
+
+      LINEAR SOLVER CONVERGENCE BEHAVIOR
+ iter       residual  real residual
+    1   4.040989E-32   6.340922E-17  <<SYMMETRIC SOLVER>>
+
+                     NONLINEAR CONVERGENCE BEHAVIOR 
+ iter- convergence error norms  node    PNEW at    POLD at  residual error norms
+ ation         PL2      PIKMAX IKMAX      IKMAX      IKMAX        FL2       FINF
+     1  2.1425E-05 -1.1321E-06   274  -1.50E+01  -1.50E+01  1.021E-13  4.326E-15
+ CONVERGENCE ACHIEVED IN    1 ITERATIONS
+
+  INFLOW (I) AND OUTFLOW (O) FROM ATM (A) AND NON-ATM, NON-SEEP FACE (N) BC'S;
+  'C F' CURRENT FLUX; 'P F' PREVIOUS FLUX; 'VOL' VOLUME
+      IA DIRIC OA DIRIC IN DIRIC ON DIRIC IA NEUMN OA NEUMN IN NEUMN ON NEUMN
+ C F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ P F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ VOL   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+
+ TOTAL I VOL  TOTAL O VOL  STOR CHNG VOL | ABS MASS BAL ERR   REL MASS BAL ERR,%
+   0.000E+00    0.000E+00   -1.40274E-15 |   1.40273801E-15     0.0000000000E+00
+
+
+      TIME STEP:     2570    DELTAT:   1.0000E+03    TIME:   2.5548E+06
+     ******************************************************************
+
+
+      LINEAR SOLVER CONVERGENCE BEHAVIOR
+ iter       residual  real residual
+    1   3.794583E-32   6.519485E-17  <<SYMMETRIC SOLVER>>
+
+                     NONLINEAR CONVERGENCE BEHAVIOR 
+ iter- convergence error norms  node    PNEW at    POLD at  residual error norms
+ ation         PL2      PIKMAX IKMAX      IKMAX      IKMAX        FL2       FINF
+     1  2.1421E-05 -1.1318E-06   274  -1.50E+01  -1.50E+01  1.021E-13  4.326E-15
+ CONVERGENCE ACHIEVED IN    1 ITERATIONS
+
+  INFLOW (I) AND OUTFLOW (O) FROM ATM (A) AND NON-ATM, NON-SEEP FACE (N) BC'S;
+  'C F' CURRENT FLUX; 'P F' PREVIOUS FLUX; 'VOL' VOLUME
+      IA DIRIC OA DIRIC IN DIRIC ON DIRIC IA NEUMN OA NEUMN IN NEUMN ON NEUMN
+ C F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ P F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ VOL   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+
+ TOTAL I VOL  TOTAL O VOL  STOR CHNG VOL | ABS MASS BAL ERR   REL MASS BAL ERR,%
+   0.000E+00    0.000E+00   -1.40306E-15 |   1.40306101E-15     0.0000000000E+00
+
+
+      TIME STEP:     2571    DELTAT:   1.0000E+03    TIME:   2.5558E+06
+     ******************************************************************
+
+
+      LINEAR SOLVER CONVERGENCE BEHAVIOR
+ iter       residual  real residual
+    1   4.748635E-32   6.409936E-17  <<SYMMETRIC SOLVER>>
+
+                     NONLINEAR CONVERGENCE BEHAVIOR 
+ iter- convergence error norms  node    PNEW at    POLD at  residual error norms
+ ation         PL2      PIKMAX IKMAX      IKMAX      IKMAX        FL2       FINF
+     1  2.1417E-05 -1.1314E-06   274  -1.50E+01  -1.50E+01  1.021E-13  4.326E-15
+ CONVERGENCE ACHIEVED IN    1 ITERATIONS
+
+  INFLOW (I) AND OUTFLOW (O) FROM ATM (A) AND NON-ATM, NON-SEEP FACE (N) BC'S;
+  'C F' CURRENT FLUX; 'P F' PREVIOUS FLUX; 'VOL' VOLUME
+      IA DIRIC OA DIRIC IN DIRIC ON DIRIC IA NEUMN OA NEUMN IN NEUMN ON NEUMN
+ C F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ P F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ VOL   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+
+ TOTAL I VOL  TOTAL O VOL  STOR CHNG VOL | ABS MASS BAL ERR   REL MASS BAL ERR,%
+   0.000E+00    0.000E+00   -1.40335E-15 |   1.40335192E-15     0.0000000000E+00
+
+
+      TIME STEP:     2572    DELTAT:   1.0000E+03    TIME:   2.5568E+06
+     ******************************************************************
+
+
+      LINEAR SOLVER CONVERGENCE BEHAVIOR
+ iter       residual  real residual
+    1   4.273501E-32   6.470051E-17  <<SYMMETRIC SOLVER>>
+
+                     NONLINEAR CONVERGENCE BEHAVIOR 
+ iter- convergence error norms  node    PNEW at    POLD at  residual error norms
+ ation         PL2      PIKMAX IKMAX      IKMAX      IKMAX        FL2       FINF
+     1  2.1413E-05 -1.1311E-06   274  -1.50E+01  -1.50E+01  1.021E-13  4.326E-15
+ CONVERGENCE ACHIEVED IN    1 ITERATIONS
+
+  INFLOW (I) AND OUTFLOW (O) FROM ATM (A) AND NON-ATM, NON-SEEP FACE (N) BC'S;
+  'C F' CURRENT FLUX; 'P F' PREVIOUS FLUX; 'VOL' VOLUME
+      IA DIRIC OA DIRIC IN DIRIC ON DIRIC IA NEUMN OA NEUMN IN NEUMN ON NEUMN
+ C F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ P F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ VOL   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+
+ TOTAL I VOL  TOTAL O VOL  STOR CHNG VOL | ABS MASS BAL ERR   REL MASS BAL ERR,%
+   0.000E+00    0.000E+00   -1.40354E-15 |   1.40354370E-15     0.0000000000E+00
+
+
+      TIME STEP:     2573    DELTAT:   1.0000E+03    TIME:   2.5578E+06
+     ******************************************************************
+
+
+      LINEAR SOLVER CONVERGENCE BEHAVIOR
+ iter       residual  real residual
+    1   4.477490E-32   6.541708E-17  <<SYMMETRIC SOLVER>>
+
+                     NONLINEAR CONVERGENCE BEHAVIOR 
+ iter- convergence error norms  node    PNEW at    POLD at  residual error norms
+ ation         PL2      PIKMAX IKMAX      IKMAX      IKMAX        FL2       FINF
+     1  2.1409E-05 -1.1308E-06   274  -1.50E+01  -1.50E+01  1.021E-13  4.326E-15
+ CONVERGENCE ACHIEVED IN    1 ITERATIONS
+
+  INFLOW (I) AND OUTFLOW (O) FROM ATM (A) AND NON-ATM, NON-SEEP FACE (N) BC'S;
+  'C F' CURRENT FLUX; 'P F' PREVIOUS FLUX; 'VOL' VOLUME
+      IA DIRIC OA DIRIC IN DIRIC ON DIRIC IA NEUMN OA NEUMN IN NEUMN ON NEUMN
+ C F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ P F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ VOL   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+
+ TOTAL I VOL  TOTAL O VOL  STOR CHNG VOL | ABS MASS BAL ERR   REL MASS BAL ERR,%
+   0.000E+00    0.000E+00   -1.40362E-15 |   1.40362247E-15     0.0000000000E+00
+
+
+      TIME STEP:     2574    DELTAT:   1.0000E+03    TIME:   2.5588E+06
+     ******************************************************************
+
+
+      LINEAR SOLVER CONVERGENCE BEHAVIOR
+ iter       residual  real residual
+    1   4.398782E-32   6.365116E-17  <<SYMMETRIC SOLVER>>
+
+                     NONLINEAR CONVERGENCE BEHAVIOR 
+ iter- convergence error norms  node    PNEW at    POLD at  residual error norms
+ ation         PL2      PIKMAX IKMAX      IKMAX      IKMAX        FL2       FINF
+     1  2.1404E-05 -1.1305E-06   274  -1.50E+01  -1.50E+01  1.021E-13  4.326E-15
+ CONVERGENCE ACHIEVED IN    1 ITERATIONS
+
+  INFLOW (I) AND OUTFLOW (O) FROM ATM (A) AND NON-ATM, NON-SEEP FACE (N) BC'S;
+  'C F' CURRENT FLUX; 'P F' PREVIOUS FLUX; 'VOL' VOLUME
+      IA DIRIC OA DIRIC IN DIRIC ON DIRIC IA NEUMN OA NEUMN IN NEUMN ON NEUMN
+ C F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ P F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ VOL   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+
+ TOTAL I VOL  TOTAL O VOL  STOR CHNG VOL | ABS MASS BAL ERR   REL MASS BAL ERR,%
+   0.000E+00    0.000E+00   -1.40367E-15 |   1.40366740E-15     0.0000000000E+00
+
+
+      TIME STEP:     2575    DELTAT:   1.0000E+03    TIME:   2.5598E+06
+     ******************************************************************
+
+
+      LINEAR SOLVER CONVERGENCE BEHAVIOR
+ iter       residual  real residual
+    1   4.676219E-32   6.213739E-17  <<SYMMETRIC SOLVER>>
+
+                     NONLINEAR CONVERGENCE BEHAVIOR 
+ iter- convergence error norms  node    PNEW at    POLD at  residual error norms
+ ation         PL2      PIKMAX IKMAX      IKMAX      IKMAX        FL2       FINF
+     1  2.1400E-05 -1.1302E-06   274  -1.50E+01  -1.50E+01  1.020E-13  4.326E-15
+ CONVERGENCE ACHIEVED IN    1 ITERATIONS
+
+  INFLOW (I) AND OUTFLOW (O) FROM ATM (A) AND NON-ATM, NON-SEEP FACE (N) BC'S;
+  'C F' CURRENT FLUX; 'P F' PREVIOUS FLUX; 'VOL' VOLUME
+      IA DIRIC OA DIRIC IN DIRIC ON DIRIC IA NEUMN OA NEUMN IN NEUMN ON NEUMN
+ C F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ P F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ VOL   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+
+ TOTAL I VOL  TOTAL O VOL  STOR CHNG VOL | ABS MASS BAL ERR   REL MASS BAL ERR,%
+   0.000E+00    0.000E+00   -1.40388E-15 |   1.40387908E-15     0.0000000000E+00
+
+
+      TIME STEP:     2576    DELTAT:   1.0000E+03    TIME:   2.5608E+06
+     ******************************************************************
+
+
+      LINEAR SOLVER CONVERGENCE BEHAVIOR
+ iter       residual  real residual
+    1   4.961244E-32   6.656325E-17  <<SYMMETRIC SOLVER>>
+
+                     NONLINEAR CONVERGENCE BEHAVIOR 
+ iter- convergence error norms  node    PNEW at    POLD at  residual error norms
+ ation         PL2      PIKMAX IKMAX      IKMAX      IKMAX        FL2       FINF
+     1  2.1396E-05 -1.1299E-06   274  -1.50E+01  -1.50E+01  1.020E-13  4.326E-15
+ CONVERGENCE ACHIEVED IN    1 ITERATIONS
+
+  INFLOW (I) AND OUTFLOW (O) FROM ATM (A) AND NON-ATM, NON-SEEP FACE (N) BC'S;
+  'C F' CURRENT FLUX; 'P F' PREVIOUS FLUX; 'VOL' VOLUME
+      IA DIRIC OA DIRIC IN DIRIC ON DIRIC IA NEUMN OA NEUMN IN NEUMN ON NEUMN
+ C F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ P F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ VOL   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+
+ TOTAL I VOL  TOTAL O VOL  STOR CHNG VOL | ABS MASS BAL ERR   REL MASS BAL ERR,%
+   0.000E+00    0.000E+00   -1.40415E-15 |   1.40415329E-15     0.0000000000E+00
+
+
+      TIME STEP:     2577    DELTAT:   1.0000E+03    TIME:   2.5618E+06
+     ******************************************************************
+
+
+      LINEAR SOLVER CONVERGENCE BEHAVIOR
+ iter       residual  real residual
+    1   8.106574E-32   6.205501E-17  <<SYMMETRIC SOLVER>>
+
+                     NONLINEAR CONVERGENCE BEHAVIOR 
+ iter- convergence error norms  node    PNEW at    POLD at  residual error norms
+ ation         PL2      PIKMAX IKMAX      IKMAX      IKMAX        FL2       FINF
+     1  2.1392E-05 -1.1296E-06   274  -1.50E+01  -1.50E+01  1.020E-13  4.326E-15
+ CONVERGENCE ACHIEVED IN    1 ITERATIONS
+
+  INFLOW (I) AND OUTFLOW (O) FROM ATM (A) AND NON-ATM, NON-SEEP FACE (N) BC'S;
+  'C F' CURRENT FLUX; 'P F' PREVIOUS FLUX; 'VOL' VOLUME
+      IA DIRIC OA DIRIC IN DIRIC ON DIRIC IA NEUMN OA NEUMN IN NEUMN ON NEUMN
+ C F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ P F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ VOL   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+
+ TOTAL I VOL  TOTAL O VOL  STOR CHNG VOL | ABS MASS BAL ERR   REL MASS BAL ERR,%
+   0.000E+00    0.000E+00   -1.40446E-15 |   1.40445641E-15     0.0000000000E+00
+
+
+      TIME STEP:     2578    DELTAT:   1.0000E+03    TIME:   2.5628E+06
+     ******************************************************************
+
+
+      LINEAR SOLVER CONVERGENCE BEHAVIOR
+ iter       residual  real residual
+    1   4.724495E-32   6.316020E-17  <<SYMMETRIC SOLVER>>
+
+                     NONLINEAR CONVERGENCE BEHAVIOR 
+ iter- convergence error norms  node    PNEW at    POLD at  residual error norms
+ ation         PL2      PIKMAX IKMAX      IKMAX      IKMAX        FL2       FINF
+     1  2.1388E-05 -1.1293E-06   274  -1.50E+01  -1.50E+01  1.020E-13  4.326E-15
+ CONVERGENCE ACHIEVED IN    1 ITERATIONS
+
+  INFLOW (I) AND OUTFLOW (O) FROM ATM (A) AND NON-ATM, NON-SEEP FACE (N) BC'S;
+  'C F' CURRENT FLUX; 'P F' PREVIOUS FLUX; 'VOL' VOLUME
+      IA DIRIC OA DIRIC IN DIRIC ON DIRIC IA NEUMN OA NEUMN IN NEUMN ON NEUMN
+ C F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ P F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ VOL   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+
+ TOTAL I VOL  TOTAL O VOL  STOR CHNG VOL | ABS MASS BAL ERR   REL MASS BAL ERR,%
+   0.000E+00    0.000E+00   -1.40477E-15 |   1.40476718E-15     0.0000000000E+00
+
+
+      TIME STEP:     2579    DELTAT:   1.0000E+03    TIME:   2.5638E+06
+     ******************************************************************
+
+
+      LINEAR SOLVER CONVERGENCE BEHAVIOR
+ iter       residual  real residual
+    1   4.189644E-32   6.558971E-17  <<SYMMETRIC SOLVER>>
+
+                     NONLINEAR CONVERGENCE BEHAVIOR 
+ iter- convergence error norms  node    PNEW at    POLD at  residual error norms
+ ation         PL2      PIKMAX IKMAX      IKMAX      IKMAX        FL2       FINF
+     1  2.1384E-05 -1.1290E-06   274  -1.50E+01  -1.50E+01  1.020E-13  4.326E-15
+ CONVERGENCE ACHIEVED IN    1 ITERATIONS
+
+  INFLOW (I) AND OUTFLOW (O) FROM ATM (A) AND NON-ATM, NON-SEEP FACE (N) BC'S;
+  'C F' CURRENT FLUX; 'P F' PREVIOUS FLUX; 'VOL' VOLUME
+      IA DIRIC OA DIRIC IN DIRIC ON DIRIC IA NEUMN OA NEUMN IN NEUMN ON NEUMN
+ C F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ P F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ VOL   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+
+ TOTAL I VOL  TOTAL O VOL  STOR CHNG VOL | ABS MASS BAL ERR   REL MASS BAL ERR,%
+   0.000E+00    0.000E+00   -1.40496E-15 |   1.40495707E-15     0.0000000000E+00
+
+
+      TIME STEP:     2580    DELTAT:   1.0000E+03    TIME:   2.5648E+06
+     ******************************************************************
+
+
+      LINEAR SOLVER CONVERGENCE BEHAVIOR
+ iter       residual  real residual
+    1   4.667777E-32   6.383844E-17  <<SYMMETRIC SOLVER>>
+
+                     NONLINEAR CONVERGENCE BEHAVIOR 
+ iter- convergence error norms  node    PNEW at    POLD at  residual error norms
+ ation         PL2      PIKMAX IKMAX      IKMAX      IKMAX        FL2       FINF
+     1  2.1380E-05 -1.1286E-06   274  -1.50E+01  -1.50E+01  1.020E-13  4.326E-15
+ CONVERGENCE ACHIEVED IN    1 ITERATIONS
+
+  INFLOW (I) AND OUTFLOW (O) FROM ATM (A) AND NON-ATM, NON-SEEP FACE (N) BC'S;
+  'C F' CURRENT FLUX; 'P F' PREVIOUS FLUX; 'VOL' VOLUME
+      IA DIRIC OA DIRIC IN DIRIC ON DIRIC IA NEUMN OA NEUMN IN NEUMN ON NEUMN
+ C F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ P F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ VOL   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+
+ TOTAL I VOL  TOTAL O VOL  STOR CHNG VOL | ABS MASS BAL ERR   REL MASS BAL ERR,%
+   0.000E+00    0.000E+00   -1.40501E-15 |   1.40501079E-15     0.0000000000E+00
+
+
+      TIME STEP:     2581    DELTAT:   1.0000E+03    TIME:   2.5658E+06
+     ******************************************************************
+
+
+      LINEAR SOLVER CONVERGENCE BEHAVIOR
+ iter       residual  real residual
+    1   4.015153E-32   6.596839E-17  <<SYMMETRIC SOLVER>>
+
+                     NONLINEAR CONVERGENCE BEHAVIOR 
+ iter- convergence error norms  node    PNEW at    POLD at  residual error norms
+ ation         PL2      PIKMAX IKMAX      IKMAX      IKMAX        FL2       FINF
+     1  2.1376E-05 -1.1283E-06   274  -1.50E+01  -1.50E+01  1.020E-13  4.326E-15
+ CONVERGENCE ACHIEVED IN    1 ITERATIONS
+
+  INFLOW (I) AND OUTFLOW (O) FROM ATM (A) AND NON-ATM, NON-SEEP FACE (N) BC'S;
+  'C F' CURRENT FLUX; 'P F' PREVIOUS FLUX; 'VOL' VOLUME
+      IA DIRIC OA DIRIC IN DIRIC ON DIRIC IA NEUMN OA NEUMN IN NEUMN ON NEUMN
+ C F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ P F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ VOL   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+
+ TOTAL I VOL  TOTAL O VOL  STOR CHNG VOL | ABS MASS BAL ERR   REL MASS BAL ERR,%
+   0.000E+00    0.000E+00   -1.40518E-15 |   1.40518306E-15     0.0000000000E+00
+
+
+      TIME STEP:     2582    DELTAT:   1.0000E+03    TIME:   2.5668E+06
+     ******************************************************************
+
+
+      LINEAR SOLVER CONVERGENCE BEHAVIOR
+ iter       residual  real residual
+    1   3.871572E-32   6.486947E-17  <<SYMMETRIC SOLVER>>
+
+                     NONLINEAR CONVERGENCE BEHAVIOR 
+ iter- convergence error norms  node    PNEW at    POLD at  residual error norms
+ ation         PL2      PIKMAX IKMAX      IKMAX      IKMAX        FL2       FINF
+     1  2.1372E-05 -1.1280E-06   274  -1.50E+01  -1.50E+01  1.020E-13  4.326E-15
+ CONVERGENCE ACHIEVED IN    1 ITERATIONS
+
+  INFLOW (I) AND OUTFLOW (O) FROM ATM (A) AND NON-ATM, NON-SEEP FACE (N) BC'S;
+  'C F' CURRENT FLUX; 'P F' PREVIOUS FLUX; 'VOL' VOLUME
+      IA DIRIC OA DIRIC IN DIRIC ON DIRIC IA NEUMN OA NEUMN IN NEUMN ON NEUMN
+ C F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ P F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ VOL   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+
+ TOTAL I VOL  TOTAL O VOL  STOR CHNG VOL | ABS MASS BAL ERR   REL MASS BAL ERR,%
+   0.000E+00    0.000E+00   -1.40527E-15 |   1.40526589E-15     0.0000000000E+00
+
+
+      TIME STEP:     2583    DELTAT:   1.0000E+03    TIME:   2.5678E+06
+     ******************************************************************
+
+
+      LINEAR SOLVER CONVERGENCE BEHAVIOR
+ iter       residual  real residual
+    1   4.874402E-32   6.359818E-17  <<SYMMETRIC SOLVER>>
+
+                     NONLINEAR CONVERGENCE BEHAVIOR 
+ iter- convergence error norms  node    PNEW at    POLD at  residual error norms
+ ation         PL2      PIKMAX IKMAX      IKMAX      IKMAX        FL2       FINF
+     1  2.1368E-05 -1.1277E-06   274  -1.50E+01  -1.50E+01  1.020E-13  4.326E-15
+ CONVERGENCE ACHIEVED IN    1 ITERATIONS
+
+  INFLOW (I) AND OUTFLOW (O) FROM ATM (A) AND NON-ATM, NON-SEEP FACE (N) BC'S;
+  'C F' CURRENT FLUX; 'P F' PREVIOUS FLUX; 'VOL' VOLUME
+      IA DIRIC OA DIRIC IN DIRIC ON DIRIC IA NEUMN OA NEUMN IN NEUMN ON NEUMN
+ C F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ P F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ VOL   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+
+ TOTAL I VOL  TOTAL O VOL  STOR CHNG VOL | ABS MASS BAL ERR   REL MASS BAL ERR,%
+   0.000E+00    0.000E+00   -1.40560E-15 |   1.40559765E-15     0.0000000000E+00
+
+
+      TIME STEP:     2584    DELTAT:   1.0000E+03    TIME:   2.5688E+06
+     ******************************************************************
+
+
+      LINEAR SOLVER CONVERGENCE BEHAVIOR
+ iter       residual  real residual
+    1   4.000625E-32   6.429753E-17  <<SYMMETRIC SOLVER>>
+
+                     NONLINEAR CONVERGENCE BEHAVIOR 
+ iter- convergence error norms  node    PNEW at    POLD at  residual error norms
+ ation         PL2      PIKMAX IKMAX      IKMAX      IKMAX        FL2       FINF
+     1  2.1364E-05 -1.1274E-06   274  -1.50E+01  -1.50E+01  1.020E-13  4.326E-15
+ CONVERGENCE ACHIEVED IN    1 ITERATIONS
+
+  INFLOW (I) AND OUTFLOW (O) FROM ATM (A) AND NON-ATM, NON-SEEP FACE (N) BC'S;
+  'C F' CURRENT FLUX; 'P F' PREVIOUS FLUX; 'VOL' VOLUME
+      IA DIRIC OA DIRIC IN DIRIC ON DIRIC IA NEUMN OA NEUMN IN NEUMN ON NEUMN
+ C F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ P F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ VOL   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+
+ TOTAL I VOL  TOTAL O VOL  STOR CHNG VOL | ABS MASS BAL ERR   REL MASS BAL ERR,%
+   0.000E+00    0.000E+00   -1.40585E-15 |   1.40585410E-15     0.0000000000E+00
+
+
+      TIME STEP:     2585    DELTAT:   1.0000E+03    TIME:   2.5698E+06
+     ******************************************************************
+
+
+      LINEAR SOLVER CONVERGENCE BEHAVIOR
+ iter       residual  real residual
+    1   4.062998E-32   6.255734E-17  <<SYMMETRIC SOLVER>>
+
+                     NONLINEAR CONVERGENCE BEHAVIOR 
+ iter- convergence error norms  node    PNEW at    POLD at  residual error norms
+ ation         PL2      PIKMAX IKMAX      IKMAX      IKMAX        FL2       FINF
+     1  2.1360E-05 -1.1271E-06   274  -1.50E+01  -1.50E+01  1.020E-13  4.326E-15
+ CONVERGENCE ACHIEVED IN    1 ITERATIONS
+
+  INFLOW (I) AND OUTFLOW (O) FROM ATM (A) AND NON-ATM, NON-SEEP FACE (N) BC'S;
+  'C F' CURRENT FLUX; 'P F' PREVIOUS FLUX; 'VOL' VOLUME
+      IA DIRIC OA DIRIC IN DIRIC ON DIRIC IA NEUMN OA NEUMN IN NEUMN ON NEUMN
+ C F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ P F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ VOL   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+
+ TOTAL I VOL  TOTAL O VOL  STOR CHNG VOL | ABS MASS BAL ERR   REL MASS BAL ERR,%
+   0.000E+00    0.000E+00   -1.40617E-15 |   1.40616538E-15     0.0000000000E+00
+
+
+      TIME STEP:     2586    DELTAT:   1.0000E+03    TIME:   2.5708E+06
+     ******************************************************************
+
+
+      LINEAR SOLVER CONVERGENCE BEHAVIOR
+ iter       residual  real residual
+    1   4.727836E-32   6.020239E-17  <<SYMMETRIC SOLVER>>
+
+                     NONLINEAR CONVERGENCE BEHAVIOR 
+ iter- convergence error norms  node    PNEW at    POLD at  residual error norms
+ ation         PL2      PIKMAX IKMAX      IKMAX      IKMAX        FL2       FINF
+     1  2.1356E-05 -1.1268E-06   274  -1.50E+01  -1.50E+01  1.020E-13  4.326E-15
+ CONVERGENCE ACHIEVED IN    1 ITERATIONS
+
+  INFLOW (I) AND OUTFLOW (O) FROM ATM (A) AND NON-ATM, NON-SEEP FACE (N) BC'S;
+  'C F' CURRENT FLUX; 'P F' PREVIOUS FLUX; 'VOL' VOLUME
+      IA DIRIC OA DIRIC IN DIRIC ON DIRIC IA NEUMN OA NEUMN IN NEUMN ON NEUMN
+ C F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ P F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ VOL   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+
+ TOTAL I VOL  TOTAL O VOL  STOR CHNG VOL | ABS MASS BAL ERR   REL MASS BAL ERR,%
+   0.000E+00    0.000E+00   -1.40635E-15 |   1.40635405E-15     0.0000000000E+00
+
+
+      TIME STEP:     2587    DELTAT:   1.0000E+03    TIME:   2.5718E+06
+     ******************************************************************
+
+
+      LINEAR SOLVER CONVERGENCE BEHAVIOR
+ iter       residual  real residual
+    1   3.921861E-32   6.727887E-17  <<SYMMETRIC SOLVER>>
+
+                     NONLINEAR CONVERGENCE BEHAVIOR 
+ iter- convergence error norms  node    PNEW at    POLD at  residual error norms
+ ation         PL2      PIKMAX IKMAX      IKMAX      IKMAX        FL2       FINF
+     1  2.1352E-05 -1.1265E-06   274  -1.50E+01  -1.50E+01  1.020E-13  4.326E-15
+ CONVERGENCE ACHIEVED IN    1 ITERATIONS
+
+  INFLOW (I) AND OUTFLOW (O) FROM ATM (A) AND NON-ATM, NON-SEEP FACE (N) BC'S;
+  'C F' CURRENT FLUX; 'P F' PREVIOUS FLUX; 'VOL' VOLUME
+      IA DIRIC OA DIRIC IN DIRIC ON DIRIC IA NEUMN OA NEUMN IN NEUMN ON NEUMN
+ C F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ P F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ VOL   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+
+ TOTAL I VOL  TOTAL O VOL  STOR CHNG VOL | ABS MASS BAL ERR   REL MASS BAL ERR,%
+   0.000E+00    0.000E+00   -1.40642E-15 |   1.40641983E-15     0.0000000000E+00
+
+
+      TIME STEP:     2588    DELTAT:   1.0000E+03    TIME:   2.5728E+06
+     ******************************************************************
+
+
+      LINEAR SOLVER CONVERGENCE BEHAVIOR
+ iter       residual  real residual
+    1   3.942466E-32   6.411874E-17  <<SYMMETRIC SOLVER>>
+
+                     NONLINEAR CONVERGENCE BEHAVIOR 
+ iter- convergence error norms  node    PNEW at    POLD at  residual error norms
+ ation         PL2      PIKMAX IKMAX      IKMAX      IKMAX        FL2       FINF
+     1  2.1348E-05 -1.1262E-06   274  -1.50E+01  -1.50E+01  1.020E-13  4.326E-15
+ CONVERGENCE ACHIEVED IN    1 ITERATIONS
+
+  INFLOW (I) AND OUTFLOW (O) FROM ATM (A) AND NON-ATM, NON-SEEP FACE (N) BC'S;
+  'C F' CURRENT FLUX; 'P F' PREVIOUS FLUX; 'VOL' VOLUME
+      IA DIRIC OA DIRIC IN DIRIC ON DIRIC IA NEUMN OA NEUMN IN NEUMN ON NEUMN
+ C F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ P F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ VOL   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+
+ TOTAL I VOL  TOTAL O VOL  STOR CHNG VOL | ABS MASS BAL ERR   REL MASS BAL ERR,%
+   0.000E+00    0.000E+00   -1.40665E-15 |   1.40665202E-15     0.0000000000E+00
+
+
+      TIME STEP:     2589    DELTAT:   1.0000E+03    TIME:   2.5738E+06
+     ******************************************************************
+
+
+      LINEAR SOLVER CONVERGENCE BEHAVIOR
+ iter       residual  real residual
+    1   4.776945E-32   6.482988E-17  <<SYMMETRIC SOLVER>>
+
+                     NONLINEAR CONVERGENCE BEHAVIOR 
+ iter- convergence error norms  node    PNEW at    POLD at  residual error norms
+ ation         PL2      PIKMAX IKMAX      IKMAX      IKMAX        FL2       FINF
+     1  2.1344E-05 -1.1259E-06   274  -1.50E+01  -1.50E+01  1.020E-13  4.326E-15
+ CONVERGENCE ACHIEVED IN    1 ITERATIONS
+
+  INFLOW (I) AND OUTFLOW (O) FROM ATM (A) AND NON-ATM, NON-SEEP FACE (N) BC'S;
+  'C F' CURRENT FLUX; 'P F' PREVIOUS FLUX; 'VOL' VOLUME
+      IA DIRIC OA DIRIC IN DIRIC ON DIRIC IA NEUMN OA NEUMN IN NEUMN ON NEUMN
+ C F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ P F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ VOL   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+
+ TOTAL I VOL  TOTAL O VOL  STOR CHNG VOL | ABS MASS BAL ERR   REL MASS BAL ERR,%
+   0.000E+00    0.000E+00   -1.40667E-15 |   1.40666565E-15     0.0000000000E+00
+
+
+      TIME STEP:     2590    DELTAT:   1.0000E+03    TIME:   2.5748E+06
+     ******************************************************************
+
+
+      LINEAR SOLVER CONVERGENCE BEHAVIOR
+ iter       residual  real residual
+    1   3.826540E-32   6.433687E-17  <<SYMMETRIC SOLVER>>
+
+                     NONLINEAR CONVERGENCE BEHAVIOR 
+ iter- convergence error norms  node    PNEW at    POLD at  residual error norms
+ ation         PL2      PIKMAX IKMAX      IKMAX      IKMAX        FL2       FINF
+     1  2.1340E-05 -1.1256E-06   274  -1.50E+01  -1.50E+01  1.020E-13  4.326E-15
+ CONVERGENCE ACHIEVED IN    1 ITERATIONS
+
+  INFLOW (I) AND OUTFLOW (O) FROM ATM (A) AND NON-ATM, NON-SEEP FACE (N) BC'S;
+  'C F' CURRENT FLUX; 'P F' PREVIOUS FLUX; 'VOL' VOLUME
+      IA DIRIC OA DIRIC IN DIRIC ON DIRIC IA NEUMN OA NEUMN IN NEUMN ON NEUMN
+ C F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ P F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ VOL   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+
+ TOTAL I VOL  TOTAL O VOL  STOR CHNG VOL | ABS MASS BAL ERR   REL MASS BAL ERR,%
+   0.000E+00    0.000E+00   -1.40696E-15 |   1.40695657E-15     0.0000000000E+00
+
+
+      TIME STEP:     2591    DELTAT:   1.0000E+03    TIME:   2.5758E+06
+     ******************************************************************
+
+
+      LINEAR SOLVER CONVERGENCE BEHAVIOR
+ iter       residual  real residual
+    1   4.076782E-32   6.292826E-17  <<SYMMETRIC SOLVER>>
+
+                     NONLINEAR CONVERGENCE BEHAVIOR 
+ iter- convergence error norms  node    PNEW at    POLD at  residual error norms
+ ation         PL2      PIKMAX IKMAX      IKMAX      IKMAX        FL2       FINF
+     1  2.1336E-05 -1.1253E-06   274  -1.50E+01  -1.50E+01  1.020E-13  4.326E-15
+ CONVERGENCE ACHIEVED IN    1 ITERATIONS
+
+  INFLOW (I) AND OUTFLOW (O) FROM ATM (A) AND NON-ATM, NON-SEEP FACE (N) BC'S;
+  'C F' CURRENT FLUX; 'P F' PREVIOUS FLUX; 'VOL' VOLUME
+      IA DIRIC OA DIRIC IN DIRIC ON DIRIC IA NEUMN OA NEUMN IN NEUMN ON NEUMN
+ C F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ P F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ VOL   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+
+ TOTAL I VOL  TOTAL O VOL  STOR CHNG VOL | ABS MASS BAL ERR   REL MASS BAL ERR,%
+   0.000E+00    0.000E+00   -1.40726E-15 |   1.40726271E-15     0.0000000000E+00
+
+
+      TIME STEP:     2592    DELTAT:   1.0000E+03    TIME:   2.5768E+06
+     ******************************************************************
+
+
+      LINEAR SOLVER CONVERGENCE BEHAVIOR
+ iter       residual  real residual
+    1   3.788429E-32   6.301221E-17  <<SYMMETRIC SOLVER>>
+
+                     NONLINEAR CONVERGENCE BEHAVIOR 
+ iter- convergence error norms  node    PNEW at    POLD at  residual error norms
+ ation         PL2      PIKMAX IKMAX      IKMAX      IKMAX        FL2       FINF
+     1  2.1332E-05 -1.1249E-06   274  -1.50E+01  -1.50E+01  1.020E-13  4.326E-15
+ CONVERGENCE ACHIEVED IN    1 ITERATIONS
+
+  INFLOW (I) AND OUTFLOW (O) FROM ATM (A) AND NON-ATM, NON-SEEP FACE (N) BC'S;
+  'C F' CURRENT FLUX; 'P F' PREVIOUS FLUX; 'VOL' VOLUME
+      IA DIRIC OA DIRIC IN DIRIC ON DIRIC IA NEUMN OA NEUMN IN NEUMN ON NEUMN
+ C F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ P F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ VOL   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+
+ TOTAL I VOL  TOTAL O VOL  STOR CHNG VOL | ABS MASS BAL ERR   REL MASS BAL ERR,%
+   0.000E+00    0.000E+00   -1.40758E-15 |   1.40757733E-15     0.0000000000E+00
+
+
+      TIME STEP:     2593    DELTAT:   1.0000E+03    TIME:   2.5778E+06
+     ******************************************************************
+
+
+      LINEAR SOLVER CONVERGENCE BEHAVIOR
+ iter       residual  real residual
+    1   3.661836E-32   6.472819E-17  <<SYMMETRIC SOLVER>>
+
+                     NONLINEAR CONVERGENCE BEHAVIOR 
+ iter- convergence error norms  node    PNEW at    POLD at  residual error norms
+ ation         PL2      PIKMAX IKMAX      IKMAX      IKMAX        FL2       FINF
+     1  2.1328E-05 -1.1246E-06   274  -1.50E+01  -1.50E+01  1.020E-13  4.326E-15
+ CONVERGENCE ACHIEVED IN    1 ITERATIONS
+
+  INFLOW (I) AND OUTFLOW (O) FROM ATM (A) AND NON-ATM, NON-SEEP FACE (N) BC'S;
+  'C F' CURRENT FLUX; 'P F' PREVIOUS FLUX; 'VOL' VOLUME
+      IA DIRIC OA DIRIC IN DIRIC ON DIRIC IA NEUMN OA NEUMN IN NEUMN ON NEUMN
+ C F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ P F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ VOL   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+
+ TOTAL I VOL  TOTAL O VOL  STOR CHNG VOL | ABS MASS BAL ERR   REL MASS BAL ERR,%
+   0.000E+00    0.000E+00   -1.40778E-15 |   1.40777822E-15     0.0000000000E+00
+
+
+      TIME STEP:     2594    DELTAT:   1.0000E+03    TIME:   2.5788E+06
+     ******************************************************************
+
+
+      LINEAR SOLVER CONVERGENCE BEHAVIOR
+ iter       residual  real residual
+    1   4.825962E-32   6.169825E-17  <<SYMMETRIC SOLVER>>
+
+                     NONLINEAR CONVERGENCE BEHAVIOR 
+ iter- convergence error norms  node    PNEW at    POLD at  residual error norms
+ ation         PL2      PIKMAX IKMAX      IKMAX      IKMAX        FL2       FINF
+     1  2.1324E-05 -1.1243E-06   274  -1.50E+01  -1.50E+01  1.020E-13  4.326E-15
+ CONVERGENCE ACHIEVED IN    1 ITERATIONS
+
+  INFLOW (I) AND OUTFLOW (O) FROM ATM (A) AND NON-ATM, NON-SEEP FACE (N) BC'S;
+  'C F' CURRENT FLUX; 'P F' PREVIOUS FLUX; 'VOL' VOLUME
+      IA DIRIC OA DIRIC IN DIRIC ON DIRIC IA NEUMN OA NEUMN IN NEUMN ON NEUMN
+ C F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ P F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ VOL   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+
+ TOTAL I VOL  TOTAL O VOL  STOR CHNG VOL | ABS MASS BAL ERR   REL MASS BAL ERR,%
+   0.000E+00    0.000E+00   -1.40788E-15 |   1.40788118E-15     0.0000000000E+00
+
+
+      TIME STEP:     2595    DELTAT:   1.0000E+03    TIME:   2.5798E+06
+     ******************************************************************
+
+
+      LINEAR SOLVER CONVERGENCE BEHAVIOR
+ iter       residual  real residual
+    1   4.005248E-32   6.528689E-17  <<SYMMETRIC SOLVER>>
+
+                     NONLINEAR CONVERGENCE BEHAVIOR 
+ iter- convergence error norms  node    PNEW at    POLD at  residual error norms
+ ation         PL2      PIKMAX IKMAX      IKMAX      IKMAX        FL2       FINF
+     1  2.1320E-05 -1.1240E-06   274  -1.50E+01  -1.50E+01  1.020E-13  4.326E-15
+ CONVERGENCE ACHIEVED IN    1 ITERATIONS
+
+  INFLOW (I) AND OUTFLOW (O) FROM ATM (A) AND NON-ATM, NON-SEEP FACE (N) BC'S;
+  'C F' CURRENT FLUX; 'P F' PREVIOUS FLUX; 'VOL' VOLUME
+      IA DIRIC OA DIRIC IN DIRIC ON DIRIC IA NEUMN OA NEUMN IN NEUMN ON NEUMN
+ C F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ P F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ VOL   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+
+ TOTAL I VOL  TOTAL O VOL  STOR CHNG VOL | ABS MASS BAL ERR   REL MASS BAL ERR,%
+   0.000E+00    0.000E+00   -1.40811E-15 |   1.40810893E-15     0.0000000000E+00
+
+
+      TIME STEP:     2596    DELTAT:   1.0000E+03    TIME:   2.5808E+06
+     ******************************************************************
+
+
+      LINEAR SOLVER CONVERGENCE BEHAVIOR
+ iter       residual  real residual
+    1   3.965651E-32   6.519686E-17  <<SYMMETRIC SOLVER>>
+
+                     NONLINEAR CONVERGENCE BEHAVIOR 
+ iter- convergence error norms  node    PNEW at    POLD at  residual error norms
+ ation         PL2      PIKMAX IKMAX      IKMAX      IKMAX        FL2       FINF
+     1  2.1316E-05 -1.1237E-06   274  -1.50E+01  -1.50E+01  1.020E-13  4.326E-15
+ CONVERGENCE ACHIEVED IN    1 ITERATIONS
+
+  INFLOW (I) AND OUTFLOW (O) FROM ATM (A) AND NON-ATM, NON-SEEP FACE (N) BC'S;
+  'C F' CURRENT FLUX; 'P F' PREVIOUS FLUX; 'VOL' VOLUME
+      IA DIRIC OA DIRIC IN DIRIC ON DIRIC IA NEUMN OA NEUMN IN NEUMN ON NEUMN
+ C F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ P F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ VOL   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+
+ TOTAL I VOL  TOTAL O VOL  STOR CHNG VOL | ABS MASS BAL ERR   REL MASS BAL ERR,%
+   0.000E+00    0.000E+00   -1.40814E-15 |   1.40813808E-15     0.0000000000E+00
+
+
+      TIME STEP:     2597    DELTAT:   1.0000E+03    TIME:   2.5818E+06
+     ******************************************************************
+
+
+      LINEAR SOLVER CONVERGENCE BEHAVIOR
+ iter       residual  real residual
+    1   4.633273E-32   6.156973E-17  <<SYMMETRIC SOLVER>>
+
+                     NONLINEAR CONVERGENCE BEHAVIOR 
+ iter- convergence error norms  node    PNEW at    POLD at  residual error norms
+ ation         PL2      PIKMAX IKMAX      IKMAX      IKMAX        FL2       FINF
+     1  2.1312E-05 -1.1234E-06   274  -1.50E+01  -1.50E+01  1.020E-13  4.326E-15
+ CONVERGENCE ACHIEVED IN    1 ITERATIONS
+
+  INFLOW (I) AND OUTFLOW (O) FROM ATM (A) AND NON-ATM, NON-SEEP FACE (N) BC'S;
+  'C F' CURRENT FLUX; 'P F' PREVIOUS FLUX; 'VOL' VOLUME
+      IA DIRIC OA DIRIC IN DIRIC ON DIRIC IA NEUMN OA NEUMN IN NEUMN ON NEUMN
+ C F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ P F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ VOL   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+
+ TOTAL I VOL  TOTAL O VOL  STOR CHNG VOL | ABS MASS BAL ERR   REL MASS BAL ERR,%
+   0.000E+00    0.000E+00   -1.40837E-15 |   1.40836899E-15     0.0000000000E+00
+
+
+      TIME STEP:     2598    DELTAT:   1.0000E+03    TIME:   2.5828E+06
+     ******************************************************************
+
+
+      LINEAR SOLVER CONVERGENCE BEHAVIOR
+ iter       residual  real residual
+    1   4.621849E-32   6.761075E-17  <<SYMMETRIC SOLVER>>
+
+                     NONLINEAR CONVERGENCE BEHAVIOR 
+ iter- convergence error norms  node    PNEW at    POLD at  residual error norms
+ ation         PL2      PIKMAX IKMAX      IKMAX      IKMAX        FL2       FINF
+     1  2.1307E-05 -1.1231E-06   274  -1.50E+01  -1.50E+01  1.020E-13  4.326E-15
+ CONVERGENCE ACHIEVED IN    1 ITERATIONS
+
+  INFLOW (I) AND OUTFLOW (O) FROM ATM (A) AND NON-ATM, NON-SEEP FACE (N) BC'S;
+  'C F' CURRENT FLUX; 'P F' PREVIOUS FLUX; 'VOL' VOLUME
+      IA DIRIC OA DIRIC IN DIRIC ON DIRIC IA NEUMN OA NEUMN IN NEUMN ON NEUMN
+ C F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ P F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ VOL   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+
+ TOTAL I VOL  TOTAL O VOL  STOR CHNG VOL | ABS MASS BAL ERR   REL MASS BAL ERR,%
+   0.000E+00    0.000E+00   -1.40862E-15 |   1.40862467E-15     0.0000000000E+00
+
+
+      TIME STEP:     2599    DELTAT:   1.0000E+03    TIME:   2.5838E+06
+     ******************************************************************
+
+
+      LINEAR SOLVER CONVERGENCE BEHAVIOR
+ iter       residual  real residual
+    1   3.983915E-32   6.199065E-17  <<SYMMETRIC SOLVER>>
+
+                     NONLINEAR CONVERGENCE BEHAVIOR 
+ iter- convergence error norms  node    PNEW at    POLD at  residual error norms
+ ation         PL2      PIKMAX IKMAX      IKMAX      IKMAX        FL2       FINF
+     1  2.1303E-05 -1.1228E-06   274  -1.50E+01  -1.50E+01  1.020E-13  4.326E-15
+ CONVERGENCE ACHIEVED IN    1 ITERATIONS
+
+  INFLOW (I) AND OUTFLOW (O) FROM ATM (A) AND NON-ATM, NON-SEEP FACE (N) BC'S;
+  'C F' CURRENT FLUX; 'P F' PREVIOUS FLUX; 'VOL' VOLUME
+      IA DIRIC OA DIRIC IN DIRIC ON DIRIC IA NEUMN OA NEUMN IN NEUMN ON NEUMN
+ C F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ P F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ VOL   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+
+ TOTAL I VOL  TOTAL O VOL  STOR CHNG VOL | ABS MASS BAL ERR   REL MASS BAL ERR,%
+   0.000E+00    0.000E+00   -1.40898E-15 |   1.40897982E-15     0.0000000000E+00
+
+
+      TIME STEP:     2600    DELTAT:   1.0000E+03    TIME:   2.5848E+06
+     ******************************************************************
+
+
+      LINEAR SOLVER CONVERGENCE BEHAVIOR
+ iter       residual  real residual
+    1   4.026455E-32   6.287295E-17  <<SYMMETRIC SOLVER>>
+
+                     NONLINEAR CONVERGENCE BEHAVIOR 
+ iter- convergence error norms  node    PNEW at    POLD at  residual error norms
+ ation         PL2      PIKMAX IKMAX      IKMAX      IKMAX        FL2       FINF
+     1  2.1299E-05 -1.1225E-06   274  -1.50E+01  -1.50E+01  1.020E-13  4.326E-15
+ CONVERGENCE ACHIEVED IN    1 ITERATIONS
+
+  INFLOW (I) AND OUTFLOW (O) FROM ATM (A) AND NON-ATM, NON-SEEP FACE (N) BC'S;
+  'C F' CURRENT FLUX; 'P F' PREVIOUS FLUX; 'VOL' VOLUME
+      IA DIRIC OA DIRIC IN DIRIC ON DIRIC IA NEUMN OA NEUMN IN NEUMN ON NEUMN
+ C F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ P F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ VOL   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+
+ TOTAL I VOL  TOTAL O VOL  STOR CHNG VOL | ABS MASS BAL ERR   REL MASS BAL ERR,%
+   0.000E+00    0.000E+00   -1.40921E-15 |   1.40920721E-15     0.0000000000E+00
+
+
+      TIME STEP:     2601    DELTAT:   1.0000E+03    TIME:   2.5858E+06
+     ******************************************************************
+
+
+      LINEAR SOLVER CONVERGENCE BEHAVIOR
+ iter       residual  real residual
+    1   4.754284E-32   6.507212E-17  <<SYMMETRIC SOLVER>>
+
+                     NONLINEAR CONVERGENCE BEHAVIOR 
+ iter- convergence error norms  node    PNEW at    POLD at  residual error norms
+ ation         PL2      PIKMAX IKMAX      IKMAX      IKMAX        FL2       FINF
+     1  2.1295E-05 -1.1222E-06   274  -1.50E+01  -1.50E+01  1.020E-13  4.326E-15
+ CONVERGENCE ACHIEVED IN    1 ITERATIONS
+
+  INFLOW (I) AND OUTFLOW (O) FROM ATM (A) AND NON-ATM, NON-SEEP FACE (N) BC'S;
+  'C F' CURRENT FLUX; 'P F' PREVIOUS FLUX; 'VOL' VOLUME
+      IA DIRIC OA DIRIC IN DIRIC ON DIRIC IA NEUMN OA NEUMN IN NEUMN ON NEUMN
+ C F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ P F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ VOL   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+
+ TOTAL I VOL  TOTAL O VOL  STOR CHNG VOL | ABS MASS BAL ERR   REL MASS BAL ERR,%
+   0.000E+00    0.000E+00   -1.40940E-15 |   1.40940255E-15     0.0000000000E+00
+
+
+      TIME STEP:     2602    DELTAT:   1.0000E+03    TIME:   2.5868E+06
+     ******************************************************************
+
+
+      LINEAR SOLVER CONVERGENCE BEHAVIOR
+ iter       residual  real residual
+    1   4.656721E-32   6.428030E-17  <<SYMMETRIC SOLVER>>
+
+                     NONLINEAR CONVERGENCE BEHAVIOR 
+ iter- convergence error norms  node    PNEW at    POLD at  residual error norms
+ ation         PL2      PIKMAX IKMAX      IKMAX      IKMAX        FL2       FINF
+     1  2.1291E-05 -1.1219E-06   274  -1.50E+01  -1.50E+01  1.020E-13  4.326E-15
+ CONVERGENCE ACHIEVED IN    1 ITERATIONS
+
+  INFLOW (I) AND OUTFLOW (O) FROM ATM (A) AND NON-ATM, NON-SEEP FACE (N) BC'S;
+  'C F' CURRENT FLUX; 'P F' PREVIOUS FLUX; 'VOL' VOLUME
+      IA DIRIC OA DIRIC IN DIRIC ON DIRIC IA NEUMN OA NEUMN IN NEUMN ON NEUMN
+ C F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ P F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ VOL   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+
+ TOTAL I VOL  TOTAL O VOL  STOR CHNG VOL | ABS MASS BAL ERR   REL MASS BAL ERR,%
+   0.000E+00    0.000E+00   -1.40950E-15 |   1.40950411E-15     0.0000000000E+00
+
+
+      TIME STEP:     2603    DELTAT:   1.0000E+03    TIME:   2.5878E+06
+     ******************************************************************
+
+
+      LINEAR SOLVER CONVERGENCE BEHAVIOR
+ iter       residual  real residual
+    1   4.035806E-32   6.313129E-17  <<SYMMETRIC SOLVER>>
+
+                     NONLINEAR CONVERGENCE BEHAVIOR 
+ iter- convergence error norms  node    PNEW at    POLD at  residual error norms
+ ation         PL2      PIKMAX IKMAX      IKMAX      IKMAX        FL2       FINF
+     1  2.1287E-05 -1.1216E-06   274  -1.50E+01  -1.50E+01  1.020E-13  4.326E-15
+ CONVERGENCE ACHIEVED IN    1 ITERATIONS
+
+  INFLOW (I) AND OUTFLOW (O) FROM ATM (A) AND NON-ATM, NON-SEEP FACE (N) BC'S;
+  'C F' CURRENT FLUX; 'P F' PREVIOUS FLUX; 'VOL' VOLUME
+      IA DIRIC OA DIRIC IN DIRIC ON DIRIC IA NEUMN OA NEUMN IN NEUMN ON NEUMN
+ C F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ P F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ VOL   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+
+ TOTAL I VOL  TOTAL O VOL  STOR CHNG VOL | ABS MASS BAL ERR   REL MASS BAL ERR,%
+   0.000E+00    0.000E+00   -1.40959E-15 |   1.40959172E-15     0.0000000000E+00
+
+
+      TIME STEP:     2604    DELTAT:   1.0000E+03    TIME:   2.5888E+06
+     ******************************************************************
+
+
+      LINEAR SOLVER CONVERGENCE BEHAVIOR
+ iter       residual  real residual
+    1   3.951043E-32   6.679202E-17  <<SYMMETRIC SOLVER>>
+
+                     NONLINEAR CONVERGENCE BEHAVIOR 
+ iter- convergence error norms  node    PNEW at    POLD at  residual error norms
+ ation         PL2      PIKMAX IKMAX      IKMAX      IKMAX        FL2       FINF
+     1  2.1283E-05 -1.1213E-06   274  -1.50E+01  -1.50E+01  1.020E-13  4.326E-15
+ CONVERGENCE ACHIEVED IN    1 ITERATIONS
+
+  INFLOW (I) AND OUTFLOW (O) FROM ATM (A) AND NON-ATM, NON-SEEP FACE (N) BC'S;
+  'C F' CURRENT FLUX; 'P F' PREVIOUS FLUX; 'VOL' VOLUME
+      IA DIRIC OA DIRIC IN DIRIC ON DIRIC IA NEUMN OA NEUMN IN NEUMN ON NEUMN
+ C F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ P F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ VOL   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+
+ TOTAL I VOL  TOTAL O VOL  STOR CHNG VOL | ABS MASS BAL ERR   REL MASS BAL ERR,%
+   0.000E+00    0.000E+00   -1.40975E-15 |   1.40975301E-15     0.0000000000E+00
+
+
+      TIME STEP:     2605    DELTAT:   1.0000E+03    TIME:   2.5898E+06
+     ******************************************************************
+
+
+      LINEAR SOLVER CONVERGENCE BEHAVIOR
+ iter       residual  real residual
+    1   4.395930E-32   6.415650E-17  <<SYMMETRIC SOLVER>>
+
+                     NONLINEAR CONVERGENCE BEHAVIOR 
+ iter- convergence error norms  node    PNEW at    POLD at  residual error norms
+ ation         PL2      PIKMAX IKMAX      IKMAX      IKMAX        FL2       FINF
+     1  2.1279E-05 -1.1210E-06   274  -1.50E+01  -1.50E+01  1.020E-13  4.326E-15
+ CONVERGENCE ACHIEVED IN    1 ITERATIONS
+
+  INFLOW (I) AND OUTFLOW (O) FROM ATM (A) AND NON-ATM, NON-SEEP FACE (N) BC'S;
+  'C F' CURRENT FLUX; 'P F' PREVIOUS FLUX; 'VOL' VOLUME
+      IA DIRIC OA DIRIC IN DIRIC ON DIRIC IA NEUMN OA NEUMN IN NEUMN ON NEUMN
+ C F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ P F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ VOL   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+
+ TOTAL I VOL  TOTAL O VOL  STOR CHNG VOL | ABS MASS BAL ERR   REL MASS BAL ERR,%
+   0.000E+00    0.000E+00   -1.41002E-15 |   1.41001986E-15     0.0000000000E+00
+
+
+      TIME STEP:     2606    DELTAT:   1.0000E+03    TIME:   2.5908E+06
+     ******************************************************************
+
+
+      LINEAR SOLVER CONVERGENCE BEHAVIOR
+ iter       residual  real residual
+    1   4.758463E-32   6.651188E-17  <<SYMMETRIC SOLVER>>
+
+                     NONLINEAR CONVERGENCE BEHAVIOR 
+ iter- convergence error norms  node    PNEW at    POLD at  residual error norms
+ ation         PL2      PIKMAX IKMAX      IKMAX      IKMAX        FL2       FINF
+     1  2.1275E-05 -1.1207E-06   274  -1.50E+01  -1.50E+01  1.020E-13  4.326E-15
+ CONVERGENCE ACHIEVED IN    1 ITERATIONS
+
+  INFLOW (I) AND OUTFLOW (O) FROM ATM (A) AND NON-ATM, NON-SEEP FACE (N) BC'S;
+  'C F' CURRENT FLUX; 'P F' PREVIOUS FLUX; 'VOL' VOLUME
+      IA DIRIC OA DIRIC IN DIRIC ON DIRIC IA NEUMN OA NEUMN IN NEUMN ON NEUMN
+ C F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ P F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ VOL   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+
+ TOTAL I VOL  TOTAL O VOL  STOR CHNG VOL | ABS MASS BAL ERR   REL MASS BAL ERR,%
+   0.000E+00    0.000E+00   -1.41034E-15 |   1.41033681E-15     0.0000000000E+00
+
+
+      TIME STEP:     2607    DELTAT:   5.8265E+02    TIME:   2.5914E+06
+     ******************************************************************
+
+
+      LINEAR SOLVER CONVERGENCE BEHAVIOR
+ iter       residual  real residual
+    1   3.414355E-32   6.612431E-17  <<SYMMETRIC SOLVER>>
+
+                     NONLINEAR CONVERGENCE BEHAVIOR 
+ iter- convergence error norms  node    PNEW at    POLD at  residual error norms
+ ation         PL2      PIKMAX IKMAX      IKMAX      IKMAX        FL2       FINF
+     1  1.2395E-05 -6.5284E-07   274  -1.50E+01  -1.50E+01  1.020E-13  4.326E-15
+ CONVERGENCE ACHIEVED IN    1 ITERATIONS
+
+  INFLOW (I) AND OUTFLOW (O) FROM ATM (A) AND NON-ATM, NON-SEEP FACE (N) BC'S;
+  'C F' CURRENT FLUX; 'P F' PREVIOUS FLUX; 'VOL' VOLUME
+      IA DIRIC OA DIRIC IN DIRIC ON DIRIC IA NEUMN OA NEUMN IN NEUMN ON NEUMN
+ C F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ P F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ VOL   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+
+ TOTAL I VOL  TOTAL O VOL  STOR CHNG VOL | ABS MASS BAL ERR   REL MASS BAL ERR,%
+   0.000E+00    0.000E+00   -8.21945E-16 |   8.21944750E-16     0.0000000000E+00
+
+
+      TIME STEP:     2608    DELTAT:   5.8265E+02    TIME:   2.5920E+06
+     ******************************************************************
+
+
+      LINEAR SOLVER CONVERGENCE BEHAVIOR
+ iter       residual  real residual
+    1   3.309778E-32   6.945106E-17  <<SYMMETRIC SOLVER>>
+
+                     NONLINEAR CONVERGENCE BEHAVIOR 
+ iter- convergence error norms  node    PNEW at    POLD at  residual error norms
+ ation         PL2      PIKMAX IKMAX      IKMAX      IKMAX        FL2       FINF
+     1  1.2393E-05 -6.5274E-07   274  -1.50E+01  -1.50E+01  1.020E-13  4.326E-15
+ CONVERGENCE ACHIEVED IN    1 ITERATIONS
+
+  INFLOW (I) AND OUTFLOW (O) FROM ATM (A) AND NON-ATM, NON-SEEP FACE (N) BC'S;
+  'C F' CURRENT FLUX; 'P F' PREVIOUS FLUX; 'VOL' VOLUME
+      IA DIRIC OA DIRIC IN DIRIC ON DIRIC IA NEUMN OA NEUMN IN NEUMN ON NEUMN
+ C F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ P F   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+ VOL   0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00  0.0E+00
+
+ TOTAL I VOL  TOTAL O VOL  STOR CHNG VOL | ABS MASS BAL ERR   REL MASS BAL ERR,%
+   0.000E+00    0.000E+00   -8.22024E-16 |   8.22024007E-16     0.0000000000E+00
 
 
 
@@ -65082,28 +67263,28 @@
   TOTAL NUMBER OF LINEAR SOLVER FAILURES         :      0
 
 
-  TOT CPU FOR THE SIMULATION           =           29.68 SECONDS  100.00 %
-  TOT CPU FOR NONLINEAR SCHEME         =           19.99 SECONDS   67.36 %
-  TOT CPU FOR OVERHEAD (SEE CODE DESC.)=            9.69 SECONDS   32.64 %
+  TOT CPU FOR THE SIMULATION           =           30.12 SECONDS  100.00 %
+  TOT CPU FOR NONLINEAR SCHEME         =           20.42 SECONDS   67.79 %
+  TOT CPU FOR OVERHEAD (SEE CODE DESC.)=            9.70 SECONDS   32.21 %
 
-  TOT CPU FOR UNSAT CHARACTERISTICS    =            7.09 SECONDS   23.90 %
-  TOT CPU FOR INIT. OF SYSTEM MATRICES =            0.26 SECONDS    0.89 %
-  TOT CPU FOR LOCAL SYSTEM ASSEMBLY    =            3.63 SECONDS   12.22 %
-  TOT CPU FOR RHS CALCULATION W/O BC'S =            0.60 SECONDS    2.02 %
-  TOT CPU FOR GLOBAL LHS SYSTEM MATRIX =            0.21 SECONDS    0.70 %
-  TOT CPU FOR BC CONTRIBUTIONS TO RHS  =            0.75 SECONDS    2.53 %
-  TOT CPU FOR LINEAR SOLVER & RESIDUAL =            2.90 SECONDS    9.76 %
+  TOT CPU FOR UNSAT CHARACTERISTICS    =            7.34 SECONDS   24.38 %
+  TOT CPU FOR INIT. OF SYSTEM MATRICES =            0.24 SECONDS    0.81 %
+  TOT CPU FOR LOCAL SYSTEM ASSEMBLY    =            3.63 SECONDS   12.04 %
+  TOT CPU FOR RHS CALCULATION W/O BC'S =            0.61 SECONDS    2.02 %
+  TOT CPU FOR GLOBAL LHS SYSTEM MATRIX =            0.20 SECONDS    0.67 %
+  TOT CPU FOR BC CONTRIBUTIONS TO RHS  =            0.75 SECONDS    2.50 %
+  TOT CPU FOR LINEAR SOLVER & RESIDUAL =            2.96 SECONDS    9.82 %
   TOT CPU FOR DIR. RESETTING AND DIFMAX=            0.01 SECONDS    0.05 %
-  TOT CPU FOR B-FLX, M-BAL, SW, & EX-PT=            4.51 SECONDS   15.20 %
+  TOT CPU FOR B-FLX, M-BAL, SW, & EX-PT=            4.64 SECONDS   15.40 %
                                          -----------         -------
-                                               19.96 SECONDS   67.26 %
+                                               20.39 SECONDS   67.69 %
 
-  TOTAL NUMBER OF TIME STEPS           =     2521
+  TOTAL NUMBER OF TIME STEPS           =     2608
   SMALLEST TIME STEP SIZE              =   1.000E+02  AT TIME   1.000E+02
   LARGEST  TIME STEP SIZE              =   1.000E+03  AT TIME   1.083E+04
   AVERAGE  TIME STEP SIZE              =   9.939E+02
-  TOTAL NUMBER OF NONLINEAR ITERATIONS =     2521
-  TOTAL NUMBER OF LINEAR ITERATIONS    =     2521  (= 0 FOR NONSYM)
+  TOTAL NUMBER OF NONLINEAR ITERATIONS =     2608
+  TOTAL NUMBER OF LINEAR ITERATIONS    =     2608  (= 0 FOR NONSYM)
   AVG NL ITERATIONS PER TIME STEP      =     1.00
   AVG LINEAR ITERATIONS PER TIME STEP  =     1.00
   AVG LIN ITERATIONS PER NL ITERATION  =     1.00

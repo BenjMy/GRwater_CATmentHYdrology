@@ -4,7 +4,7 @@
   "two_layers": true,
   "failed_months": [],
   "complete": false,
-  "months_simulated": 8,
+  "months_simulated": 9,
   "months_planned": 24,
   "fire_date": "2020-07-01 00:00:00",
   "rech_var": "recharge",

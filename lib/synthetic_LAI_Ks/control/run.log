@@ -616,3 +616,401 @@ homogeneous soil
 🔄 Update parm file 
 🔄 Update parm file 
 🛠  Recompile src files [431s]
+🍳 gfortran compilation [441s]
+✅ Compilation successful!
+👟 Run processor
+    → Soil updated | table rows: 5 (all zones, fixed) | spatially active this month: [1] (semantic: [1]) | PMIN: -1e+35 m | SCF: 1 (Feddes) | Ks: PERMX=1.217e-05, PERMY=1.217e-05, PERMZ=1.217e-05 m/s | retention curve: pyCATHY default | Feddes: pyCATHY default
+  2020-10 | LAI 0.14 (min 0.13, max 0.15) | Ks 43.8 mm/hr
+      ks_fire_utils [off]: no override -> static PERMX 43.80 mm/hr, identical every month (LAI 0.14 only changes the vegetation map)
+      soil Ks vs previous month: 43.80 -> 43.80 mm/hr (+0.0%)  [unchanged]
+      soil file (update_soil / SPP_map): PERMX = 43.80 mm/hr in every stratum [unchanged]; PERMY = x1, PERMZ = x1 | veg zones [1]
+      soil check: Ks unchanged (+0.0%) | veg zones [1] | read-back PERMX 43.80 mm/hr OK
+      running CATHY …
+      solver settings: simu.parm DTMIN=0.001, DTMAX=1000, DELTAT=100  OK || parm file: 100.0 0.001 1000.0 2592000	DELTAT DTMIN DTMAX TMAX
+      saved [10/24 months]: psi/sw/ET/recharge/hgraph, ks_fire_monthly.csv, failures.csv, area-mean CSVs
+    → injected 2x2 placeholder block(s) for vegetation class(es) [2, 3, 4, 5] (absent this raster), 3+ pixels inside the DEM interior, so root_map keeps NVEG == MAXVEG == 5
+🔄 Update soil
+🔄 Update atmbc
+🔄 Update parm file 
+🔄 Update parm file 
+─────────────────────────────────────────────────────────────────────────────────────── ⚠ warning messages above ⚠ ────────────────────────────────────────────────────────────────────────────────────────
+['Adjusting NPRT with respect to time of interests requested\n']
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+🔄 Update ic
+🔄 Update parm file 
+🔄 Update parm file 
+🛠  Recompile src files [477s]
+🍳 gfortran compilation [487s]
+✅ Compilation successful!
+👟 Run processor
+    → Soil updated | table rows: 5 (all zones, fixed) | spatially active this month: [1] (semantic: [1]) | PMIN: -1e+35 m | SCF: 1 (Feddes) | Ks: PERMX=1.217e-05, PERMY=1.217e-05, PERMZ=1.217e-05 m/s | retention curve: pyCATHY default | Feddes: pyCATHY default
+  2020-11 | LAI 0.17 (min 0.16, max 0.19) | Ks 43.8 mm/hr
+      ks_fire_utils [off]: no override -> static PERMX 43.80 mm/hr, identical every month (LAI 0.17 only changes the vegetation map)
+      soil Ks vs previous month: 43.80 -> 43.80 mm/hr (+0.0%)  [unchanged]
+      soil file (update_soil / SPP_map): PERMX = 43.80 mm/hr in every stratum [unchanged]; PERMY = x1, PERMZ = x1 | veg zones [1]
+      soil check: Ks unchanged (+0.0%) | veg zones [1] | read-back PERMX 43.80 mm/hr OK
+      running CATHY …
+      solver settings: simu.parm DTMIN=0.001, DTMAX=1000, DELTAT=100  OK || parm file: 100.0 0.001 1000.0 2505600	DELTAT DTMIN DTMAX TMAX
+      saved [11/24 months]: psi/sw/ET/recharge/hgraph, ks_fire_monthly.csv, failures.csv, area-mean CSVs
+    → injected 2x2 placeholder block(s) for vegetation class(es) [2, 3, 4, 5] (absent this raster), 3+ pixels inside the DEM interior, so root_map keeps NVEG == MAXVEG == 5
+🔄 Update soil
+🔄 Update atmbc
+🔄 Update parm file 
+🔄 Update parm file 
+─────────────────────────────────────────────────────────────────────────────────────── ⚠ warning messages above ⚠ ────────────────────────────────────────────────────────────────────────────────────────
+['Adjusting NPRT with respect to time of interests requested\n']
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+🔄 Update ic
+🔄 Update parm file 
+🔄 Update parm file 
+🛠  Recompile src files [520s]
+🍳 gfortran compilation [531s]
+✅ Compilation successful!
+👟 Run processor
+    → Soil updated | table rows: 5 (all zones, fixed) | spatially active this month: [1] (semantic: [1]) | PMIN: -1e+35 m | SCF: 1 (Feddes) | Ks: PERMX=1.217e-05, PERMY=1.217e-05, PERMZ=1.217e-05 m/s | retention curve: pyCATHY default | Feddes: pyCATHY default
+  2020-12 | LAI 0.23 (min 0.21, max 0.25) | Ks 43.8 mm/hr
+      ks_fire_utils [off]: no override -> static PERMX 43.80 mm/hr, identical every month (LAI 0.23 only changes the vegetation map)
+      soil Ks vs previous month: 43.80 -> 43.80 mm/hr (+0.0%)  [unchanged]
+      soil file (update_soil / SPP_map): PERMX = 43.80 mm/hr in every stratum [unchanged]; PERMY = x1, PERMZ = x1 | veg zones [1]
+      soil check: Ks unchanged (+0.0%) | veg zones [1] | read-back PERMX 43.80 mm/hr OK
+      running CATHY …
+      solver settings: simu.parm DTMIN=0.001, DTMAX=1000, DELTAT=100  OK || parm file: 100.0 0.001 1000.0 2592000	DELTAT DTMIN DTMAX TMAX
+      saved [12/24 months]: psi/sw/ET/recharge/hgraph, ks_fire_monthly.csv, failures.csv, area-mean CSVs
+    → injected 2x2 placeholder block(s) for vegetation class(es) [2, 3, 4, 5] (absent this raster), 3+ pixels inside the DEM interior, so root_map keeps NVEG == MAXVEG == 5
+🔄 Update soil
+🔄 Update atmbc
+🔄 Update parm file 
+🔄 Update parm file 
+─────────────────────────────────────────────────────────────────────────────────────── ⚠ warning messages above ⚠ ────────────────────────────────────────────────────────────────────────────────────────
+['Adjusting NPRT with respect to time of interests requested\n']
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+🔄 Update ic
+🔄 Update parm file 
+🔄 Update parm file 
+🛠  Recompile src files [567s]
+🍳 gfortran compilation [577s]
+✅ Compilation successful!
+👟 Run processor
+    → Soil updated | table rows: 5 (all zones, fixed) | spatially active this month: [1] (semantic: [1]) | PMIN: -1e+35 m | SCF: 1 (Feddes) | Ks: PERMX=1.217e-05, PERMY=1.217e-05, PERMZ=1.217e-05 m/s | retention curve: pyCATHY default | Feddes: pyCATHY default
+  2021-01 | LAI 0.33 (min 0.30, max 0.36) | Ks 43.8 mm/hr
+      ks_fire_utils [off]: no override -> static PERMX 43.80 mm/hr, identical every month (LAI 0.33 only changes the vegetation map)
+      soil Ks vs previous month: 43.80 -> 43.80 mm/hr (+0.0%)  [unchanged]
+      soil file (update_soil / SPP_map): PERMX = 43.80 mm/hr in every stratum [unchanged]; PERMY = x1, PERMZ = x1 | veg zones [1]
+      soil check: Ks unchanged (+0.0%) | veg zones [1] | read-back PERMX 43.80 mm/hr OK
+      running CATHY …
+      solver settings: simu.parm DTMIN=0.001, DTMAX=1000, DELTAT=100  OK || parm file: 100.0 0.001 1000.0 2592000	DELTAT DTMIN DTMAX TMAX
+      saved [13/24 months]: psi/sw/ET/recharge/hgraph, ks_fire_monthly.csv, failures.csv, area-mean CSVs
+    → injected 2x2 placeholder block(s) for vegetation class(es) [2, 3, 4, 5] (absent this raster), 3+ pixels inside the DEM interior, so root_map keeps NVEG == MAXVEG == 5
+🔄 Update soil
+🔄 Update atmbc
+🔄 Update parm file 
+🔄 Update parm file 
+─────────────────────────────────────────────────────────────────────────────────────── ⚠ warning messages above ⚠ ────────────────────────────────────────────────────────────────────────────────────────
+['Adjusting NPRT with respect to time of interests requested\n']
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+🔄 Update ic
+🔄 Update parm file 
+🔄 Update parm file 
+🛠  Recompile src files [610s]
+🍳 gfortran compilation [620s]
+✅ Compilation successful!
+👟 Run processor
+    → Soil updated | table rows: 5 (all zones, fixed) | spatially active this month: [1] (semantic: [1]) | PMIN: -1e+35 m | SCF: 1 (Feddes) | Ks: PERMX=1.217e-05, PERMY=1.217e-05, PERMZ=1.217e-05 m/s | retention curve: pyCATHY default | Feddes: pyCATHY default
+  2021-02 | LAI 0.46 (min 0.42, max 0.51) | Ks 43.8 mm/hr
+      ks_fire_utils [off]: no override -> static PERMX 43.80 mm/hr, identical every month (LAI 0.46 only changes the vegetation map)
+      soil Ks vs previous month: 43.80 -> 43.80 mm/hr (+0.0%)  [unchanged]
+      soil file (update_soil / SPP_map): PERMX = 43.80 mm/hr in every stratum [unchanged]; PERMY = x1, PERMZ = x1 | veg zones [1]
+      soil check: Ks unchanged (+0.0%) | veg zones [1] | read-back PERMX 43.80 mm/hr OK
+      running CATHY …
+      solver settings: simu.parm DTMIN=0.001, DTMAX=1000, DELTAT=100  OK || parm file: 100.0 0.001 1000.0 2332800	DELTAT DTMIN DTMAX TMAX
+      saved [14/24 months]: psi/sw/ET/recharge/hgraph, ks_fire_monthly.csv, failures.csv, area-mean CSVs
+    → injected 2x2 placeholder block(s) for vegetation class(es) [2, 3, 4, 5] (absent this raster), 3+ pixels inside the DEM interior, so root_map keeps NVEG == MAXVEG == 5
+🔄 Update soil
+🔄 Update atmbc
+🔄 Update parm file 
+🔄 Update parm file 
+─────────────────────────────────────────────────────────────────────────────────────── ⚠ warning messages above ⚠ ────────────────────────────────────────────────────────────────────────────────────────
+['Adjusting NPRT with respect to time of interests requested\n']
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+🔄 Update ic
+🔄 Update parm file 
+🔄 Update parm file 
+🛠  Recompile src files [649s]
+🍳 gfortran compilation [659s]
+✅ Compilation successful!
+👟 Run processor
+    → Soil updated | table rows: 5 (all zones, fixed) | spatially active this month: [1] (semantic: [1]) | PMIN: -1e+35 m | SCF: 1 (Feddes) | Ks: PERMX=1.217e-05, PERMY=1.217e-05, PERMZ=1.217e-05 m/s | retention curve: pyCATHY default | Feddes: pyCATHY default
+  2021-03 | LAI 0.61 (min 0.55, max 0.67) | Ks 43.8 mm/hr
+      ks_fire_utils [off]: no override -> static PERMX 43.80 mm/hr, identical every month (LAI 0.61 only changes the vegetation map)
+      soil Ks vs previous month: 43.80 -> 43.80 mm/hr (+0.0%)  [unchanged]
+      soil file (update_soil / SPP_map): PERMX = 43.80 mm/hr in every stratum [unchanged]; PERMY = x1, PERMZ = x1 | veg zones [1]
+      soil check: Ks unchanged (+0.0%) | veg zones [1] | read-back PERMX 43.80 mm/hr OK
+      running CATHY …
+      solver settings: simu.parm DTMIN=0.001, DTMAX=1000, DELTAT=100  OK || parm file: 100.0 0.001 1000.0 2592000	DELTAT DTMIN DTMAX TMAX
+      saved [15/24 months]: psi/sw/ET/recharge/hgraph, ks_fire_monthly.csv, failures.csv, area-mean CSVs
+    → injected 2x2 placeholder block(s) for vegetation class(es) [2, 3, 4, 5] (absent this raster), 3+ pixels inside the DEM interior, so root_map keeps NVEG == MAXVEG == 5
+🔄 Update soil
+🔄 Update atmbc
+🔄 Update parm file 
+🔄 Update parm file 
+─────────────────────────────────────────────────────────────────────────────────────── ⚠ warning messages above ⚠ ────────────────────────────────────────────────────────────────────────────────────────
+['Adjusting NPRT with respect to time of interests requested\n']
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+🔄 Update ic
+🔄 Update parm file 
+🔄 Update parm file 
+🛠  Recompile src files [692s]
+🍳 gfortran compilation [702s]
+✅ Compilation successful!
+👟 Run processor
+    → Soil updated | table rows: 5 (all zones, fixed) | spatially active this month: [1] (semantic: [1]) | PMIN: -1e+35 m | SCF: 1 (Feddes) | Ks: PERMX=1.217e-05, PERMY=1.217e-05, PERMZ=1.217e-05 m/s | retention curve: pyCATHY default | Feddes: pyCATHY default
+  2021-04 | LAI 0.76 (min 0.68, max 0.84) | Ks 43.8 mm/hr
+      ks_fire_utils [off]: no override -> static PERMX 43.80 mm/hr, identical every month (LAI 0.76 only changes the vegetation map)
+      soil Ks vs previous month: 43.80 -> 43.80 mm/hr (+0.0%)  [unchanged]
+      soil file (update_soil / SPP_map): PERMX = 43.80 mm/hr in every stratum [unchanged]; PERMY = x1, PERMZ = x1 | veg zones [1]
+      soil check: Ks unchanged (+0.0%) | veg zones [1] | read-back PERMX 43.80 mm/hr OK
+      running CATHY …
+      solver settings: simu.parm DTMIN=0.001, DTMAX=1000, DELTAT=100  OK || parm file: 100.0 0.001 1000.0 2505600	DELTAT DTMIN DTMAX TMAX
+      saved [16/24 months]: psi/sw/ET/recharge/hgraph, ks_fire_monthly.csv, failures.csv, area-mean CSVs
+    → injected 2x2 placeholder block(s) for vegetation class(es) [2, 3, 4, 5] (absent this raster), 3+ pixels inside the DEM interior, so root_map keeps NVEG == MAXVEG == 5
+🔄 Update soil
+🔄 Update atmbc
+🔄 Update parm file 
+🔄 Update parm file 
+─────────────────────────────────────────────────────────────────────────────────────── ⚠ warning messages above ⚠ ────────────────────────────────────────────────────────────────────────────────────────
+['Adjusting NPRT with respect to time of interests requested\n']
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+🔄 Update ic
+🔄 Update parm file 
+🔄 Update parm file 
+🛠  Recompile src files [736s]
+🍳 gfortran compilation [746s]
+✅ Compilation successful!
+👟 Run processor
+    → Soil updated | table rows: 5 (all zones, fixed) | spatially active this month: [1] (semantic: [1]) | PMIN: -1e+35 m | SCF: 1 (Feddes) | Ks: PERMX=1.217e-05, PERMY=1.217e-05, PERMZ=1.217e-05 m/s | retention curve: pyCATHY default | Feddes: pyCATHY default
+  2021-05 | LAI 0.87 (min 0.78, max 0.95) | Ks 43.8 mm/hr
+      ks_fire_utils [off]: no override -> static PERMX 43.80 mm/hr, identical every month (LAI 0.87 only changes the vegetation map)
+      soil Ks vs previous month: 43.80 -> 43.80 mm/hr (+0.0%)  [unchanged]
+      soil file (update_soil / SPP_map): PERMX = 43.80 mm/hr in every stratum [unchanged]; PERMY = x1, PERMZ = x1 | veg zones [1]
+      soil check: Ks unchanged (+0.0%) | veg zones [1] | read-back PERMX 43.80 mm/hr OK
+      running CATHY …
+      solver settings: simu.parm DTMIN=0.001, DTMAX=1000, DELTAT=100  OK || parm file: 100.0 0.001 1000.0 2592000	DELTAT DTMIN DTMAX TMAX
+      saved [17/24 months]: psi/sw/ET/recharge/hgraph, ks_fire_monthly.csv, failures.csv, area-mean CSVs
+    → injected 2x2 placeholder block(s) for vegetation class(es) [3, 4, 5] (absent this raster), 3+ pixels inside the DEM interior, so root_map keeps NVEG == MAXVEG == 5
+🔄 Update soil
+🔄 Update atmbc
+🔄 Update parm file 
+🔄 Update parm file 
+─────────────────────────────────────────────────────────────────────────────────────── ⚠ warning messages above ⚠ ────────────────────────────────────────────────────────────────────────────────────────
+['Adjusting NPRT with respect to time of interests requested\n']
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+🔄 Update ic
+🔄 Update parm file 
+🔄 Update parm file 
+🛠  Recompile src files [780s]
+🍳 gfortran compilation [790s]
+✅ Compilation successful!
+👟 Run processor
+    → Soil updated | table rows: 5 (all zones, fixed) | spatially active this month: [1, 2] (semantic: [1, 2]) | PMIN: -1e+35 m | SCF: 1 (Feddes) | Ks: PERMX=1.217e-05, PERMY=1.217e-05, PERMZ=1.217e-05 m/s | retention curve: pyCATHY default | Feddes: pyCATHY default
+  2021-06 | LAI 0.92 (min 0.82, max 1.01) | Ks 43.8 mm/hr
+      ks_fire_utils [off]: no override -> static PERMX 43.80 mm/hr, identical every month (LAI 0.92 only changes the vegetation map)
+      soil Ks vs previous month: 43.80 -> 43.80 mm/hr (+0.0%)  [unchanged]
+      soil file (update_soil / SPP_map): PERMX = 43.80 mm/hr in every stratum [unchanged]; PERMY = x1, PERMZ = x1 | veg zones [1, 2]
+      soil check: Ks unchanged (+0.0%) | veg zones [1, 2] (changed) | read-back PERMX 43.80 mm/hr OK
+      running CATHY …
+      solver settings: simu.parm DTMIN=0.001, DTMAX=1000, DELTAT=100  OK || parm file: 100.0 0.001 1000.0 2505600	DELTAT DTMIN DTMAX TMAX
+      saved [18/24 months]: psi/sw/ET/recharge/hgraph, ks_fire_monthly.csv, failures.csv, area-mean CSVs
+    → injected 2x2 placeholder block(s) for vegetation class(es) [2, 3, 4, 5] (absent this raster), 3+ pixels inside the DEM interior, so root_map keeps NVEG == MAXVEG == 5
+🔄 Update soil
+🔄 Update atmbc
+🔄 Update parm file 
+🔄 Update parm file 
+─────────────────────────────────────────────────────────────────────────────────────── ⚠ warning messages above ⚠ ────────────────────────────────────────────────────────────────────────────────────────
+['Adjusting NPRT with respect to time of interests requested\n']
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+🔄 Update ic
+🔄 Update parm file 
+🔄 Update parm file 
+🛠  Recompile src files [823s]
+🍳 gfortran compilation [833s]
+✅ Compilation successful!
+👟 Run processor
+    → Soil updated | table rows: 5 (all zones, fixed) | spatially active this month: [1] (semantic: [1]) | PMIN: -1e+35 m | SCF: 1 (Feddes) | Ks: PERMX=1.217e-05, PERMY=1.217e-05, PERMZ=1.217e-05 m/s | retention curve: pyCATHY default | Feddes: pyCATHY default
+  2021-07 | LAI 0.89 (min 0.80, max 0.98) | Ks 43.8 mm/hr
+      ks_fire_utils [off]: no override -> static PERMX 43.80 mm/hr, identical every month (LAI 0.89 only changes the vegetation map)
+      soil Ks vs previous month: 43.80 -> 43.80 mm/hr (+0.0%)  [unchanged]
+      soil file (update_soil / SPP_map): PERMX = 43.80 mm/hr in every stratum [unchanged]; PERMY = x1, PERMZ = x1 | veg zones [1]
+      soil check: Ks unchanged (+0.0%) | veg zones [1] (changed) | read-back PERMX 43.80 mm/hr OK
+      running CATHY …
+      solver settings: simu.parm DTMIN=0.001, DTMAX=1000, DELTAT=100  OK || parm file: 100.0 0.001 1000.0 2592000	DELTAT DTMIN DTMAX TMAX
+      saved [19/24 months]: psi/sw/ET/recharge/hgraph, ks_fire_monthly.csv, failures.csv, area-mean CSVs
+    → injected 2x2 placeholder block(s) for vegetation class(es) [2, 3, 4, 5] (absent this raster), 3+ pixels inside the DEM interior, so root_map keeps NVEG == MAXVEG == 5
+🔄 Update soil
+🔄 Update atmbc
+🔄 Update parm file 
+🔄 Update parm file 
+─────────────────────────────────────────────────────────────────────────────────────── ⚠ warning messages above ⚠ ────────────────────────────────────────────────────────────────────────────────────────
+['Adjusting NPRT with respect to time of interests requested\n']
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+🔄 Update ic
+🔄 Update parm file 
+🔄 Update parm file 
+🛠  Recompile src files [865s]
+🍳 gfortran compilation [874s]
+✅ Compilation successful!
+👟 Run processor
+    → Soil updated | table rows: 5 (all zones, fixed) | spatially active this month: [1] (semantic: [1]) | PMIN: -1e+35 m | SCF: 1 (Feddes) | Ks: PERMX=1.217e-05, PERMY=1.217e-05, PERMZ=1.217e-05 m/s | retention curve: pyCATHY default | Feddes: pyCATHY default
+  2021-08 | LAI 0.82 (min 0.74, max 0.90) | Ks 43.8 mm/hr
+      ks_fire_utils [off]: no override -> static PERMX 43.80 mm/hr, identical every month (LAI 0.82 only changes the vegetation map)
+      soil Ks vs previous month: 43.80 -> 43.80 mm/hr (+0.0%)  [unchanged]
+      soil file (update_soil / SPP_map): PERMX = 43.80 mm/hr in every stratum [unchanged]; PERMY = x1, PERMZ = x1 | veg zones [1]
+      soil check: Ks unchanged (+0.0%) | veg zones [1] | read-back PERMX 43.80 mm/hr OK
+      running CATHY …
+      solver settings: simu.parm DTMIN=0.001, DTMAX=1000, DELTAT=100  OK || parm file: 100.0 0.001 1000.0 2592000	DELTAT DTMIN DTMAX TMAX
+      saved [20/24 months]: psi/sw/ET/recharge/hgraph, ks_fire_monthly.csv, failures.csv, area-mean CSVs
+    → injected 2x2 placeholder block(s) for vegetation class(es) [2, 3, 4, 5] (absent this raster), 3+ pixels inside the DEM interior, so root_map keeps NVEG == MAXVEG == 5
+🔄 Update soil
+🔄 Update atmbc
+🔄 Update parm file 
+🔄 Update parm file 
+─────────────────────────────────────────────────────────────────────────────────────── ⚠ warning messages above ⚠ ────────────────────────────────────────────────────────────────────────────────────────
+['Adjusting NPRT with respect to time of interests requested\n']
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+🔄 Update ic
+🔄 Update parm file 
+🔄 Update parm file 
+🛠  Recompile src files [908s]
+🍳 gfortran compilation [917s]
+✅ Compilation successful!
+👟 Run processor
+    → Soil updated | table rows: 5 (all zones, fixed) | spatially active this month: [1] (semantic: [1]) | PMIN: -1e+35 m | SCF: 1 (Feddes) | Ks: PERMX=1.217e-05, PERMY=1.217e-05, PERMZ=1.217e-05 m/s | retention curve: pyCATHY default | Feddes: pyCATHY default
+  2021-09 | LAI 0.72 (min 0.65, max 0.79) | Ks 43.8 mm/hr
+      ks_fire_utils [off]: no override -> static PERMX 43.80 mm/hr, identical every month (LAI 0.72 only changes the vegetation map)
+      soil Ks vs previous month: 43.80 -> 43.80 mm/hr (+0.0%)  [unchanged]
+      soil file (update_soil / SPP_map): PERMX = 43.80 mm/hr in every stratum [unchanged]; PERMY = x1, PERMZ = x1 | veg zones [1]
+      soil check: Ks unchanged (+0.0%) | veg zones [1] | read-back PERMX 43.80 mm/hr OK
+      running CATHY …
+      solver settings: simu.parm DTMIN=0.001, DTMAX=1000, DELTAT=100  OK || parm file: 100.0 0.001 1000.0 2505600	DELTAT DTMIN DTMAX TMAX
+      saved [21/24 months]: psi/sw/ET/recharge/hgraph, ks_fire_monthly.csv, failures.csv, area-mean CSVs
+    → injected 2x2 placeholder block(s) for vegetation class(es) [2, 3, 4, 5] (absent this raster), 3+ pixels inside the DEM interior, so root_map keeps NVEG == MAXVEG == 5
+🔄 Update soil
+🔄 Update atmbc
+🔄 Update parm file 
+🔄 Update parm file 
+─────────────────────────────────────────────────────────────────────────────────────── ⚠ warning messages above ⚠ ────────────────────────────────────────────────────────────────────────────────────────
+['Adjusting NPRT with respect to time of interests requested\n']
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+🔄 Update ic
+🔄 Update parm file 
+🔄 Update parm file 
+🛠  Recompile src files [951s]
+🍳 gfortran compilation [961s]
+✅ Compilation successful!
+👟 Run processor
+    → Soil updated | table rows: 5 (all zones, fixed) | spatially active this month: [1] (semantic: [1]) | PMIN: -1e+35 m | SCF: 1 (Feddes) | Ks: PERMX=1.217e-05, PERMY=1.217e-05, PERMZ=1.217e-05 m/s | retention curve: pyCATHY default | Feddes: pyCATHY default
+  2021-10 | LAI 0.64 (min 0.58, max 0.71) | Ks 43.8 mm/hr
+      ks_fire_utils [off]: no override -> static PERMX 43.80 mm/hr, identical every month (LAI 0.64 only changes the vegetation map)
+      soil Ks vs previous month: 43.80 -> 43.80 mm/hr (+0.0%)  [unchanged]
+      soil file (update_soil / SPP_map): PERMX = 43.80 mm/hr in every stratum [unchanged]; PERMY = x1, PERMZ = x1 | veg zones [1]
+      soil check: Ks unchanged (+0.0%) | veg zones [1] | read-back PERMX 43.80 mm/hr OK
+      running CATHY …
+      solver settings: simu.parm DTMIN=0.001, DTMAX=1000, DELTAT=100  OK || parm file: 100.0 0.001 1000.0 2592000	DELTAT DTMIN DTMAX TMAX
+      saved [22/24 months]: psi/sw/ET/recharge/hgraph, ks_fire_monthly.csv, failures.csv, area-mean CSVs
+    → injected 2x2 placeholder block(s) for vegetation class(es) [2, 3, 4, 5] (absent this raster), 3+ pixels inside the DEM interior, so root_map keeps NVEG == MAXVEG == 5
+🔄 Update soil
+🔄 Update atmbc
+🔄 Update parm file 
+🔄 Update parm file 
+─────────────────────────────────────────────────────────────────────────────────────── ⚠ warning messages above ⚠ ────────────────────────────────────────────────────────────────────────────────────────
+['Adjusting NPRT with respect to time of interests requested\n']
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+🔄 Update ic
+🔄 Update parm file 
+🔄 Update parm file 
+🛠  Recompile src files [994s]
+🍳 gfortran compilation [1004s]
+✅ Compilation successful!
+👟 Run processor
+    → Soil updated | table rows: 5 (all zones, fixed) | spatially active this month: [1] (semantic: [1]) | PMIN: -1e+35 m | SCF: 1 (Feddes) | Ks: PERMX=1.217e-05, PERMY=1.217e-05, PERMZ=1.217e-05 m/s | retention curve: pyCATHY default | Feddes: pyCATHY default
+  2021-11 | LAI 0.64 (min 0.57, max 0.70) | Ks 43.8 mm/hr
+      ks_fire_utils [off]: no override -> static PERMX 43.80 mm/hr, identical every month (LAI 0.64 only changes the vegetation map)
+      soil Ks vs previous month: 43.80 -> 43.80 mm/hr (+0.0%)  [unchanged]
+      soil file (update_soil / SPP_map): PERMX = 43.80 mm/hr in every stratum [unchanged]; PERMY = x1, PERMZ = x1 | veg zones [1]
+      soil check: Ks unchanged (+0.0%) | veg zones [1] | read-back PERMX 43.80 mm/hr OK
+      running CATHY …
+      solver settings: simu.parm DTMIN=0.001, DTMAX=1000, DELTAT=100  OK || parm file: 100.0 0.001 1000.0 2505600	DELTAT DTMIN DTMAX TMAX
+      saved [23/24 months]: psi/sw/ET/recharge/hgraph, ks_fire_monthly.csv, failures.csv, area-mean CSVs
+    → injected 2x2 placeholder block(s) for vegetation class(es) [2, 3, 4, 5] (absent this raster), 3+ pixels inside the DEM interior, so root_map keeps NVEG == MAXVEG == 5
+🔄 Update soil
+🔄 Update atmbc
+🔄 Update parm file 
+🔄 Update parm file 
+─────────────────────────────────────────────────────────────────────────────────────── ⚠ warning messages above ⚠ ────────────────────────────────────────────────────────────────────────────────────────
+['Adjusting NPRT with respect to time of interests requested\n']
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+🔄 Update ic
+🔄 Update parm file 
+🔄 Update parm file 
+🛠  Recompile src files [1037s]
+🍳 gfortran compilation [1047s]
+✅ Compilation successful!
+👟 Run processor
+/home/ben/Nextcloud/BenCSIC/Codes/Tech4agro_org/GRwater_CATmentHYdrology/lib/results_plotter.py:1969: UserWarning: No artists with labels found to put in legend.  Note that artists whose label start with an underscore are ignored when legend() is called with no argument.
+  axes2[1].legend(fontsize=8)
+    → Soil updated | table rows: 5 (all zones, fixed) | spatially active this month: [1] (semantic: [1]) | PMIN: -1e+35 m | SCF: 1 (Feddes) | Ks: PERMX=1.217e-05, PERMY=1.217e-05, PERMZ=1.217e-05 m/s | retention curve: pyCATHY default | Feddes: pyCATHY default
+  2021-12 | LAI 0.72 (min 0.64, max 0.79) | Ks 43.8 mm/hr
+      ks_fire_utils [off]: no override -> static PERMX 43.80 mm/hr, identical every month (LAI 0.72 only changes the vegetation map)
+      soil Ks vs previous month: 43.80 -> 43.80 mm/hr (+0.0%)  [unchanged]
+      soil file (update_soil / SPP_map): PERMX = 43.80 mm/hr in every stratum [unchanged]; PERMY = x1, PERMZ = x1 | veg zones [1]
+      soil check: Ks unchanged (+0.0%) | veg zones [1] | read-back PERMX 43.80 mm/hr OK
+      running CATHY …
+      solver settings: simu.parm DTMIN=0.001, DTMAX=1000, DELTAT=100  OK || parm file: 100.0 0.001 1000.0 2592000	DELTAT DTMIN DTMAX TMAX
+      saved [24/24 months]: psi/sw/ET/recharge/hgraph, ks_fire_monthly.csv, failures.csv, area-mean CSVs
+  ── ks_fire_utils: soil Ks updates over time (whole soil) ──
+  month    LAI   driver  Ks mm/hr   change   soil file
+  2020-01   1.65   1.000     43.80             initial
+  2020-02   2.00   1.000     43.80     +0.0%   unchanged
+  2020-03   2.35   1.000     43.80     +0.0%   unchanged
+  2020-04   2.61   1.000     43.80     +0.0%   unchanged
+  2020-05   2.70   1.000     43.80     +0.0%   unchanged
+  2020-06   2.61   1.000     43.80     +0.0%   unchanged
+  2020-07   0.00   0.000     43.80     +0.0%   unchanged  <- fire
+  2020-08   0.07   0.034     43.80     +0.0%   unchanged
+  2020-09   0.11   0.068     43.80     +0.0%   unchanged
+  2020-10   0.14   0.100     43.80     +0.0%   unchanged
+  2020-11   0.17   0.134     43.80     +0.0%   unchanged
+  2020-12   0.23   0.166     43.80     +0.0%   unchanged
+  2021-01   0.33   0.199     43.80     +0.0%   unchanged
+  2021-02   0.46   0.231     43.80     +0.0%   unchanged
+  2021-03   0.61   0.260     43.80     +0.0%   unchanged
+  2021-04   0.76   0.291     43.80     +0.0%   unchanged
+  2021-05   0.87   0.321     43.80     +0.0%   unchanged
+  2021-06   0.92   0.351     43.80     +0.0%   unchanged
+  2021-07   0.89   0.380     43.80     +0.0%   unchanged
+  2021-08   0.82   0.408     43.80     +0.0%   unchanged
+  2021-09   0.72   0.436     43.80     +0.0%   unchanged
+  2021-10   0.64   0.462     43.80     +0.0%   unchanged
+  2021-11   0.64   0.489     43.80     +0.0%   unchanged
+  2021-12   0.72   0.513     43.80     +0.0%   unchanged
+  Ks changed in 0 of 23 monthly updates (range 43.80 - 43.80 mm/hr)
+[4/6] Assembling outputs …
+[5/6] Plotting …
+  Saved → /home/ben/Nextcloud/BenCSIC/Codes/Tech4agro_org/GRwater_CATmentHYdrology/lib/synthetic_LAI_Ks/control/synth_ks-off_2020-2021/figures/fig_lai_vs_ks.png
+  Saved → /home/ben/Nextcloud/BenCSIC/Codes/Tech4agro_org/GRwater_CATmentHYdrology/lib/synthetic_LAI_Ks/control/synth_ks-off_2020-2021/figures/ET_monthly_mean.png
+  Plotting hydro_xr time-series (2020-01-01 → 2021-12-31) …
+  Saved → /home/ben/Nextcloud/BenCSIC/Codes/Tech4agro_org/GRwater_CATmentHYdrology/lib/synthetic_LAI_Ks/control/synth_ks-off_2020-2021/figures/fig6_hydro_timeseries.png
+  Plotting et_sw_lai_xr time-series (2020-01-01 → 2021-12-31) …
+  Saved → /home/ben/Nextcloud/BenCSIC/Codes/Tech4agro_org/GRwater_CATmentHYdrology/lib/synthetic_LAI_Ks/control/synth_ks-off_2020-2021/figures/fig7b_et_sw_lai_timeseries.png
+  Plotting et_psi_lai_xr time-series (2020-01-01 → 2021-12-31) …
+  Saved → /home/ben/Nextcloud/BenCSIC/Codes/Tech4agro_org/GRwater_CATmentHYdrology/lib/synthetic_LAI_Ks/control/synth_ks-off_2020-2021/figures/fig7f_et_psi_lai_timeseries.png
+  Saved → /home/ben/Nextcloud/BenCSIC/Codes/Tech4agro_org/GRwater_CATmentHYdrology/lib/synthetic_LAI_Ks/control/synth_ks-off_2020-2021/figures/fig_node_locations.png
+  Plotting hydrograph from hgraph_output.csv …
+  Saved → /home/ben/Nextcloud/BenCSIC/Codes/Tech4agro_org/GRwater_CATmentHYdrology/lib/synthetic_LAI_Ks/control/synth_ks-off_2020-2021/figures/hgraph.png
+  Plotting recharge from recharge_output.nc …
+  Saved → /home/ben/Nextcloud/BenCSIC/Codes/Tech4agro_org/GRwater_CATmentHYdrology/lib/synthetic_LAI_Ks/control/synth_ks-off_2020-2021/figures/recharge_monthly_all_years.png
+  Saved → /home/ben/Nextcloud/BenCSIC/Codes/Tech4agro_org/GRwater_CATmentHYdrology/lib/synthetic_LAI_Ks/control/synth_ks-off_2020-2021/figures/recharge_yearly.png
+[6/6] Done.
+  Outputs : /home/ben/Nextcloud/BenCSIC/Codes/Tech4agro_org/GRwater_CATmentHYdrology/lib/synthetic_LAI_Ks/control/synth_ks-off_2020-2021/outputs
+  Figures : /home/ben/Nextcloud/BenCSIC/Codes/Tech4agro_org/GRwater_CATmentHYdrology/lib/synthetic_LAI_Ks/control/synth_ks-off_2020-2021/figures
+  Failures tracked: 1
+    - import withLAI_results: No module named 'Agramon_utils'
