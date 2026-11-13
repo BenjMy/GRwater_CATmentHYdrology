@@ -732,9 +732,9 @@ def _parse_args(argv=None) -> argparse.Namespace:
                    help="multiply the daily rain forcing by X (wetter/drier test; 1 = as read)")
     p.add_argument("--etp-scale", type=float, default=1.0, metavar="X",
                    help="multiply the daily ETp forcing by X (1 = as read)")
-    p.add_argument("--dtmin", type=float, default=1e-3)
-    p.add_argument("--dtmax", type=float, default=1e3)
-    p.add_argument("--deltat", type=float, default=1e2)
+    p.add_argument("--dtmin", type=float, default=1e-2)
+    p.add_argument("--dtmax", type=float, default=1e4)
+    p.add_argument("--deltat", type=float, default=1e3)
     p.add_argument("--max-consecutive-fail", type=int, default=3, metavar="N",
                    help="stop the monthly loop after N months in a row that could not be "
                         "simulated (the months done so far are still saved); 0 = never stop")

@@ -3,7 +3,13 @@
 SSHydro_withETp_withLAI
 SSHydro
 lib/test_validation_tomas/*.nc
+lib/synthetic_LAI_Ks_wet
+
 
 # Python bytecode
 __pycache__/
 *.pyc
+/lib/synthetic_LAI_Ks_wet/
+
+# Synthetic LAI-Ks simulation outputs
+lib/synthetic_LAI_Ks_wet/
