@@ -526,6 +526,36 @@ def test_agramon_log():
                     and getattr(n.func, "id", "") == "print"], mod
 
 
+def test_recovery_metrics():
+    import numpy as np
+    import pandas as pd
+    import recovery_metrics as R
+    idx = pd.date_range("2020-01-31", periods=12, freq="ME")
+    ctrl = pd.Series(1.0, index=idx)
+    burn = pd.Series([1.0] * 6 + [0.4, 0.5, 0.7, 0.92, 0.95, 1.0], index=idx)   # fire 2020-07
+    r = R.relative_to_control(burn, ctrl)
+    assert np.isclose(r.iloc[6], 0.4)
+    # recovered (|r-1|<=0.1) from Oct 2020 for >=3 months -> 3 months after July
+    assert R.recovery_time(r, "2020-07-01", tol=0.1, sustain=3) == 3.0
+    assert np.isnan(R.recovery_time(r, "2020-07-01", tol=0.01, sustain=3))   # never within 1 %
+    assert np.isnan(R.recovery_time(r, "2020-07-01", tol=0.1, sustain=4))    # run too short
+    assert np.isclose(R.deficit(burn, ctrl, "2020-07-01"), 0.6 + 0.5 + 0.3 + 0.08 + 0.05)
+    df_b = pd.DataFrame({"LAI": burn, "ETa": burn * 2}); df_c = pd.DataFrame({"LAI": ctrl, "ETa": ctrl * 2})
+    tab = R.recovery_table(df_b, df_c, "2020-07-01")
+    assert list(tab.index) == ["LAI", "ETa"] and np.isclose(tab.loc["LAI", "min_ratio"], 0.4)
+    assert np.isclose(tab.loc["ETa", "deficit"], 2 * tab.loc["LAI", "deficit"])
+    z = R.relative_to_control(burn, ctrl * 0)
+    assert z.isna().all()
+    for bad in (lambda: R.recovery_time(r, "2020-07-01", sustain=0),
+                lambda: R.relative_to_control(burn.values, ctrl)):
+        try:
+            bad()
+        except (ValueError, TypeError):
+            pass
+        else:
+            raise AssertionError("bad input accepted")
+
+
 if __name__ == "__main__":
     for name, fn in sorted(globals().items()):
         if name.startswith("test_") and callable(fn):

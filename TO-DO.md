@@ -233,7 +233,7 @@ giving "'ic' has length N but the mesh has M points"), and the main script works
 - [ ] 🟡 `pyCATHY` wrapper fixes for BCs (`update_nansfdirbc`, `update_nansfneubc`, `update_sfbc`): in progress
 - [ ] 🟡 Validate `pyCATHY` fixes for the `map_prop2mesh` bug and the stale `mesh_pv_attributes` cache (both fixes are already in the code: `np.isscalar` check, `_mesh_is_stale()`/`_mesh_dirty` and the nnod3 guard; still to confirm on a real run with `--mesh-props`)
 - [ ] 🟡 Fill the mesh `.vtk` systematically with soil and root properties; rewrite the existing IC-based mapping properly (§5.4): pycathy_wrapper branch `mesh-vtk-properties` has `mesh_properties.py` + `map_soil_root_to_mesh(origin=...)` (tests pass on a synthetic mesh); **check on a real run** (map row order `origin`, Feddes table layout), xarray (layer, y, x) master still open
-- [ ] ⬜ Hydrological recovery metrics (§4)
+- [ ] 🟡 Hydrological recovery metrics (§4): `lib/recovery_metrics.py` (ratio to control, recovery time with tolerance + sustain, deficit, per-variable table; tested on synthetic series). To decide: `tol` (0.1?), `sustain` (3?), which variables, and wire it to the burned/control outputs once the control catchment exists
 
 ### Simulations (confirm which are completed and checked)
 - [ ] 🟡 Burned, baseline: `SCF=1`, `PMIN=−1e34`, closed, `Ks=1e-4`, both root-depth sets
@@ -303,6 +303,7 @@ giving "'ic' has length N but the mesh has M points"), and the main script works
 - 2026-11-14: REFACTORING 2.2: `prepare_month_vegetation`, `month_forcing_indices`, `plot_month_forcing` moved to `agramon_monthly.py` (AST-checked). Left in the loop: 12.6 (mutates n_surf/ETp_nodes/rain_nodes) and 12.11c.
 - 2026-11-14: REFACTORING 2.10 done: `agramon_log.py`; prints in agramon_* + main script converted to `log.*` (stdout output unchanged by default, warnings/errors now real levels); new `--log-level` / `--log-file`.
 - 2026-11-14: §5.4: `map_soil_root_to_mesh` got an explicit `origin` (map row order; default 'upper' = CATHY files) because the Agramon rasters use 'lower' in `build_mesh_dataset`; to check against a real run. Found that the `~isinstance` and stale-cache bugs are already fixed in pyCATHY (tracker updated).
+- 2026-11-14: §4 first step: `lib/recovery_metrics.py` (burned/control ratio, recovery time, deficit, table) + test. Thresholds are placeholders for the author to choose.
 - 2026-11-13: §3.1 implemented (see ticks); only "new study: different DEM slopes" remains. Checked: py_compile, `--smoke-test`, comparison rebuilt on committed dry runs. Not checked: full CATHY runs (`--quick`, `--wet`).
 
 ## 10. References to cite
