@@ -41,7 +41,7 @@ python synthetic_ksfire_LAI.py --path2prj <root>/<name> --start-year ... --end-y
 Outputs land in:
 
 ```
-<root>/                                  (default ../synthetic_LAI_Ks)
+<root>/                                  (default <repo>/results/synthetic_LAI_Ks, outside lib/)
   <name>/
     run.log                              full console output of that scenario
     _monthly_backup/<scenario>/          one file per simulated month, enables restart
@@ -95,6 +95,27 @@ Soil layers:
   the fire model every month, over a stable subsoil (`--permx-deep`, default = unburned Ks).
 - 1 layer (`--no-two-layers`): one homogeneous soil.
 
+## Hypotheses: what each scenario should do (theory)
+
+The synthetic fire removes LAI on 2020-07-01 (root-water uptake and ETa drop at once, in all
+scenarios including the controls); LAI then regrows (`--lai-recovery-rate`). The scenarios differ
+only in how Ks responds. Expected sign of scenario − matching control:
+
+| Scenario | Ks after the fire | Expected ΔETa | Expected Δrecharge |
+|---|---|---|---|
+| `control`, `control_2L` | constant | 0 (reference; shows the pure vegetation effect) | 0 |
+| `lai_1L` / `lai_2L` | drops to the post-fire minimum (16.2 mm/hr, 37 % of unburned), recovers with the LAI recovery ratio | small decrease or none: less infiltration, more ponding and runoff, drier topsoil in storms | decrease right after the fire, converging to 0 as LAI regrows. Stronger in 1L (whole 3 m column slowed) than 2L (only 0.1 m topsoil: it throttles infiltration but not deep drainage) |
+| `lai_raw_2L` | follows the seasonal absolute LAI | as `lai`, plus a seasonal Ks oscillation (artefact of not normalising by the unburned LAI) | as `lai` with seasonal noise |
+| `time_*` | logistic recovery in time since fire, independent of vegetation (`overall_average`, `median` fast, `lower_bound`/`upper_bound` extremes) | as `lai`, but the recovery speed is set by the preset, not by regrowth | as `lai`; `lower_bound` recovers slowest, so the longest deficit |
+| `burnsev_*` | one static reduction (severity 0.6), no recovery | persistent small decrease | persistent decrease, no convergence to 0 |
+| `lai_2L_top0.5` | as `lai_2L`, 0.5 m burned layer | slightly larger effect than 0.1 m | larger decrease (thicker low-Ks layer) |
+| `lai_2L_deepK5e-5` | as `lai_2L`, stiffer subsoil | negligible | decrease in recharge (deep drainage limited), independent of the fire |
+
+**Caveat.** The forcing is daily: even 3x rain stays well below the lowest post-fire Ks (16.2 mm/hr
+≈ 390 mm/day), so infiltration capacity is rarely exceeded and Ks acts mainly through
+redistribution and recharge, not through infiltration-excess runoff. Expect small Δ unless the
+soil is wet or Ks is lowered further (`--ks-fire-ll`).
+
 ## Selecting scenarios
 
 `--only` takes names and/or tags; `--skip` removes names and/or tags afterwards.
@@ -116,10 +137,13 @@ An unknown name or tag stops the script and prints the valid names and tags.
 python scenario.py --start-year 2020 --end-year 2024
 
 # different output root
-python scenario.py --root /data/synthetic_LAI_Ks
+python scenario.py --root /data/synthetic_LAI_Ks     # or: export SYNTH_KS_ROOT=/data/synthetic_LAI_Ks
 
 # run 3 scenarios in parallel (each is a separate CATHY run; mind CPU/RAM/disk)
 python scenario.py --only all --skip ic --jobs 3
+
+# quick test: 5x5 grid (no spatial heterogeneity), own root results/synthetic_LAI_Ks_quick
+python scenario.py --quick --only control control_2L lai_2L
 
 # quick test: no figures
 python scenario.py --only control control_2L lai_2L --no-plots
@@ -141,11 +165,16 @@ With the default forcing (rain ~1-3 mm/day against ETp 1-4.5 mm/day) and a unifo
 head of -15 m, the soil stays dry and Ks has almost nothing to act on. `--wet` appends
 
 ```
---rain-scale 3 --ic-head -1 --pmin -15 --eta-net-neg-mode gross
+--rain-scale 3 --ic-wt-depth 2.5 --pmin -15 --eta-net-neg-mode gross
 ```
 
 to every run (before the scenario's own arguments and `--extra`, so both can override it) and
-writes to its own root, `../synthetic_LAI_Ks_wet`, so the controls match. Never mix wet and
+writes to its own root, `<repo>/results/synthetic_LAI_Ks_wet`, so the controls match. The IC is
+hydrostatic with the water table 2.5 m below the surface (the mesh is 3 m deep); the earlier
+uniform head of -1 m saturated the whole column (Sw = 1 at 1 m and 2 m). `--ic-wt-depth M`
+sets that depth in a single run (`--ic-wtposition` is the same thing measured from the grid base).
+Note the mesh is only 3 m deep, so "2 m" in the soil figures is really ~1.7 m (the figure
+label says so). Never mix wet and
 normal runs in the same root.
 
 ```bash
@@ -235,12 +264,21 @@ Built by `synthetic_ksfire_analysis.py` from every run that has an
 
 | File | Content |
 |---|---|
+| `fig_cmp_atmospheric.png` | atmospheric BCs shared by all runs: rain, ETp, cumulative rain vs ETp, LAI |
 | `fig_cmp_monthly_eta_recharge.png` | monthly ETa and recharge, all scenarios |
-| `fig_cmp_cumulative.png` | cumulative ETa and recharge |
-| `fig_cmp_delta_vs_control.png` | scenario minus matching control (monthly, cumulative) |
+| `fig_cmp_cumulative.png` | cumulative ETa and recharge, plus the cumulative ΔETa to the control (zoomed) |
+| `fig_cmp_delta_vs_control.png` | scenario minus matching control (monthly with rain/ETp behind, cumulative) |
 | `fig_cmp_periods.png` | half-year totals before/after the fire, and difference to control |
-| `fig_cmp_ks_response.png` | change in ETa / recharge vs the Ks applied that month |
 | `fig_cmp_soil_water.png` | Sw and psi at 0, 1, 2 m depth |
+
+Every figure has a LAI panel at the bottom. Half-year labels read e.g. `2020 / Jul–Dec /
+after fire` (the keys `2020-H2` are only used in the CSVs: H1 = Jan–Jun, H2 = Jul–Dec).
+`fig_cmp_ks_response.png` was dropped: it showed nothing that `fig_cmp_delta_vs_control.png` does not.
+
+**Why can the cumulative curves look identical?** ETa stays close to ETp, so absolute
+cumulative ETa of different scenarios differs by far less than its own magnitude; read the
+cumulative Δ row instead. If ETa == ETp in every month (dry default forcing, soil never
+limiting) the comparison prints a NOTE and the Δ is exactly 0: Ks cannot act. Use `--wet`.
 | `summary_periods.csv`, `summary_annual.csv` | totals and differences per period / year |
 
 **Matching control:** for each run the baseline is the `--ks-fire-mode off` run with the

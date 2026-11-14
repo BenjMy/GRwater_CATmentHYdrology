@@ -13,3 +13,6 @@ __pycache__/
 
 # Synthetic LAI-Ks simulation outputs
 lib/synthetic_LAI_Ks_wet/
+
+# Synthetic Ks study results (outside lib/)
+results/

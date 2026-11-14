@@ -79,6 +79,9 @@ ET_VAR = "ACT. ETRA_patched"
 ET_SCALE = 1e3 * 86400            # m/s -> mm/day
 SYN_CRS = "EPSG:25830"
 XLL, YLL = 450000.0, 4120000.0    # arbitrary UTM-like origin of the synthetic DEM
+# results live outside lib/: <repo>/results/synthetic_LAI_Ks (override: $SYNTH_KS_ROOT)
+DEFAULT_ROOT = Path(os.environ.get("SYNTH_KS_ROOT") or
+                    Path(__file__).resolve().parents[2] / "results" / "synthetic_LAI_Ks")
 PATH_ET = Path.home() / "Nextcloud" / "GRwater" / "data" / "satellite" / "Agramon"
 
 # ── Pure helpers (no pyCATHY needed -> usable in the smoke test) ─────────────
@@ -370,9 +373,16 @@ def two_layer_spp(spp_map, n_top, permx_top, permx_deep,
     return df
 
 
-def ic_settings(args) -> dict:
-    """kwargs of simu.update_ic: hydrostatic (INDP=3) when --ic-wtposition is given,
-    else the uniform pressure head --ic-head (INDP=0, default -15 m)."""
+def ic_settings(args, column_depth=None) -> dict:
+    """kwargs of simu.update_ic: hydrostatic (INDP=3) when --ic-wtposition or
+    --ic-wt-depth is given, else the uniform pressure head --ic-head (INDP=0, default
+    -15 m). --ic-wt-depth is the water-table depth below the surface; it is converted to
+    a height above the grid base with `column_depth` (total mesh depth, m)."""
+    wt_depth = getattr(args, "ic_wt_depth", None)
+    if args.ic_wtposition is None and wt_depth is not None:
+        if column_depth is None:
+            raise ValueError("--ic-wt-depth needs the mesh depth (column_depth)")
+        return {"INDP": 3, "WTPOSITION": max(float(column_depth) - float(wt_depth), 0.0)}
     if args.ic_wtposition is not None:
         return {"INDP": 3, "WTPOSITION": args.ic_wtposition}
     return {"INDP": 0, "pressure_head_ini": float(args.ic_head)}
@@ -725,6 +735,10 @@ def _parse_args(argv=None) -> argparse.Namespace:
     p.add_argument("--ic-wtposition", type=float, default=None, metavar="M",
                    help="if given, overrides --ic-head: hydrostatic IC with the water table "
                         "at this height above the base of the grid (INDP=3)")
+    p.add_argument("--ic-wt-depth", type=float, default=None, metavar="M",
+                   help="hydrostatic IC with the water table M metres BELOW the surface "
+                        "(INDP=3; converted with the mesh depth). Ignored if --ic-wtposition "
+                        "is given")
     p.add_argument("--eta-net-neg-mode", choices=["etp", "gross", "off"], default="etp")
     p.add_argument("--etp-file", default=str(PATH_ET / "20161001_20241231_ET0.nc"))
     p.add_argument("--rain-file", default=str(PATH_ET / "20161001_20241231_TP.nc"))
@@ -732,13 +746,13 @@ def _parse_args(argv=None) -> argparse.Namespace:
                    help="multiply the daily rain forcing by X (wetter/drier test; 1 = as read)")
     p.add_argument("--etp-scale", type=float, default=1.0, metavar="X",
                    help="multiply the daily ETp forcing by X (1 = as read)")
-    p.add_argument("--dtmin", type=float, default=1e-2)
-    p.add_argument("--dtmax", type=float, default=1e4)
-    p.add_argument("--deltat", type=float, default=1e3)
+    p.add_argument("--dtmin", type=float, default=1e-3)
+    p.add_argument("--dtmax", type=float, default=1e3)
+    p.add_argument("--deltat", type=float, default=1e2)
     p.add_argument("--max-consecutive-fail", type=int, default=3, metavar="N",
                    help="stop the monthly loop after N months in a row that could not be "
                         "simulated (the months done so far are still saved); 0 = never stop")
-    p.add_argument("--path2prj", default="../synthetic_LAI_Ks",
+    p.add_argument("--path2prj", default=str(DEFAULT_ROOT),
                    help="root folder of the run (project, outputs/ and figures/ "
                         "are created under <path2prj>/<scenario>/)")
     p.add_argument("--dpi", type=int, default=150)
@@ -914,6 +928,9 @@ def smoke_test() -> None:
     assert ic_settings(args) == {"INDP": 0, "pressure_head_ini": -15.0}, "default IC: -15 m uniform"
     assert ic_settings(_parse_args(["--ic-head", "-5"]))["pressure_head_ini"] == -5.0
     assert ic_settings(_parse_args(["--ic-wtposition", "8"])) == {"INDP": 3, "WTPOSITION": 8.0}
+    assert ic_settings(_parse_args(["--ic-wt-depth", "2.5"]), 3.0) == {"INDP": 3, "WTPOSITION": 0.5}
+    assert ic_settings(_parse_args(["--ic-wt-depth", "5"]), 3.0)["WTPOSITION"] == 0.0, "clipped"
+    assert ic_settings(_parse_args(["--ic-wt-depth", "2", "--ic-wtposition", "1"]), 3.0)["WTPOSITION"] == 1.0
     describe_ks_cfg(cfg, args)
     print("smoke test OK  (Ks range mm/hr: "
           f"{KsFire.m_s_to_mm_hr(ks.min()):.1f} - {KsFire.m_s_to_mm_hr(ks.max()):.1f})")
@@ -1083,7 +1100,8 @@ def run_pipeline(args: argparse.Namespace) -> None:
     ETp_nodes, rain_nodes = _nodes(n_surf)
 
     # 4. ICs / BCs -------------------------------------------------------------
-    ic_kw = ic_settings(args)
+    col_depth = float(np.ptp(np.asarray(grid3d["mesh3d_nodes"], float)[:, 2]))
+    ic_kw = ic_settings(args, col_depth)
     print("  Initial condition: " + (f"hydrostatic, water table {ic_kw['WTPOSITION']:g} m "
           f"above the grid base" if ic_kw["INDP"] == 3
           else f"uniform pressure head {ic_kw['pressure_head_ini']:g} m"))

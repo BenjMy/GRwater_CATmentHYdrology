@@ -14,15 +14,16 @@ Companion of synthetic_ksfire_LAI.py.
     * figures: fig_areamean_hydro.png, fig_areamean_year_compare.png
 
 (2) ACROSS SCENARIOS (standalone):
-        python synthetic_ksfire_analysis.py --root ../synthetic_LAI_Ks
+        python synthetic_ksfire_analysis.py --root <root>   (default: <repo>/results/synthetic_LAI_Ks)
     reads  <root>/<name>/<scenario>/outputs/areamean_timeseries.csv  of every
     run and writes <root>/_comparison/ :
+        fig_cmp_atmospheric.png            rain, ETp, cumulative balance, LAI (shared forcing)
         fig_cmp_monthly_eta_recharge.png   monthly ETa / recharge, all scenarios
-        fig_cmp_cumulative.png             cumulative ETa / recharge
-        fig_cmp_delta_vs_control.png       scenario - matching control (monthly, cumulative)
+        fig_cmp_cumulative.png             cumulative ETa / recharge + cumulative delta ETa
+        fig_cmp_delta_vs_control.png       scenario - matching control (monthly + rain/ETp, cumulative)
         fig_cmp_periods.png                half-year totals (before/after fire) + delta vs control
-        fig_cmp_ks_response.png            delta ETa / recharge vs the Ks applied that month
         fig_cmp_soil_water.png             Sw and psi at 0/1/2 m, all scenarios
+    Every figure has a LAI panel at the bottom.
         summary_periods.csv, summary_annual.csv
     The "matching control" of a run is the mode-off run with the same number of
     layers (control for 1 layer, control_2L for 2 layers). Because the weather
@@ -32,12 +33,16 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
 
 DEPTHS = (0.0, 1.0, 2.0)
+# Results live OUTSIDE lib/ : <repo>/results/synthetic_LAI_Ks (override: $SYNTH_KS_ROOT)
+DEFAULT_ROOT = Path(os.environ.get("SYNTH_KS_ROOT") or
+                    Path(__file__).resolve().parents[2] / "results" / "synthetic_LAI_Ks")
 FLUX_COLS = ("eta_mm", "recharge_mm", "rain_mm", "etp_mm")
 
 
@@ -285,7 +290,8 @@ def plot_run_year_compare(mon, per, fig_dir, fire_date, title, dpi=150):
             continue
         a.bar(range(len(per)), per[col], color=[pc[p] for p in per["phase"]])
         a.set_xticks(range(len(per)))
-        a.set_xticklabels([f"{k}\n{p}" for k, p in zip(per.index, per["phase"])], fontsize=8)
+        a.set_xticklabels([_period_label(k, p) for k, p in zip(per.index, per["phase"])],
+                          fontsize=8)
         a.set_ylabel(lab)
         a.grid(True, axis="y", ls="--", alpha=0.3)
     fig.suptitle(f"{title} — same season, different years", fontsize=10, fontweight="bold")
@@ -360,13 +366,98 @@ def _longest(runs):
     return max(runs.values(), key=lambda r: len(r["ts"]))["ts"]
 
 
+# -- shared figure helpers -------------------------------------------------------
+
+def _period_label(key: str, phase: str = "") -> str:
+    """'2020-H2','post' -> '2020\\nJul–Dec\\nafter fire' (readable replacement of H1/H2)."""
+    year, _, half = key.partition("-H")
+    span = {"1": "Jan–Jun", "2": "Jul–Dec"}.get(half, "Jan–Dec")
+    ph = {"pre": "before fire", "post": "after fire", "fire": "fire half-year"}.get(phase, "")
+    return "\n".join(x for x in (year, span, ph) if x)
+
+
+def _period_start(key: str) -> pd.Timestamp:
+    year, _, half = key.partition("-H")
+    return pd.Timestamp(int(year), 7 if half == "2" else 1, 1)
+
+
+def _lai_axis(a, runs, fire, ylabel="LAI (m² m⁻²)"):
+    """LAI time series (domain mean; the synthetic LAI is identical in all scenarios)."""
+    ts = _longest(runs)
+    if "lai_mean" in ts and ts["lai_mean"].notna().any():
+        a.plot(ts.index, ts["lai_mean"], color="#006837", lw=1.5, label="LAI (domain mean)")
+        a.legend(fontsize=7, loc="upper right")
+    a.set_ylabel(ylabel, fontsize=8)
+    _fire_line(a, fire)
+    a.grid(True, ls="--", alpha=0.3)
+
+
+def _atm_overlay(a, ref_mon, ylabel="rain / ETp (mm month⁻¹)"):
+    """Rain (bars) and ETp (dotted) on a twin axis behind the main curves."""
+    b = a.twinx()
+    if "rain_mm" in ref_mon:
+        b.bar(ref_mon.index, ref_mon["rain_mm"], width=20, color="#4575b4", alpha=0.18,
+              label="rain")
+    if "etp_mm" in ref_mon:
+        b.plot(ref_mon.index, ref_mon["etp_mm"], ":", color="#d94801", lw=1.0, label="ETp")
+    b.set_ylabel(ylabel, fontsize=7, color="#4575b4")
+    b.tick_params(labelsize=7)
+    b.set_zorder(a.get_zorder() - 1)
+    a.patch.set_visible(False)
+    return b
+
+
+def diagnose_eta_vs_etp(runs, tol=1e-3) -> list:
+    """Scenarios whose ETa equals ETp in (almost) every month: the soil never limits
+    evaporation, so Ks cannot change ETa (and identical curves are expected)."""
+    flagged = []
+    for lab, r in runs.items():
+        m = r["mon"]
+        if "eta_mm" in m and "etp_mm" in m and len(m):
+            ratio = (m["eta_mm"] / m["etp_mm"]).dropna()
+            if len(ratio) and (ratio.sub(1).abs() < tol).all():
+                flagged.append(lab)
+    return flagged
+
+
+def cmp_atmospheric(runs, fire, out, dpi):
+    """Atmospheric boundary conditions shared by all scenarios: rain, ETp, their
+    cumulative balance and the LAI."""
+    plt = _plt()
+    ts = _longest(runs)
+    fig, ax = plt.subplots(4, 1, figsize=(11, 11), sharex=True, constrained_layout=True,
+                           gridspec_kw={"height_ratios": [1, 1, 1, 0.8]})
+    if "rain_mm_d" in ts:
+        ax[0].bar(ts.index, ts["rain_mm_d"], width=1.0, color="#4575b4", label="rain (daily)")
+    ax[0].set_ylabel("rain (mm d⁻¹)")
+    if "etp_mm_d" in ts:
+        ax[1].plot(ts.index, ts["etp_mm_d"], color="#fdae61", lw=0.7, label="ETp daily")
+        ax[1].plot(ts.index, ts["etp_mm_d"].rolling(30, center=True, min_periods=1).mean(),
+                   color="#d94801", lw=1.6, label="ETp 30-d mean")
+    ax[1].set_ylabel("ETp (mm d⁻¹)")
+    if "rain_mm_d" in ts:
+        ax[2].plot(ts.index, ts["rain_mm_d"].cumsum(), color="#4575b4", lw=1.6, label="cumulative rain")
+    if "etp_mm_d" in ts:
+        ax[2].plot(ts.index, ts["etp_mm_d"].cumsum(), color="#d94801", lw=1.6, label="cumulative ETp")
+    ax[2].set_ylabel("cumulative (mm)")
+    ax[0].set_title("Atmospheric boundary conditions (identical for all scenarios)",
+                    fontsize=10, fontweight="bold")
+    _lai_axis(ax[3], runs, fire)
+    for a in ax[:3]:
+        _fire_line(a, fire)
+        a.grid(True, ls="--", alpha=0.3)
+        a.legend(fontsize=8, loc="upper left")
+    fig.savefig(out / "fig_cmp_atmospheric.png", dpi=dpi)
+    plt.close(fig)
+
+
 def cmp_monthly(runs, st, fire, out, dpi):
     plt = _plt()
-    ref = _longest(runs)
-    refm = monthly_table(ref)
-    fig, ax = plt.subplots(2, 1, figsize=(11, 8), sharex=True, constrained_layout=True)
+    refm = monthly_table(_longest(runs))
+    fig, ax = plt.subplots(3, 1, figsize=(11, 10), sharex=True, constrained_layout=True,
+                           gridspec_kw={"height_ratios": [1, 1, 0.6]})
     for lab, r in runs.items():
-        for a, col in zip(ax, ("eta_mm", "recharge_mm")):
+        for a, col in zip(ax[:2], ("eta_mm", "recharge_mm")):
             if col in r["mon"]:
                 a.plot(r["mon"].index, r["mon"][col], marker="o", ms=3, lw=1.3, label=lab, **st[lab])
     if "etp_mm" in refm:
@@ -377,7 +468,8 @@ def cmp_monthly(runs, st, fire, out, dpi):
     ax[1].set_ylabel("recharge (mm month⁻¹)")
     ax[0].set_title("Full-area monthly ETa and recharge — all scenarios", fontsize=10,
                     fontweight="bold")
-    for a in ax:
+    _lai_axis(ax[2], runs, fire)
+    for a in ax[:2]:
         _fire_line(a, fire)
         a.grid(True, ls="--", alpha=0.3)
         a.legend(fontsize=7, ncol=3, loc="upper right")
@@ -385,18 +477,33 @@ def cmp_monthly(runs, st, fire, out, dpi):
     plt.close(fig)
 
 
-def cmp_cumulative(runs, st, fire, out, dpi):
+def cmp_cumulative(runs, ctrl, st, fire, out, dpi):
+    """Cumulative ETa / recharge (top) and the cumulative difference to the control
+    (zoomed). ETa stays close to ETp, so absolute cumulative curves of different
+    scenarios overlap; only the difference row shows the Ks effect."""
     plt = _plt()
-    fig, ax = plt.subplots(2, 1, figsize=(11, 8), sharex=True, constrained_layout=True)
+    refm = monthly_table(_longest(runs))
+    fig, ax = plt.subplots(4, 1, figsize=(11, 12), sharex=True, constrained_layout=True,
+                           gridspec_kw={"height_ratios": [1, 1, 1, 0.6]})
     for lab, r in runs.items():
-        for a, col in zip(ax, ("eta_mm", "recharge_mm")):
+        for a, col in zip(ax[:2], ("eta_mm", "recharge_mm")):
             if col in r["mon"]:
                 a.plot(r["mon"].index, r["mon"][col].cumsum(), lw=1.6, label=lab, **st[lab])
+        d = _delta(runs, ctrl, lab, "eta_mm")
+        if d is not None:
+            ax[2].plot(d.index, d.cumsum().values, lw=1.6, label=lab, **st[lab])
+    if "etp_mm" in refm:
+        ax[0].plot(refm.index, refm["etp_mm"].cumsum(), ":", color="grey", lw=1.4, label="ETp")
+    if "rain_mm" in refm:
+        ax[1].plot(refm.index, refm["rain_mm"].cumsum(), ":", color="#4575b4", lw=1.4, label="rain")
     ax[0].set_ylabel("cumulative ETa (mm)")
     ax[1].set_ylabel("cumulative recharge (mm)")
+    ax[2].set_ylabel("cumulative Δ ETa (mm)\nscenario − control")
+    ax[2].axhline(0, color="k", lw=0.8)
     ax[0].set_title("Cumulative full-area ETa and recharge since the start of the run",
                     fontsize=10, fontweight="bold")
-    for a in ax:
+    _lai_axis(ax[3], runs, fire)
+    for a in ax[:3]:
         _fire_line(a, fire)
         a.grid(True, ls="--", alpha=0.3)
         a.legend(fontsize=7, ncol=3, loc="upper left")
@@ -406,7 +513,9 @@ def cmp_cumulative(runs, st, fire, out, dpi):
 
 def cmp_delta(runs, ctrl, st, fire, out, dpi):
     plt = _plt()
-    fig, ax = plt.subplots(2, 2, figsize=(13, 8), sharex=True, constrained_layout=True)
+    refm = monthly_table(_longest(runs))
+    fig, ax = plt.subplots(3, 2, figsize=(13, 10), sharex=True, constrained_layout=True,
+                           gridspec_kw={"height_ratios": [1, 1, 0.6]})
     drawn = False
     for lab in runs:
         for i, col in enumerate(("eta_mm", "recharge_mm")):
@@ -424,11 +533,14 @@ def cmp_delta(runs, ctrl, st, fire, out, dpi):
     for i in range(2):
         ax[i, 0].set_ylabel(f"Δ {names[i]} (mm month⁻¹)\nscenario − control")
         ax[i, 1].set_ylabel(f"cumulative Δ {names[i]} (mm)")
+        _atm_overlay(ax[i, 0], refm)      # rain (bars) and ETp (dotted) behind the monthly Δ
         for j in range(2):
             ax[i, j].axhline(0, color="k", lw=0.8)
             _fire_line(ax[i, j], fire)
             ax[i, j].grid(True, ls="--", alpha=0.3)
-    ax[0, 0].set_title("monthly difference", fontsize=10)
+    for j in range(2):
+        _lai_axis(ax[2, j], runs, fire)
+    ax[0, 0].set_title("monthly difference (+ rain / ETp)", fontsize=10)
     ax[0, 1].set_title("cumulative difference", fontsize=10)
     ax[0, 0].legend(fontsize=7, ncol=2)
     fig.suptitle("Effect of Ks on ETa and recharge (same weather: scenario − matching control)",
@@ -468,7 +580,9 @@ def cmp_periods(res, runs, ctrl, st, out, dpi):
         return
     phase = df.drop_duplicates("period").set_index("period")["phase"]
     order = sorted(phase.index)
-    fig, ax = plt.subplots(2, 2, figsize=(14, 9), constrained_layout=True)
+    labels = [_period_label(p, phase[p]) for p in order]
+    fig, ax = plt.subplots(3, 2, figsize=(14, 11), constrained_layout=True,
+                           gridspec_kw={"height_ratios": [1, 1, 0.6]})
     for j, (col, lab) in enumerate((("eta_mm", "ETa"), ("recharge_mm", "recharge"))):
         piv = df.pivot(index="period", columns="scenario", values=col).reindex(order)
         piv = piv[[c for c in runs if c in piv.columns]]
@@ -483,46 +597,22 @@ def cmp_periods(res, runs, ctrl, st, out, dpi):
             pd_.plot.bar(ax=ax[1, j], color=[st[c]["color"] for c in pd_.columns], width=0.85)
         ax[1, j].axhline(0, color="k", lw=0.8)
         ax[1, j].set_ylabel(f"Δ {lab} (mm) scenario − control")
-        for a in (ax[0, j], ax[1, j]):
-            a.set_xticklabels([f"{p}\n{phase[p]}" for p in order], rotation=0, fontsize=8)
+        # LAI of each half-year (mean of the daily domain-mean LAI)
+        ts = _longest(runs)
+        if "lai_mean" in ts:
+            lai = [ts["lai_mean"][(ts.index >= _period_start(p)) &
+                                  (ts.index < _period_start(p) + pd.DateOffset(months=6))].mean()
+                   for p in order]
+            ax[2, j].bar(range(len(order)), lai, color="#006837", alpha=0.7, width=0.85)
+        ax[2, j].set_ylabel("mean LAI (m² m⁻²)")
+        for a in (ax[0, j], ax[1, j], ax[2, j]):
+            a.set_xticks(range(len(order)))
+            a.set_xticklabels(labels, rotation=0, fontsize=8)
             a.set_xlabel("")
             a.grid(True, axis="y", ls="--", alpha=0.3)
+        for a in (ax[0, j], ax[1, j]):
             a.legend(fontsize=7, ncol=2)
     fig.savefig(out / "fig_cmp_periods.png", dpi=dpi)
-    plt.close(fig)
-
-
-def cmp_ks_response(runs, ctrl, st, fire, out, dpi):
-    plt = _plt()
-    fig, ax = plt.subplots(1, 2, figsize=(12, 5), constrained_layout=True)
-    f = pd.Timestamp(fire)
-    sc = None
-    for lab, r in runs.items():
-        if r["ks"] is None:
-            continue
-        for a, col, nm in ((ax[0], "eta_mm", "ETa"), (ax[1], "recharge_mm", "recharge")):
-            d = _delta(runs, ctrl, lab, col)
-            if d is None:
-                continue
-            ks = r["ks"]["permx_mm_hr"].reindex(d.index)
-            ok = ks.notna()
-            mo = ((d.index.year - f.year) * 12 + d.index.month - f.month).to_numpy()
-            sc = a.scatter(ks[ok], d[ok], c=mo[ok.to_numpy()], cmap="coolwarm", s=30,
-                           marker="os^vDp"[list(runs).index(lab) % 6], edgecolors="k",
-                           linewidths=0.4, vmin=-6, vmax=30, label=lab)
-            a.set_xlabel("Ks top applied that month (mm hr⁻¹)")
-            a.set_ylabel(f"Δ {nm} (mm month⁻¹)  scenario − control")
-    for a in ax:
-        a.axhline(0, color="k", lw=0.8)
-        a.grid(True, ls="--", alpha=0.3)
-        a.legend(fontsize=7)
-    if sc is None:
-        plt.close(fig)
-        print("  no Ks/control pair -> Ks-response figure skipped")
-        return
-    fig.colorbar(sc, ax=ax, label="months since fire")
-    fig.suptitle("Monthly ETa / recharge response vs Ks", fontsize=10, fontweight="bold")
-    fig.savefig(out / "fig_cmp_ks_response.png", dpi=dpi)
     plt.close(fig)
 
 
@@ -532,9 +622,14 @@ def cmp_soil(runs, st, fire, out, dpi):
                 key=float)
     if not dz:
         return
-    fig, ax = plt.subplots(len(dz), 2, figsize=(14, 3.2 * len(dz)), sharex=True,
-                           constrained_layout=True, squeeze=False)
+    actual = next((r["meta"].get("depth_actual_m") for r in runs.values()
+                   if r["meta"].get("depth_actual_m")), {}) or {}
+    fig, ax = plt.subplots(len(dz) + 1, 2, figsize=(14, 3.2 * len(dz) + 2), sharex=True,
+                           constrained_layout=True, squeeze=False,
+                           gridspec_kw={"height_ratios": [1] * len(dz) + [0.6]})
     for i, d in enumerate(dz):
+        dlab = f"{d} m" if abs(actual.get(d, float(d)) - float(d)) < 0.05 else \
+            f"{d} m (mesh: {actual[d]:.2f} m)"
         for j, (pre, lab) in enumerate((("sw", "Sw (–)"), ("psi", "ψ (m)"))):
             a = ax[i, j]
             for k, r in runs.items():
@@ -542,9 +637,11 @@ def cmp_soil(runs, st, fire, out, dpi):
                 if c in r["ts"]:
                     s = r["ts"][c].rolling(7, center=True, min_periods=1).mean()
                     a.plot(s.index, s.values, lw=1.2, label=k, **st[k])
-            a.set_ylabel(f"{lab}  @ {d} m")
+            a.set_ylabel(f"{lab}  @ {dlab}")
             _fire_line(a, fire)
             a.grid(True, ls="--", alpha=0.3)
+    for j in range(2):
+        _lai_axis(ax[-1, j], runs, fire)
     ax[0, 0].legend(fontsize=7, ncol=2)
     ax[0, 0].set_title("full-area mean saturation (7-d mean)", fontsize=10)
     ax[0, 1].set_title("full-area mean pressure head (7-d mean)", fontsize=10)
@@ -562,8 +659,7 @@ def explain_missing_runs(root, runs) -> None:
     print("(optional, used if present: run_meta.json, ks_fire_monthly.csv)\n")
     if not root.is_dir():
         print(f"  !! root folder does not exist: {root}\n"
-              f"     -> pass the right one with --root (default ../synthetic_LAI_Ks, "
-              f"relative to the CURRENT directory)")
+              f"     -> pass the right one with --root (default {DEFAULT_ROOT})")
         return
     sims = sorted(d for d in root.glob("*/*") if d.is_dir() and not d.parent.name.startswith("_"))
     if not sims:
@@ -612,11 +708,16 @@ def compare_scenarios(root, out=None, exclude=(), fire_date=None, dpi=150) -> Pa
     print(f"Comparing {len(runs)} runs: {', '.join(runs)}")
     print("  matching control:", {k: v for k, v in ctrl.items()})
     res = summary_tables(runs, ctrl, fire, out)
-    for fn in (lambda: cmp_monthly(runs, st, fire, out, dpi),
-               lambda: cmp_cumulative(runs, st, fire, out, dpi),
+    flat = diagnose_eta_vs_etp(runs)
+    if flat:
+        print("  NOTE: ETa == ETp in every month for: " + ", ".join(flat) + "\n"
+              "        -> the soil never limits evaporation (too dry / ETa floor), so Ks cannot\n"
+              "           change ETa and scenario curves overlap. Try --wet or a larger --rain-scale.")
+    for fn in (lambda: cmp_atmospheric(runs, fire, out, dpi),
+               lambda: cmp_monthly(runs, st, fire, out, dpi),
+               lambda: cmp_cumulative(runs, ctrl, st, fire, out, dpi),
                lambda: cmp_delta(runs, ctrl, st, fire, out, dpi),
                lambda: cmp_periods(res, runs, ctrl, st, out, dpi),
-               lambda: cmp_ks_response(runs, ctrl, st, fire, out, dpi),
                lambda: cmp_soil(runs, st, fire, out, dpi)):
         try:
             fn()
@@ -628,7 +729,7 @@ def compare_scenarios(root, out=None, exclude=(), fire_date=None, dpi=150) -> Pa
 
 def main(argv=None):
     p = argparse.ArgumentParser(description="Compare the synthetic Ks/fire scenarios")
-    p.add_argument("--root", default="../synthetic_LAI_Ks",
+    p.add_argument("--root", default=str(DEFAULT_ROOT),
                    help="folder holding <name>/<scenario>/outputs/ of every run")
     p.add_argument("--out", default=None, help="default: <root>/_comparison")
     p.add_argument("--exclude", nargs="*", default=[],

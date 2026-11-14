@@ -102,16 +102,16 @@ ZROOT_SETS=("0.3 0.6 2.0 3.0 5.0")
 ## 3. Task list by study
 
 ### 3.1 Synthetic Ks fire study (`lib/synthetic_LAI_Ks/synthetic_ksfire_LAI.py`)
-- [ ] Results (`synthetic_LAI_Ks_wet`) are produced in the root folder → relocate outside `lib/`
-- [ ] `_comparison`: add a graph with atmospheric BCs (ETp and rain)
-- [ ] README: better explanation of scenarios `lai_1L`, `time_2L`, … and the hypothesis on how each should affect (theoretically) ETa and recharge
-- [ ] `fig_cmp_ks_response` is hard to interpret and adds nothing over `fig_cmp_delta_vs_control` → drop or redesign
-- [ ] `fig_cmp_delta_vs_control`: add rain and ETp over the monthly-difference subplot
-- [ ] Explain or relabel `H2`, `H1` on the x axis of `fig_cmp_period`
-- [ ] For ALL figures (or wherever appropriate) add an axis with the LAI time series
-- [ ] `fig_cmp_soil_water`: soil is fully saturated at 1 m and 2 m after 2021-01 → water table is far too shallow, deepen it
-- [ ] Why are all curves identical in `fig_cmp_cumulative` while ΔETa differs between scenarios and control? (diagnose)
-- [ ] Quick-test mode: reduce the synthetic 20×20 batch driver to 5×5 (no spatial heterogeneity, faster)
+- [x] ✅ Results relocated outside `lib/`: default root `<repo>/results/synthetic_LAI_Ks[_wet][_quick]` (override `$SYNTH_KS_ROOT` / `--root`); committed runs moved there
+- [x] ✅ `_comparison`: new `fig_cmp_atmospheric.png` (rain, ETp, cumulative balance, LAI)
+- [x] ✅ README: hypotheses table per scenario + daily-forcing caveat (to review scientifically)
+- [x] ✅ `fig_cmp_ks_response` dropped
+- [x] ✅ `fig_cmp_delta_vs_control`: rain (bars) and ETp (dotted) on twin axes of the monthly-difference subplots
+- [x] ✅ H1/H2 relabelled `Jan–Jun` / `Jul–Dec` + before/after fire (CSV keys unchanged)
+- [x] ✅ LAI panel in all `_comparison` figures (half-year mean LAI in `fig_cmp_periods`); per-run hydro figure already had it
+- [x] 🟡 `--wet` IC now hydrostatic, water table 2.5 m below surface (`--ic-wt-depth`), was uniform −1 m (saturated column). **Rerun the wet batch to check**; mesh is 3 m deep so "2 m" is ~1.7 m (labelled)
+- [x] 🟡 Diagnosed: cumulative ETa ≈ cumulative ETp (hundreds of mm) hides Δ of a few mm; added a cumulative-Δ row. In the committed dry runs ETa == ETp every month (Δ = 0), now flagged by a NOTE. Not verified on the wet runs (not in the repo)
+- [x] 🟡 `scenario.py --quick` (`--n 5`, root suffix `_quick`); not run end-to-end here (no pyCATHY in the session)
 - [ ] New study: different DEM slopes (single outlet)
 
 ### 3.2 `test_validation_tomas` (validation site, `lib/test_validation_tomas/`)
@@ -263,6 +263,7 @@ Presets (Thomas 2021 Table 1, 2016 Fish Fire, loamy sand, mm/hr): `upper_bound`,
 ## 9. Log of what has been done (for future AI requests)
 - Refactoring Phase 1–2 partly done on branch `refactor-agramon-modules`: details and checks in `REFACTORING.md`.
 - `README_paper.md` merged into this file and `REFACTORING.md` (2026-11-13); keep only these two files.
+- 2026-11-13: §3.1 implemented (see ticks); only "new study: different DEM slopes" remains. Checked: py_compile, `--smoke-test`, comparison rebuilt on committed dry runs. Not checked: full CATHY runs (`--quick`, `--wet`).
 
 ## 10. References to cite
 - Camporese et al. (2014), *Adv. Water Resour.*: ψmin BC switching, ETa/ETp vs ψ (Fig. 8).

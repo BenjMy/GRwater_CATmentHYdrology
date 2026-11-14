@@ -30,6 +30,7 @@ Usage
     python scenario.py --config my_scenarios.toml    # add/override scenarios (see below)
     python scenario.py --compare-only                # skip the runs, only compare
     python scenario.py --wet --only control control_2L lai_2L   # wetter forcing + IC
+    python scenario.py --quick --wet                 # 5x5 grid, fast sanity run
 
 Custom scenarios (--config, .toml or .json)
 -------------------------------------------
@@ -48,6 +49,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import subprocess
 import sys
 import time
@@ -62,10 +64,18 @@ ANALYSIS_SCRIPT = HERE / "synthetic_ksfire_analysis.py"
 # "wetter world" preset (--wet): wetter forcing and initial condition, so that rain
 # actually reaches the soil and ETa can be limited by soil water. Applied BEFORE the
 # scenario's own args and --extra, so both can override it.
-WET_ARGS = ["--rain-scale", "3", "--ic-head", "-1", "--pmin", "-15",
+# IC: hydrostatic with the water table 2.5 m below the surface (mesh is 3 m deep). The
+# former uniform head of -1 m saturated the whole column (Sw = 1 at 1 m and 2 m).
+WET_ARGS = ["--rain-scale", "3", "--ic-wt-depth", "2.5", "--pmin", "-15",
             "--eta-net-neg-mode", "gross"]
-WET_ROOT = Path("../synthetic_LAI_Ks_wet")
-DEFAULT_ROOT = Path("../synthetic_LAI_Ks")
+# quick-test preset (--quick): 5x5 synthetic DEM (no spatial heterogeneity, much faster)
+QUICK_ARGS = ["--n", "5"]
+# Results live OUTSIDE lib/: <repo>/results/synthetic_LAI_Ks[_wet][_quick]
+# (override the base with $SYNTH_KS_ROOT or --root).
+RESULTS_BASE = Path(os.environ.get("SYNTH_KS_ROOT") or
+                    HERE.parents[1] / "results" / "synthetic_LAI_Ks")
+DEFAULT_ROOT = RESULTS_BASE
+WET_ROOT = RESULTS_BASE.with_name(RESULTS_BASE.name + "_wet")
 
 EXIT_PARTIAL = 3     # same codes as synthetic_ksfire_LAI.py
 EXIT_NO_OUTPUT = 2
@@ -194,6 +204,8 @@ def build_command(sc: Scenario, root: Path, a: argparse.Namespace) -> list[str]:
         cmd.append("--debug")
     if a.wet:
         cmd += WET_ARGS     # wetter forcing + IC (scenario args and --extra can override)
+    if a.quick:
+        cmd += QUICK_ARGS   # 5x5 grid
     cmd += sc.args          # scenario-specific
     cmd += a.extra          # global overrides last, so they win (argparse: last value wins)
     return cmd
@@ -266,11 +278,14 @@ def _parse_args(argv=None) -> argparse.Namespace:
                    help=".toml/.json file with extra or overriding scenarios")
     p.add_argument("--root", type=Path, default=None,
                    help=f"root folder: one sub-folder per scenario, plus _comparison/ "
-                        f"(default {DEFAULT_ROOT}, or {WET_ROOT} with --wet)")
+                        f"(default {DEFAULT_ROOT}, or {WET_ROOT} with --wet; _quick appended with --quick)")
     p.add_argument("--wet", action="store_true",
                    help="wetter forcing and initial condition: "
                         + " ".join(WET_ARGS) + ". Uses its own root so the controls "
                         "match (never mix wet and normal runs in one root)")
+    p.add_argument("--quick", action="store_true",
+                   help="quick test: 5x5 synthetic DEM (" + " ".join(QUICK_ARGS) + "). Uses its "
+                        "own root (suffix _quick) so it never mixes with the 20x20 runs")
     p.add_argument("--start-year", type=int, default=2020)
     p.add_argument("--end-year", type=int, default=2024,
                    help="exclusive (2024 -> simulates 2020-2023, 3.5 yr after the fire)")
@@ -308,7 +323,10 @@ def main(argv=None) -> int:
             print(f"{'':<20}args: {' '.join(s.args)}")
         return 0
 
-    root = (a.root or (WET_ROOT if a.wet else DEFAULT_ROOT)).expanduser().resolve()
+    base = a.root or (WET_ROOT if a.wet else DEFAULT_ROOT)
+    if a.quick and not a.root:
+        base = base.with_name(base.name + "_quick")
+    root = base.expanduser().resolve()
 
     if a.compare_only:
         return compare(root, a)
