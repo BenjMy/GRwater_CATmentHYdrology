@@ -411,6 +411,11 @@ def test_run_pipeline_split():
     assert params == ["args", "inp", "ms", "atm", "ks_cfg", "ds_LAI_raster",
                       "first_iteration", "spinup_done"], params
     src = inspect.getsource(A.run_pipeline)
+    assert [n for n in inspect.signature(A.configure_model).parameters] == ["args", "inp", "ms", "atm"]
+    assert set(A.ModelSetup.__dataclass_fields__) == {"ds_LAI_raster", "outlet_node_id",
+                                                      "first_iteration", "spinup_done"}
+    assert "configure_model(" in src and "run_spinup(" not in src
+    assert len(src.splitlines()) < 40, len(src.splitlines())
     assert "run_monthly_loop(" in src and "for dt, lai_2d in iter_monthly_lai" not in src
     assert "for dt, lai_2d in iter_monthly_lai" in inspect.getsource(A.run_monthly_loop)
 
