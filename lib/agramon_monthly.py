@@ -10,12 +10,16 @@ checks (``None`` if the read failed). Errors are reported, never raised.
 """
 from __future__ import annotations
 
+from pathlib import Path
+
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from pyCATHY import cathy_utils
 
 from agramon_checks import add_datetime_col, apply_eta_artefact_floor
-from agramon_config import TARGET_CRS
+from agramon_config import N_VEG_CLASSES, TARGET_CRS
+from agramon_lai import lai_to_veg_map, smooth_veg_map
 
 
 def read_sw_month(simu, dt, sw_records, month_stats, monthly_dir):
@@ -225,3 +229,62 @@ def report_month_stats(dt, month_stats, solver_status, md_log, stats_records, ou
     except Exception as exc:
         print(f"  Warning: could not refresh monthly_stats.csv after {dt:%Y-%m} ({exc})")
 
+
+
+def prepare_month_vegetation(simu, lai_2d, dt):
+    """
+    Steps 12.1-12.2: LAI -> consecutive vegetation map (+ remap dict), smooth
+    it, save the LAI/veg preview figure and push the map to ``simu``.
+    Returns ``(veg_map, remap, veg_valid, veg_map_semantic, inv_remap)``.
+    """
+    veg_map_remapped, remap = lai_to_veg_map(simu, lai_2d)
+    # 12.2  Smooth salt-and-pepper artefacts
+    veg_map = smooth_veg_map(veg_map_remapped)
+
+    fig, (ax_lai, ax_veg) = plt.subplots(1, 2, figsize=(8, 6))
+
+    # LAI plot
+    im_lai = ax_lai.imshow(lai_2d, cmap="YlGn")
+    ax_lai.set_title(f"LAI - {dt:%Y-%m}")
+    fig.colorbar(im_lai, ax=ax_lai, label="LAI")
+
+    # Vegetation map plot
+    im_veg = ax_veg.imshow(veg_map)
+    ax_veg.set_title(f"Vegetation map - {dt:%Y-%m}")
+    fig.colorbar(im_veg, ax=ax_veg)
+
+    fig.suptitle(f"{dt:%Y-%m}", fontsize=13, fontweight="bold")
+    fig.tight_layout()
+
+    outdir_veg = Path("figures_lai_temp")
+    outdir_veg.mkdir(exist_ok=True)
+    fig.savefig(outdir_veg / f"veg_map_{dt:%Y%m}.png", dpi=300, bbox_inches="tight")
+    plt.close(fig)
+
+    exclude_veg, veg_valid = simu._check_outside_DEM(veg_map)
+    simu.update_veg_map(veg_map, maxveg=N_VEG_CLASSES)
+
+    inv_remap             = {v: k for k, v in remap.items()}
+    veg_map_semantic      = np.vectorize(inv_remap.get)(veg_map).astype(int)
+    return veg_map, remap, veg_valid, veg_map_semantic, inv_remap
+
+
+def month_forcing_indices(valid_times, dt):
+    """Indices of ``valid_times`` (ETp/rain time axis) that fall in month ``dt``."""
+    month_mask = np.array([
+        pd.Timestamp(t).year == dt.year and pd.Timestamp(t).month == dt.month
+        for t in valid_times
+    ])
+    return np.where(month_mask)[0]
+
+
+def plot_month_forcing(nv_month, dt, use_etp):
+    """Optional monthly net-flux preview figure (``figures_ETp_temp/``)."""
+    outdir_etp = Path("figures_ETp_temp")
+    outdir_etp.mkdir(exist_ok=True)
+    fig2, ax2 = plt.subplots(figsize=(8, 4))
+    ax2.plot(nv_month)
+    ax2.set_title(f"Net flux ({'ETp' if use_etp else 'ERA5'}) - {dt:%Y-%m}")
+    ax2.set_ylabel("m/s")
+    fig2.savefig(outdir_etp / f"forcing_{dt:%Y%m}.png", dpi=150, bbox_inches="tight")
+    plt.close(fig2)

@@ -475,6 +475,21 @@ def test_agramon_monthly_psi_and_stats():
     assert stats[0]["solver_status"] == "✓ OK" and any("psi mean" in b for b in log.b)
 
 
+def test_agramon_monthly_prep_helpers():
+    import os, tempfile, datetime as dtm
+    import numpy as np
+    import agramon_monthly as MR
+    vt = np.array(["2020-06-30", "2020-07-01", "2020-07-02", "2020-08-01"], dtype="datetime64[D]")
+    idx = MR.month_forcing_indices(vt, dtm.datetime(2020, 7, 1))
+    assert list(idx) == [1, 2] and len(MR.month_forcing_indices(vt, dtm.datetime(2021, 1, 1))) == 0
+    old = os.getcwd(); os.chdir(tempfile.mkdtemp())
+    try:
+        MR.plot_month_forcing(np.linspace(-1e-8, 0, 5), dtm.datetime(2020, 7, 1), True)
+        assert os.path.exists("figures_ETp_temp/forcing_202007.png")
+    finally:
+        os.chdir(old)
+
+
 if __name__ == "__main__":
     for name, fn in sorted(globals().items()):
         if name.startswith("test_") and callable(fn):

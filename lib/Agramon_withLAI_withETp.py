@@ -69,7 +69,8 @@ from agramon_ks import (FIRE_DATE_DEFAULT, ks_banner_label, ks_config_from_args,
 from pyCATHY import cathy_tools, cathy_utils
 from pyCATHY.petro import Feddes_litterature  # literature-based Feddes lookup
 
-from agramon_monthly import (read_et_month, read_hgraph_month, read_psi_month,
+from agramon_monthly import (month_forcing_indices, plot_month_forcing,
+                             prepare_month_vegetation, read_et_month, read_hgraph_month, read_psi_month,
                              read_recharge_month, read_sw_month, report_month_stats)
 from agramon_checks import (
     add_datetime_col,
@@ -1216,35 +1217,8 @@ def run_monthly_loop(args: argparse.Namespace, inp: RunInputs, ms: MeshSetup,
 
     for dt, lai_2d in iter_monthly_lai(ds_LAI_raster.isel(time=slice(1, None))):
         # 12.1  LAI → consecutive vegetation map + remap dict
-        veg_map_remapped, remap = lai_to_veg_map(simu, lai_2d)
-        # 12.2  Smooth salt-and-pepper artefacts
-        veg_map = smooth_veg_map(veg_map_remapped)
-
-        fig, (ax_lai, ax_veg) = plt.subplots(1, 2, figsize=(8, 6))
-
-        # LAI plot
-        im_lai = ax_lai.imshow(lai_2d, cmap="YlGn")
-        ax_lai.set_title(f"LAI - {dt:%Y-%m}")
-        fig.colorbar(im_lai, ax=ax_lai, label="LAI")
-
-        # Vegetation map plot
-        im_veg = ax_veg.imshow(veg_map)
-        ax_veg.set_title(f"Vegetation map - {dt:%Y-%m}")
-        fig.colorbar(im_veg, ax=ax_veg)
-
-        fig.suptitle(f"{dt:%Y-%m}", fontsize=13, fontweight="bold")
-        fig.tight_layout()
-
-        outdir_veg = Path("figures_lai_temp")
-        outdir_veg.mkdir(exist_ok=True)
-        fig.savefig(outdir_veg / f"veg_map_{dt:%Y%m}.png", dpi=300, bbox_inches="tight")
-        plt.close(fig)
-
-        exclude_veg, veg_valid = simu._check_outside_DEM(veg_map)
-        simu.update_veg_map(veg_map, maxveg=N_VEG_CLASSES)
-
-        inv_remap             = {v: k for k, v in remap.items()}
-        veg_map_semantic      = np.vectorize(inv_remap.get)(veg_map).astype(int)
+        (veg_map, remap, veg_valid,
+         veg_map_semantic, inv_remap) = prepare_month_vegetation(simu, lai_2d, dt)
         lai_history[dt]       = lai_2d.copy()
         veg_map_history[dt]   = veg_map_semantic
 
@@ -1293,22 +1267,11 @@ def run_monthly_loop(args: argparse.Namespace, inp: RunInputs, ms: MeshSetup,
         # checks (12.9b). Computed once here so both reuse the same mask.
         idx_month = None
         if fm.use_etp:
-            month_mask = np.array([
-                pd.Timestamp(t).year == dt.year and pd.Timestamp(t).month == dt.month
-                for t in valid_times
-            ])
-            idx_month = np.where(month_mask)[0]
+            idx_month = month_forcing_indices(valid_times, dt)
 
 
         # Optional: plot the monthly forcing
-        outdir_etp = Path("figures_ETp_temp")
-        outdir_etp.mkdir(exist_ok=True)
-        fig2, ax2 = plt.subplots(figsize=(8, 4))
-        ax2.plot(nv_month)
-        ax2.set_title(f"Net flux ({'ETp' if fm.use_etp else 'ERA5'}) - {dt:%Y-%m}")
-        ax2.set_ylabel("m/s")
-        fig2.savefig(outdir_etp / f"forcing_{dt:%Y%m}.png", dpi=150, bbox_inches="tight")
-        plt.close(fig2)
+        plot_month_forcing(nv_month, dt, fm.use_etp)
 
         # 12.5  Update PARM print list
         df_atmbc_month = simu.read_inputs("atmbc")
