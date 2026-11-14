@@ -59,6 +59,33 @@ def ks_tag(args) -> str:
     return f"ks-{mode}" + (f"-{preset}" if preset else "")
 
 
+def ks_key(args) -> str:
+    """Stable string identifying the post-fire Ks setup of a run ('off' if disabled).
+    Logged in the CSV run log (column ks_fire) and compared by the shell runner's
+    skip-if-done check, so Ks scenarios never satisfy each other."""
+    mode = getattr(args, "ks_fire_mode", "off")
+    if mode == "off":
+        return "off"
+    g = lambda k: getattr(args, k, None)
+    num = lambda v: "" if v is None else f"{v:g}"
+    return "|".join([mode, f"preset={g('ks_fire_preset') or ''}",
+                     f"date={g('ks_fire_date') or ''}",
+                     f"ll={num(g('ks_fire_ll'))}", f"ul={num(g('ks_fire_ul'))}",
+                     f"rate={num(g('ks_fire_rate'))}",
+                     f"lai_ll={num(g('ks_fire_lai_ll'))}", f"lai_ul={num(g('ks_fire_lai_ul'))}",
+                     f"sev={num(g('ks_fire_severity'))}",
+                     f"red={num(g('ks_fire_severity_reduction'))}"])
+
+
+def ks_key_from_argv(argv) -> str:
+    """ks_key of a list of --ks-fire-* flags (used by the shell runner's check)."""
+    import argparse
+    p = argparse.ArgumentParser()
+    KsFire.add_ks_fire_args(p)
+    p.set_defaults(ks_fire_date=FIRE_DATE_DEFAULT)
+    return ks_key(p.parse_args(list(argv)))
+
+
 def ks_banner_label(cfg) -> str:
     if cfg.mode == "off":
         return "off (static --permx)"

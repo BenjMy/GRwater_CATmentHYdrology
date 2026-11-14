@@ -114,7 +114,7 @@ def apply_forcing_mode(mode: str) -> None:
 from utils import Agramon_utils as AgUtils
 from utils import ks_fire_utils as KsFire
 from agramon_ks import (FIRE_DATE_DEFAULT, ks_banner_label, ks_config_from_args,
-                        ks_for_month, ks_tag)
+                        ks_for_month, ks_key, ks_tag)
 from pyCATHY import cathy_tools, cathy_utils
 from pyCATHY.petro import Feddes_litterature  # literature-based Feddes lookup
 
@@ -1675,6 +1675,7 @@ def setup_inputs(args: argparse.Namespace) -> RunInputs:
         forcing_mode=FORCING_MODE,
         etp_ts_column=args.etp_ts_column,
         etp_ts_feature_id=etp_ts_fid,
+        ks_fire=ks_key(args),
     )
 
     # Single source of truth for this run's folder name (project dir,

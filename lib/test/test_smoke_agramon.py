@@ -179,6 +179,14 @@ def test_agramon_ks():
     assert np.isclose(AK.ks_for_month(cfg, datetime(2021, 1, 1), lai, None), 1e-6 + 9e-6 * 2.0 / 4)
     assert AK.ks_for_month(cfg, datetime(2019, 1, 1), lai, None) == 1e-5, "pre-fire -> unburned"
     assert "mode=lai" in AK.ks_banner_label(cfg)
+    # run key: identifies the setup in the CSV log / shell skip-if-done check
+    assert AK.ks_key(_ks_args([])) == "off" and AK.ks_key_from_argv([]) == "off"
+    k1 = AK.ks_key_from_argv(["--ks-fire-mode=time", "--ks-fire-preset=median"])
+    k2 = AK.ks_key_from_argv(["--ks-fire-mode=time", "--ks-fire-preset=overall_average"])
+    k3 = AK.ks_key_from_argv(["--ks-fire-mode=time", "--ks-fire-preset=median",
+                              "--ks-fire-date=2020-08-01"])
+    assert len({k1, k2, k3, "off"}) == 4 and k1.startswith("time|preset=median|date=2020-07-01")
+    assert AK.ks_key(_ks_args(["--ks-fire-mode", "time", "--ks-fire-preset", "median"])) == k1
     # incomplete configs fail at startup, not at the first month
     for bad in (["--ks-fire-mode", "time"], ["--ks-fire-mode", "lai", "--ks-fire-ul", "1e-5"]):
         try:

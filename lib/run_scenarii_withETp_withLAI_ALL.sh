@@ -58,6 +58,9 @@ PRJ_PATH_CHECK="../SSHydro_withETp_withLAI"            # matches --path2prj defa
 ZROOT_FACTORS=()                      # 5 values, empty = use Python script's default
 PERMX=""                              # m/s, empty = pyCATHY default (not overridden)
 PERMY_RATIO="1.0"
+# Post-fire Ks recovery (--ks-fire-*): forwarded verbatim, same for every run in the batch.
+# Empty = off (static --permx), i.e. unchanged behaviour. See agramon_ks.py / TO-DO.md 5.3.
+KS_ARGS=""
 PERMZ_RATIO="1.0"
 SCF="1.0"                              # float in [0,1], matches
                                         # Agramon_withLAI_withETp.py's own
@@ -171,6 +174,14 @@ Soil hydraulic conductivity (--permx / --permy-ratio / --permz-ratio):
                           Only takes effect when --permx is set.
   --permz-ratio VAL      PERMZ = --permx * this value (default: ${PERMZ_RATIO}).
                           Only takes effect when --permx is set.
+
+Post-fire Ks recovery (opt-in; forwarded to Agramon_withLAI_withETp.py, same for every run):
+  --ks-fire-mode M       off (default) | time | lai | burn_severity: PERMX computed each
+                          month instead of the static --permx (unburned Ks before the fire
+                          date, all soil zones). Also: --ks-fire-preset NAME,
+                          --ks-fire-date YYYY-MM-DD (default 2020-07-01), --ks-fire-ll,
+                          --ks-fire-ul (m/s), --ks-fire-rate, --ks-fire-lai-ll,
+                          --ks-fire-lai-ul, --ks-fire-severity, --ks-fire-severity-reduction.
 
 Root water uptake (--scf under the hood):
   --scf VAL               Float in [0,1]: 0 = PMIN-threshold approach
@@ -366,6 +377,8 @@ while [[ $# -gt 0 ]]; do
             PERMZ_RATIO="$2"; shift 2 ;;
         --scf)
             SCF="$2"; shift 2 ;;
+        --ks-fire-mode|--ks-fire-preset|--ks-fire-date|--ks-fire-ll|--ks-fire-ul|--ks-fire-rate|--ks-fire-lai-ll|--ks-fire-lai-ul|--ks-fire-severity|--ks-fire-severity-reduction)
+            KS_ARGS="${KS_ARGS} $1=$2"; shift 2 ;;
         --feddes-crop)
             FEDDES_CROP="$2"; shift 2 ;;
         --pcana)
@@ -488,6 +501,7 @@ if [ -n "${PERMX}" ]; then
     SOIL_ARGS="${SOIL_ARGS} --permx=${PERMX} --permy-ratio=${PERMY_RATIO} --permz-ratio=${PERMZ_RATIO}"
 fi
 SOIL_ARGS="${SOIL_ARGS} --scf ${SCF}"
+SOIL_ARGS="${SOIL_ARGS}${KS_ARGS}"   # "=" form (flags above are stored as --flag=value)
 if [ -n "${FEDDES_CROP}" ]; then
     SOIL_ARGS="${SOIL_ARGS} --feddes-crop ${FEDDES_CROP}"
 fi
@@ -587,6 +601,8 @@ check_already_done() {
     CHK_PERMY_RATIO="${PERMY_RATIO}" \
     CHK_PERMZ_RATIO="${PERMZ_RATIO}" \
     CHK_SCF="${SCF}" \
+    CHK_KS_ARGS="${KS_ARGS}" \
+    CHK_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)" \
     CHK_FEDDES_CROP="${FEDDES_CROP}" \
     CHK_PCANA="${PCANA}" \
     CHK_PCREF="${PCREF}" \
@@ -697,6 +713,18 @@ else:
 if "SCF" in df.columns:
     expected_scf = float(scf_str) if scf_str else 1.0
     mask &= close(df["SCF"], expected_scf)
+
+# --ks-fire-*: the logged ks_fire key must equal this run's key ("off" when no flag was
+# given; log rows written before the column existed were static-Ks runs = "off").
+import shlex
+import sys
+sys.path.insert(0, os.environ.get("CHK_LIB_DIR", "."))
+from agramon_ks import ks_key_from_argv
+expected_ks = ks_key_from_argv(shlex.split(os.environ.get("CHK_KS_ARGS", "")))
+if "ks_fire" in df.columns:
+    mask &= (df["ks_fire"].fillna("off").astype(str) == expected_ks)
+elif expected_ks != "off":
+    mask &= False
 
 # Feddes (FP_map) params — same "only enforced when this batch run
 # overrides it" reasoning as --permx above. PCANA/PCREF/PCWLT can come

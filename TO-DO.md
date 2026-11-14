@@ -200,7 +200,7 @@ Presets (Thomas 2021 Table 1, 2016 Fish Fire, loamy sand, mm/hr): `upper_bound`,
 - [x] ✅ Self-describing scenario folders, skip-if-done, markdown + CSV run logs, batch runner
 - [x] ✅ Comparison against EO-EB ETa and treatments CSV; `etp_output.nc` + Camporese Fig. 8
 - [x] ✅ Post-fire Ks equations and presets in `ks_fire_utils.py`
-- [ ] 🟡 `ks_fire_utils` wired into the main script (`agramon_ks.py`, opt-in `--ks-fire-mode`; unburned Ks before the fire; all zones). Still to do: forward the flags in the shell runner + its skip-if-done check, define the Ks scenario list (preset × mode, add to `paper_scenarios.toml`), run it. Presets come from another site (§5.3)
+- [ ] 🟡 `ks_fire_utils` wired into the main script (`agramon_ks.py`, opt-in `--ks-fire-mode`; unburned Ks before the fire; all zones). The shell runner forwards `--ks-fire-*` and its skip-if-done check uses a new `ks_fire` log column (mock-log test only). Still to do: define the Ks scenario list (preset × mode, add to `paper_scenarios.toml`), run it. Presets come from another site (§5.3)
 - [ ] ⬜ Replace placeholder dNBR→Ks relation if burn-severity mode is used
 - [ ] 🟡 `pyCATHY` wrapper fixes for BCs (`update_nansfdirbc`, `update_nansfneubc`, `update_sfbc`): in progress
 - [ ] 🟡 Validate `pyCATHY` fixes for the `map_prop2mesh` bug and the stale `mesh_pv_attributes` cache

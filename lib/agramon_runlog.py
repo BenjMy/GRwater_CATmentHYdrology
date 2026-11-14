@@ -129,7 +129,8 @@ def log_simulation(log_path: Path, start_year: int, end_year: int,
                    feddes_crop: str = None,
                    forcing_mode: str = None,
                    etp_ts_column: str = None,
-                   etp_ts_feature_id: int = None) -> int:
+                   etp_ts_feature_id: int = None,
+                   ks_fire: str = None) -> int:
     """Register parameters in the shared CSV log and return the sim_index.
 
     outlet_flux / bottom_flux / spinup / ic_* are recorded too (not just
@@ -185,6 +186,9 @@ def log_simulation(log_path: Path, start_year: int, end_year: int,
         "forcing_mode":      forcing_mode,
         "etp_ts_column":     etp_ts_column if forcing_mode == "etp_ts" else None,
         "etp_ts_feature_id": etp_ts_feature_id if forcing_mode == "etp_ts" else None,
+        # post-fire Ks setup (agramon_ks.ks_key); rows logged before this column
+        # existed were all static-Ks runs, i.e. an empty value means "off"
+        "ks_fire":           ks_fire,
     }
     sim_index = uCATHY.log_simulation(log_path, params)
     print(f"  sim_index = {sim_index}  (withLAI={with_lai})")
