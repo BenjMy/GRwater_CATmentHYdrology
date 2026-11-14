@@ -74,6 +74,7 @@ from agramon_checks import (
     check_monthly_sanity,
 )
 from agramon_config import (
+    BCConfig,
     ETP_TS_COLUMN_DEFAULT,
     FORCING_LABELS,
     FORCING_MODE_DEFAULT,
@@ -104,6 +105,7 @@ from agramon_mesh import (  # noqa: F401  (moved, REFACTORING 2.3)
 from agramon_diagnostics import save_forcing_diagnostics  # noqa: F401  (moved, REFACTORING 2.6)
 from agramon_spinup import pick_default_spinup_year, run_spinup  # noqa: F401  (moved, 2.5)
 from agramon_forcing import (
+    Forcing,
     build_etp_ds_from_timeseries,
     load_all,
     load_era5,
@@ -604,18 +606,14 @@ def setup_inputs(args: argparse.Namespace) -> RunInputs:
                  f"PERMZ ratio={args.permz_ratio}"
         ),
         "Feddes (FP_map) override": feddes_label,
-        "Initial condition": (f"WT depth {args.ic_wtposition} m (INDP=3)"
-                               if args.ic_mode == "wt"
-                               else f"uniform pressure head "
-                                    f"{args.ic_pressure_head} m (INDP=0)"),
+        "Initial condition": BCConfig.from_args(args).ic_label,
         "DEM source (tif)": str(dem_tif_path),
         "DEM plot (fid_1 clip)": args.dem_plot,
         "Spin-up": ("disabled" if args.no_spinup
                      else f"{args.spinup_cycles} cycle(s)"),
         "Outlet flux": f"{args.outlet_flux:.1e} m/s",
         "Outlet side": args.outlet_side or "auto-detect",
-        "Bottom flux": (f"{args.bottom_flux:.1e} m/s"
-                        if args.bottom_flux != 0.0 else "disabled (closed)"),
+        "Bottom flux": BCConfig.from_args(args).bottom_label,
         "Solver dtmin/dtmax/deltat": f"{args.dtmin} / {args.dtmax} / {args.deltat} s",
         "CSV run registry": str(log_path),
         "sim_index": sim_index,
@@ -757,14 +755,20 @@ def setup_mesh_and_dem(args: argparse.Namespace, inp: RunInputs) -> MeshSetup:
 
 @dataclass(frozen=True)
 class AtmbcSetup:
-    """Everything ``run_pipeline`` needs from ``build_atmbc``."""
+    """
+    Everything ``run_pipeline`` needs from ``build_atmbc``: the mesh dataset
+    and a validated :class:`agramon_forcing.Forcing` (shapes/units documented
+    there). The old flat attributes are kept as read-only properties.
+    """
     ds_mesh: Any            # xarray.Dataset, mesh nodes (x, y, z) built from the DEM
-    n_surf: Any             # int, surface node count; None in ERA5 mode
-    ETp_nodes: Any          # ndarray (time, n_surf) in m/s; None in ERA5 mode
-    rain_nodes: Any         # ndarray (time, n_surf) in m/s; None in ERA5 mode
-    net_flux: Any           # ndarray (time,) scalar mean net flux (rain - ETp)
-    t_atmbc: Any            # seconds since the first forcing step
-    valid_times: Any        # datetime64 time axis of the forcing
+    forcing: Forcing
+
+    n_surf = property(lambda self: self.forcing.n_surf)
+    ETp_nodes = property(lambda self: self.forcing.ETp_nodes)
+    rain_nodes = property(lambda self: self.forcing.rain_nodes)
+    net_flux = property(lambda self: self.forcing.net_flux)
+    t_atmbc = property(lambda self: self.forcing.t_atmbc)
+    valid_times = property(lambda self: self.forcing.valid_times)
 
 
 def build_atmbc(args: argparse.Namespace, inp: RunInputs,
@@ -943,12 +947,9 @@ def build_atmbc(args: argparse.Namespace, inp: RunInputs,
 
     return AtmbcSetup(
         ds_mesh=ds_mesh,
-        n_surf=n_surf,
-        ETp_nodes=ETp_nodes,
-        rain_nodes=rain_nodes,
-        net_flux=net_flux,
-        t_atmbc=t_atmbc,
-        valid_times=valid_times,
+        forcing=Forcing(
+            ETp_nodes=ETp_nodes, rain_nodes=rain_nodes, net_flux=net_flux,
+            t_atmbc=t_atmbc, valid_times=valid_times, n_surf=n_surf),
     )
 
 
@@ -990,14 +991,9 @@ def run_pipeline(args: argparse.Namespace) -> None:
 
     # ── 10. ICs, BCs ──────────────────────────────────────────
     # FIX: set ICs once here; BCs are built once, up front.
-    if args.ic_mode == "pressure":
-        print(f"  IC             : uniform pressure head = "
-              f"{args.ic_pressure_head} m (INDP=0)")
-        simu.update_ic(INDP=0, pressure_head_ini=args.ic_pressure_head)
-    else:
-        print(f"  IC             : hydrostatic water table at "
-              f"{args.ic_wtposition} m depth (INDP=3)")
-        simu.update_ic(INDP=3, WTPOSITION=args.ic_wtposition)
+    bc = BCConfig.from_args(args)
+    print(f"  IC             : {bc.ic_label}")
+    bc.apply_ic(simu)
     # FIX (sfbc EOF crash): configure_boundary_conditions used to be fed
     # list(simu.read_inputs("atmbc")["time"]) here - but at this point in
     # the pipeline simu.update_atmbc() has NEVER been called yet (it's
@@ -1022,16 +1018,15 @@ def run_pipeline(args: argparse.Namespace) -> None:
     bc_time_axis = np.arange(0, 32 * 86400, 86400).tolist()  # 32 daily blocks
     outlet_side, outlet_node_id = configure_boundary_conditions(
         simu, bc_time_axis,
-        outlet_flux=args.outlet_flux,
-        outlet_side=args.outlet_side,
-        bottom_flux=args.bottom_flux,
+        outlet_flux=bc.outlet_flux,
+        outlet_side=bc.outlet_side,
+        bottom_flux=bc.bottom_flux,
         res_x=res_x, res_y=res_y,
     )
     md_log.meta({
         "Resolved outlet side": outlet_side,
         "Outlet diagnostic node": outlet_node_id,
-        "Bottom flux": (f"{args.bottom_flux:.1e} m/s"
-                        if args.bottom_flux != 0.0 else "disabled (closed)"),
+        "Bottom flux": bc.bottom_label,
     })
 
     # Interpolate LAI onto DEM raster grid once, outside the loop

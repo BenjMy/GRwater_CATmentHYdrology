@@ -13,7 +13,7 @@ deprecated; see REFACTORING.md, step 3.3.
 """
 
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 import numpy as np
 import pandas as pd
@@ -302,3 +302,59 @@ def subset_atmbc_for_month(t_atmbc, net_flux: np.ndarray,
     nv_sub = net_flux[idx]        # works for both 1-D and 2-D
     t_sub  = (t_sub - t_sub[0]).tolist()
     return t_sub, nv_sub
+
+
+# ─────────────────────────────────────────────────────────────
+# Typed forcing container (REFACTORING.md 2.9)
+# ─────────────────────────────────────────────────────────────
+from dataclasses import dataclass
+
+
+@dataclass(frozen=True)
+class Forcing:
+    """
+    Atmospheric forcing handed to the monthly loop.
+
+    Shapes / units (T = number of forcing time steps, S = surface nodes):
+      * ``ETp_nodes``, ``rain_nodes`` : ndarray (T, S), m/s, positive values
+        (ETp is the potential loss, rain the gain). ``None`` in ERA5 mode.
+      * ``net_flux``    : ndarray (T,), spatial-mean rain - ETp. m/s in ETp
+        mode (negative = ET loss); ERA5 mode keeps the legacy, unconverted ERA5 units (m).
+      * ``t_atmbc``     : sequence of T times in seconds since the first step.
+      * ``valid_times`` : datetime64 axis of length T.
+      * ``n_surf``      : S (int), ``None`` in ERA5 mode.
+    """
+    ETp_nodes: Optional[np.ndarray]
+    rain_nodes: Optional[np.ndarray]
+    net_flux: np.ndarray
+    t_atmbc: Any
+    valid_times: Any
+    n_surf: Optional[int] = None
+
+    def __post_init__(self):
+        T = len(self.t_atmbc)
+        if len(self.valid_times) != T:
+            raise ValueError(f"valid_times has {len(self.valid_times)} entries, "
+                             f"t_atmbc has {T}")
+        if np.shape(self.net_flux)[0] != T:
+            raise ValueError(f"net_flux has {np.shape(self.net_flux)[0]} steps, "
+                             f"expected {T}")
+        if (self.ETp_nodes is None) != (self.rain_nodes is None):
+            raise ValueError("ETp_nodes and rain_nodes must both be set or both None")
+        if self.ETp_nodes is not None:
+            for name in ("ETp_nodes", "rain_nodes"):
+                a = np.asarray(getattr(self, name))
+                if a.ndim != 2 or a.shape[0] != T:
+                    raise ValueError(f"{name} must have shape (T={T}, n_surf), "
+                                     f"got {a.shape}")
+                if self.n_surf is not None and a.shape[1] != self.n_surf:
+                    raise ValueError(f"{name} has {a.shape[1]} nodes, "
+                                     f"n_surf={self.n_surf}")
+
+    @property
+    def is_etp(self) -> bool:
+        return self.ETp_nodes is not None
+
+    @property
+    def n_steps(self) -> int:
+        return len(self.t_atmbc)

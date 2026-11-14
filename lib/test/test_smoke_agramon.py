@@ -346,6 +346,44 @@ def test_dem_empty_polygon_regression():
     assert MS.count_valid_dem_pixels(np.array([[-9999.0, 1.0], [np.nan, 2.0]])) == 2, "nodata counted"
 
 
+def test_bc_and_forcing_containers():
+    import types
+    import numpy as np
+    import agramon_forcing as F
+    a = types.SimpleNamespace(outlet_flux=-1e-6, outlet_side=None, bottom_flux=0.0,
+                              ic_mode="wt", ic_wtposition=2.5, ic_pressure_head=-10.0)
+    bc = C.BCConfig.from_args(a)
+    assert bc.ic_label == "WT depth 2.5 m (INDP=3)" and bc.bottom_label == "disabled (closed)"
+    calls = []
+    simu = types.SimpleNamespace(update_ic=lambda **k: calls.append(k))
+    bc.apply_ic(simu)
+    C.BCConfig(ic_mode="pressure", ic_pressure_head=-3.0).apply_ic(simu)
+    assert calls == [dict(INDP=3, WTPOSITION=2.5), dict(INDP=0, pressure_head_ini=-3.0)], calls
+    for bad in (dict(ic_mode="x"), dict(outlet_side="north"), dict(ic_wtposition=-1.0)):
+        try:
+            C.BCConfig(**bad)
+        except ValueError:
+            pass
+        else:
+            raise AssertionError(bad)
+    T, S = 3, 4
+    kw = dict(t_atmbc=[0, 86400, 172800], valid_times=np.arange(T), n_surf=S)
+    f = F.Forcing(ETp_nodes=np.ones((T, S)), rain_nodes=np.zeros((T, S)),
+                  net_flux=-np.ones(T), **kw)
+    assert f.is_etp and f.n_steps == T
+    assert not F.Forcing(None, None, np.zeros(T), t_atmbc=kw["t_atmbc"],
+                         valid_times=kw["valid_times"]).is_etp
+    for bad in (dict(ETp_nodes=np.ones((T, S + 1)), rain_nodes=np.zeros((T, S)), net_flux=np.zeros(T)),
+                dict(ETp_nodes=np.ones((T, S)), rain_nodes=None, net_flux=np.zeros(T)),
+                dict(ETp_nodes=np.ones((T, S)), rain_nodes=np.zeros((T, S)), net_flux=np.zeros(T + 1))):
+        try:
+            F.Forcing(**bad, **kw)
+        except ValueError:
+            pass
+        else:
+            raise AssertionError(bad)
+
+
 if __name__ == "__main__":
     for name, fn in sorted(globals().items()):
         if name.startswith("test_") and callable(fn):

@@ -14,6 +14,7 @@ import argparse
 import warnings
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Optional
 
 
 # Column of the Agramon CSVs used as ETp (mm/day) in "etp_ts" mode: either
@@ -230,3 +231,60 @@ class ForcingMode:
     def use_etp_ts(self) -> bool:
         return self.name == "etp_ts"
 
+
+
+# ─────────────────────────────────────────────────────────────
+# Boundary / initial conditions (REFACTORING.md 2.9)
+# ─────────────────────────────────────────────────────────────
+@dataclass(frozen=True)
+class BCConfig:
+    """
+    Boundary and initial conditions of one run (replaces seven loose
+    ``args.*`` reads).
+
+    Units: fluxes in m/s, negative = water leaving the domain (Neumann);
+    ``ic_wtposition`` is the water-table depth below the surface (m, >= 0);
+    ``ic_pressure_head`` is a uniform pressure head (m, negative = unsaturated).
+    ``outlet_side`` is None for auto-detection from the DEM.
+    """
+    outlet_flux: float = 0.0
+    outlet_side: Optional[str] = None
+    bottom_flux: float = 0.0
+    ic_mode: str = "wt"
+    ic_wtposition: float = 1.0
+    ic_pressure_head: float = -10.0
+
+    def __post_init__(self):
+        sides = ("xmin_bound", "xmax_bound", "ymin_bound", "ymax_bound")
+        if self.ic_mode not in ("wt", "pressure"):
+            raise ValueError(f"ic_mode must be 'wt' or 'pressure', got {self.ic_mode!r}")
+        if self.outlet_side is not None and self.outlet_side not in sides:
+            raise ValueError(f"outlet_side must be one of {sides} or None, "
+                             f"got {self.outlet_side!r}")
+        if self.ic_mode == "wt" and self.ic_wtposition < 0:
+            raise ValueError("ic_wtposition is a depth below the surface (>= 0 m)")
+
+    @classmethod
+    def from_args(cls, args) -> "BCConfig":
+        return cls(outlet_flux=args.outlet_flux, outlet_side=args.outlet_side,
+                   bottom_flux=args.bottom_flux, ic_mode=args.ic_mode,
+                   ic_wtposition=args.ic_wtposition,
+                   ic_pressure_head=args.ic_pressure_head)
+
+    @property
+    def ic_label(self) -> str:
+        if self.ic_mode == "wt":
+            return f"WT depth {self.ic_wtposition} m (INDP=3)"
+        return f"uniform pressure head {self.ic_pressure_head} m (INDP=0)"
+
+    @property
+    def bottom_label(self) -> str:
+        return (f"{self.bottom_flux:.1e} m/s" if self.bottom_flux != 0.0
+                else "disabled (closed)")
+
+    def apply_ic(self, simu) -> None:
+        """Set the initial condition on a pyCATHY ``simu``."""
+        if self.ic_mode == "pressure":
+            simu.update_ic(INDP=0, pressure_head_ini=self.ic_pressure_head)
+        else:
+            simu.update_ic(INDP=3, WTPOSITION=self.ic_wtposition)

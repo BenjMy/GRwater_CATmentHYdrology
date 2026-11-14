@@ -293,6 +293,7 @@ giving "'ic' has length N but the mesh has M points"), and the main script works
 - Refactoring Phase 1–2 partly done on branch `refactor-agramon-modules`: details and checks in `REFACTORING.md`.
 - `README_paper.md` merged into this file and `REFACTORING.md` (2026-11-13); keep only these two files.
 - 2026-11-14: new task added by the author: systematic soil and root properties in the mesh `.vtk`, rewrite of the existing `update_ic`/`map_prop2mesh` mapping (§5.4). Not started.
+- 2026-11-14: REFACTORING 2.9 done: `BCConfig` (outlet/bottom flux, IC mode) and `Forcing` (shapes/units documented and checked in `__post_init__`); `AtmbcSetup` now wraps `Forcing`, old attributes kept as properties. Smoke test extended; not run end-to-end.
 - 2026-11-13: §3.1 implemented (see ticks); only "new study: different DEM slopes" remains. Checked: py_compile, `--smoke-test`, comparison rebuilt on committed dry runs. Not checked: full CATHY runs (`--quick`, `--wet`).
 
 ## 10. References to cite
