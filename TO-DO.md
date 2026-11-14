@@ -299,6 +299,7 @@ giving "'ic' has length N but the mesh has M points"), and the main script works
 - 2026-11-14: REFACTORING 2.2: monthly loop + final outputs extracted from `run_pipeline` into `run_monthly_loop` (verbatim, AST-checked); test_run_pipeline_split added.
 - 2026-11-14: REFACTORING 2.2: `configure_model` + `ModelSetup` extracted (verbatim); `run_pipeline` is now setup_inputs → setup_mesh_and_dem → build_atmbc → configure_model → run_monthly_loop. Remaining: split the loop body per month step.
 - 2026-11-14: REFACTORING 2.2: SW/ET/recharge/hgraph readers (12.9-12.11a) moved to `lib/agramon_monthly.py` (verbatim; only `args.save_monthly`/`fm.use_etp`/`args.eta_net_neg_mode` became parameters). Tests added.
+- 2026-11-14: REFACTORING 2.2: PSI reader (12.8) and `report_month_stats` (12.12b) moved to `agramon_monthly.py` (AST-checked); dead commented-out PSI block dropped. Remaining: 12.1-12.5 soil/LAI prep.
 - 2026-11-13: §3.1 implemented (see ticks); only "new study: different DEM slopes" remains. Checked: py_compile, `--smoke-test`, comparison rebuilt on committed dry runs. Not checked: full CATHY runs (`--quick`, `--wet`).
 
 ## 10. References to cite

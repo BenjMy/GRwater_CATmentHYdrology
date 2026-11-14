@@ -11,6 +11,7 @@ checks (``None`` if the read failed). Errors are reported, never raised.
 from __future__ import annotations
 
 import numpy as np
+import pandas as pd
 from pyCATHY import cathy_utils
 
 from agramon_checks import add_datetime_col, apply_eta_artefact_floor
@@ -131,3 +132,96 @@ def read_hgraph_month(simu, dt, all_hgraph_recs, monthly_dir):
                 print(f"  Warning: could not save monthly hgraph for {dt:%Y-%m} ({exc})")
     except Exception as exc:
         print(f"  Warning: could not read hgraph for {dt:%Y-%m} ({exc})")
+
+
+def read_psi_month(simu, dt, psi_records, month_stats, monthly_dir, md_log, t_month):
+    """
+    Step 12.8: pressure head (PSI). Checks the solver actually reached the end
+    of the month; if not, keeps the last known state. Returns
+    ``(psi_month_df, solver_status)`` (frame is ``None`` if nothing was read).
+    """
+    psi_month_df = None
+    solver_status = "✓ OK"
+    try:
+        df_psi = simu.read_outputs("psi").copy()
+        last_psi_t   = df_psi.index[-1]
+        last_month_t = t_month[-1]
+        if last_psi_t < last_month_t:
+            print(f"  WARNING: PSI last index ({last_psi_t}) is behind "
+                  f"t_month[-1] ({last_month_t}) for {dt:%Y-%m} — "
+                  f"solver did not converge; keeping last known state and continuing.")
+            solver_status = f"⚠ not converged ({last_psi_t} < {last_month_t})"
+            md_log.warn(f"{dt:%Y-%m}: solver did not converge "
+                         f"(PSI last index {last_psi_t} < expected {last_month_t}) "
+                         f"— keeping last known state.")
+            # Do not append new psi_records; psi_ini will reuse previous last row
+            # on the next iteration (len(psi_records) > 0 guard still holds).
+        else:
+            print(f"  time index ic: {last_psi_t} ✓ (t_month[-1]: {last_month_t})")
+            df_psi["datetime"] = cathy_utils.change_x2date(df_psi.index, dt)
+            psi_month_df = (
+                df_psi.reset_index(drop=True)
+                      .melt(id_vars="datetime", var_name="node", value_name="psi")
+                      .assign(node=lambda d: d["node"].astype(int))
+            )
+            psi_records.append(psi_month_df)
+            month_stats["psi_mean"] = float(psi_month_df["psi"].mean())
+            month_stats["psi_min"]  = float(psi_month_df["psi"].min())
+            month_stats["psi_max"]  = float(psi_month_df["psi"].max())
+            if monthly_dir is not None:
+                try:
+                    (
+                        psi_month_df
+                        .groupby(["datetime", "node"], as_index=False)
+                        .last()
+                        .set_index(["datetime", "node"])
+                        .to_xarray()
+                        .to_netcdf(monthly_dir / f"psi_{dt:%Y%m}.nc")
+                    )
+                except Exception as exc:
+                    print(f"  Warning: could not save monthly PSI for {dt:%Y-%m} ({exc})")
+    except Exception as exc:
+        print(f"  WARNING: could not read PSI for {dt:%Y-%m} ({exc}) — "
+              f"keeping last known state and continuing.")
+        solver_status = f"✗ PSI read failed: {exc}"
+        md_log.warn(f"{dt:%Y-%m}: could not read PSI ({exc}) — "
+                     f"keeping last known state.")
+    return psi_month_df, solver_status
+
+
+def report_month_stats(dt, month_stats, solver_status, md_log, stats_records, out_dir):
+    """
+    Step 12.12b: print and log the monthly stats, then rewrite the running
+    ``monthly_stats.csv`` in ``out_dir``.
+    """
+    # 12.12b  Monthly info stats (psi/sw/ETa/recharge means) — printed,
+    # logged to the markdown run log, and appended to a single running
+    # monthly_stats.csv in out_dir that's rewritten after every month.
+    def _fmt(key: str, unit: str = "", sci: bool = False) -> str:
+        v = month_stats.get(key)
+        if v is None:
+            return "n/a"
+        return f"{v:.3e}{unit}" if sci else f"{v:.3f}{unit}"
+
+    print(f"  stats     | psi mean: {_fmt('psi_mean', ' m')} "
+          f"(min {_fmt('psi_min', ' m')}, max {_fmt('psi_max', ' m')}) | "
+          f"sw mean: {_fmt('sw_mean')} | "
+          f"ETa mean: {_fmt('eta_mean', ' m/s', sci=True)} | "
+          f"recharge mean: {_fmt('recharge_mean', ' m/s', sci=True)}")
+    print(f"  sanity    | SW out-of-bounds: {month_stats.get('sw_out_of_bounds_n', 'n/a')} | "
+          f"PSI extreme: {month_stats.get('psi_extreme_n', 'n/a')} | "
+          f"ETa>ETp: {month_stats.get('eta_exceeds_etp_n', 'n/a')} | "
+          f"water balance residual: {_fmt('water_balance_residual_mm', ' mm')}")
+    md_log.bullet(
+        f"{dt:%Y-%m} stats — psi mean: {_fmt('psi_mean', ' m')}, "
+        f"sw mean: {_fmt('sw_mean')}, "
+        f"ETa mean: {_fmt('eta_mean', ' m/s', sci=True)}, "
+        f"recharge mean: {_fmt('recharge_mean', ' m/s', sci=True)}"
+    )
+    month_stats["solver_status"] = solver_status
+    stats_records.append(month_stats)
+    try:
+        pd.DataFrame(stats_records).to_csv(out_dir / "monthly_stats.csv", index=False)
+    except Exception as exc:
+        print(f"  Warning: could not refresh monthly_stats.csv after {dt:%Y-%m} ({exc})")
+

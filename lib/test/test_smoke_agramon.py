@@ -445,6 +445,36 @@ def test_agramon_monthly_readers():
     assert len(hg) == 1 and "time_sec" in hg[0].columns
 
 
+def test_agramon_monthly_psi_and_stats():
+    import tempfile, types, datetime as dtm
+    from pathlib import Path
+    import pandas as pd
+    import agramon_monthly as MR
+    dt = dtm.datetime(2020, 7, 1)
+
+    class Log:
+        def __init__(self): self.w, self.b = [], []
+        def warn(self, m): self.w.append(m)
+        def bullet(self, m): self.b.append(m)
+
+    class Boom:
+        def read_outputs(self, k): raise RuntimeError("no psi")
+
+    log, recs, st = Log(), [], {"month": "2020-07"}
+    df, status = MR.read_psi_month(Boom(), dt, recs, st, None, log, [86400.0])
+    assert df is None and status.startswith("✗ PSI read failed") and log.w and not recs
+
+    behind = types.SimpleNamespace(read_outputs=lambda k: pd.DataFrame(
+        {0: [-1.0], 1: [-2.0]}, index=[100.0]))
+    df, status = MR.read_psi_month(behind, dt, recs, st, None, log, [86400.0])
+    assert df is None and status.startswith("⚠ not converged") and not recs
+
+    out = Path(tempfile.mkdtemp()); stats = []
+    MR.report_month_stats(dt, {"month": "2020-07", "psi_mean": -1.5}, "✓ OK", log, stats, out)
+    assert len(stats) == 1 and (out / "monthly_stats.csv").exists()
+    assert stats[0]["solver_status"] == "✓ OK" and any("psi mean" in b for b in log.b)
+
+
 if __name__ == "__main__":
     for name, fn in sorted(globals().items()):
         if name.startswith("test_") and callable(fn):
