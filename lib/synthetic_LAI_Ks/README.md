@@ -200,7 +200,15 @@ python scenario.py --quick --slope 0.1 --only control --dry-run     # check the 
 Caveats: the hydrostatic IC (`--ic-wt-depth`) puts a horizontal water table at (column
 thickness - depth) above the grid base, so on a slope it is that deep only on average; the
 column thickness assumes a terrain-following mesh (checked only for the flat DEM). Compare
-slopes by pointing `synthetic_ksfire_analysis.py --root` at each slope root.
+slopes with
+
+```bash
+python synthetic_ksfire_analysis.py --slopes results/synthetic_LAI_Ks_wet_slope0 results/synthetic_LAI_Ks_wet_slope0.05 results/synthetic_LAI_Ks_wet_slope0.15
+```
+
+which writes `fig_cmp_slopes.png` (post-fire ETa / recharge and Δ vs the same-slope control,
+versus slope) and `summary_slopes.csv` to `--out` (default `<repo>/results/_comparison_slopes`).
+Runs made before `--slope` existed count as slope 0.
 
 ### Arguments for every run (`--extra`)
 

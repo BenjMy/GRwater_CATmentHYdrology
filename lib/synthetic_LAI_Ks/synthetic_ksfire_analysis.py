@@ -649,6 +649,79 @@ def cmp_soil(runs, st, fire, out, dpi):
     plt.close(fig)
 
 
+def slope_table(roots, exclude=(), fire_date=None) -> pd.DataFrame:
+    """One row per (slope, scenario): totals after the fire and delta to the matching
+    control of the SAME slope root. The slope comes from run_meta.json (0 if absent)."""
+    rows = []
+    for root in roots:
+        runs = load_runs(root, exclude)
+        if not runs:
+            continue
+        ctrl = matching_control(runs)
+        fire = pd.Timestamp(fire_date or next((r["meta"].get("fire_date") for r in runs.values()
+                                               if r["meta"].get("fire_date")), "2020-07-01"))
+        for lab, r in runs.items():
+            post = r["mon"][r["mon"].index >= fire]
+            tot = {c: float(post[c].sum()) for c in ("eta_mm", "recharge_mm", "rain_mm", "etp_mm")
+                   if c in post}
+            rec = {"slope": float(r["meta"].get("slope", 0.0) or 0.0), "scenario": lab,
+                   "root": str(root), **{f"post_{k}": v for k, v in tot.items()}}
+            c = ctrl.get(lab)
+            if c and c != lab:
+                cp = runs[c]["mon"][runs[c]["mon"].index >= fire]
+                for col, tag in (("eta_mm", "eta"), ("recharge_mm", "rech")):
+                    if col in post and col in cp:
+                        rec[f"d_{tag}_mm"] = float(post[col].sum() - cp[col].sum())
+            rows.append(rec)
+    return pd.DataFrame(rows).sort_values(["scenario", "slope"]).reset_index(drop=True) \
+        if rows else pd.DataFrame()
+
+
+def cmp_slopes(df, out, dpi=150):
+    """Post-fire ETa / recharge totals (top) and delta to the control (bottom) vs DEM slope."""
+    plt = _plt()
+    fig, ax = plt.subplots(2, 2, figsize=(12, 8), sharex=True, constrained_layout=True)
+    cmap = plt.get_cmap("tab10")
+    for i, (lab, g) in enumerate(df.groupby("scenario")):
+        g = g.sort_values("slope")
+        x = 100 * g["slope"]
+        kw = dict(marker="o", lw=1.4, color=cmap(i % 10), label=lab)
+        for j, (col, dcol, nm) in enumerate((("post_eta_mm", "d_eta_mm", "ETa"),
+                                             ("post_recharge_mm", "d_rech_mm", "recharge"))):
+            if col in g:
+                ax[0, j].plot(x, g[col], **kw)
+            if dcol in g and g[dcol].notna().any():
+                ax[1, j].plot(x, g[dcol], **kw)
+            ax[0, j].set_ylabel(f"{nm} after the fire (mm)")
+            ax[1, j].set_ylabel(f"Δ {nm} (mm)  scenario − control")
+            ax[1, j].set_xlabel("DEM slope (%)")
+    for a in ax.ravel():
+        a.grid(True, ls="--", alpha=0.3)
+    for a in ax[1]:
+        a.axhline(0, color="k", lw=0.8)
+    ax[0, 0].legend(fontsize=7, ncol=2)
+    fig.suptitle("Effect of DEM slope (full-area means, one root per slope)", fontsize=10,
+                 fontweight="bold")
+    fig.savefig(Path(out) / "fig_cmp_slopes.png", dpi=dpi)
+    plt.close(fig)
+
+
+def compare_slopes(roots, out, exclude=(), fire_date=None, dpi=150) -> Path | None:
+    import matplotlib
+    matplotlib.use("Agg")
+    df = slope_table(roots, exclude, fire_date)
+    if df.empty or df["slope"].nunique() < 2:
+        print("Cannot compare slopes: need runs from >= 2 different slopes "
+              "(run_meta.json 'slope'; runs made before --slope count as 0).")
+        return None
+    out = Path(out)
+    out.mkdir(parents=True, exist_ok=True)
+    df.to_csv(out / "summary_slopes.csv", index=False)
+    cmp_slopes(df, out, dpi)
+    print(f"Slope comparison written to {out}")
+    return out
+
+
 def explain_missing_runs(root, runs) -> None:
     """Say exactly what is required and what each scenario folder is missing."""
     root = Path(root)
@@ -736,7 +809,16 @@ def main(argv=None):
                    help="scenario names to leave out (e.g. deep_wt: other initial condition)")
     p.add_argument("--fire-date", default=None, help="default: read from run_meta.json")
     p.add_argument("--dpi", type=int, default=150)
+    p.add_argument("--slopes", nargs="+", default=None, metavar="ROOT",
+                   help="compare DEM slopes: one root per slope (e.g. results/*_slope*), "
+                        "writes fig_cmp_slopes.png + summary_slopes.csv to --out "
+                        "(default <repo>/results/_comparison_slopes)")
     a = p.parse_args(argv)
+    if a.slopes:
+        compare_slopes([Path(r).expanduser().resolve() for r in a.slopes],
+                       a.out or DEFAULT_ROOT.parent / "_comparison_slopes", a.exclude,
+                       a.fire_date, a.dpi)
+        return
     compare_scenarios(Path(a.root).expanduser().resolve(), a.out, a.exclude, a.fire_date, a.dpi)
 
 
