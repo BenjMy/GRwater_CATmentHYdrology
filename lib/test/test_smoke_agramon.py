@@ -35,7 +35,7 @@ from unittest import mock  # noqa: E402
 
 for _m in ("pyvista", "rioxarray", "geopandas", "scipy", "scipy.ndimage", "pyCATHY",
            "pyCATHY.meshtools", "pyCATHY.cathy_tools", "pyCATHY.cathy_utils", "pyCATHY.petro",
-           "pyCATHY.plotters", "pyCATHY.importers", "rasterio", "shapely"):
+           "pyCATHY.plotters", "pyCATHY.importers", "rasterio", "shapely", "imageio"):
     try:
         __import__(_m)
     except ImportError:
@@ -277,6 +277,26 @@ def test_forcing_mode():
     else:
         raise AssertionError("ForcingMode must be frozen")
     assert C.FORCING_MODE_DEFAULT in C.FORCING_LABELS
+
+
+def test_results_plotter_split():
+    """results_plotter (REFACTORING 2.11) is a facade over plot_*.py: same names, same objects,
+    and a figure that crosses two modules (plot_maps -> plot_common helpers) really renders."""
+    import tempfile
+    import matplotlib
+    matplotlib.use("Agg")
+    import results_plotter as RP
+    import plot_common, plot_maps, plot_monthly, plot_hydro_xr, plot_eta
+    for name, mod in (("plot_recharge_bar", plot_maps), ("plot_hydro_xr_monthly", plot_monthly),
+                      ("plot_hydro_xr", plot_hydro_xr), ("plot_eta_total", plot_eta),
+                      ("add_fire_vline", plot_common), ("FIRE_DATE", plot_common)):
+        assert getattr(RP, name) is getattr(mod, name), name
+    assert RP._infer_time_dim.__module__ == "plot_common", "last definition wins (as before the split)"
+    assert RP.CMAP_ET == "YlGnBu" and RP.DEFAULT_ET_VAR == "ACT. ETRA_patched"
+    idx = pd.date_range("2020-01-31", periods=12, freq="ME")   # month-end, as the callers pass
+    with tempfile.TemporaryDirectory() as d:
+        RP.plot_recharge_bar(pd.Series(np.arange(12.0), index=idx), Path(d), dpi=40)
+        assert (Path(d) / "recharge_LAI_loop.png").stat().st_size > 1000
 
 
 if __name__ == "__main__":
