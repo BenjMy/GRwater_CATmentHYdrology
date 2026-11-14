@@ -250,6 +250,35 @@ def test_smooth_dem():
     assert np.allclose(np.nan_to_num(MS.smooth_dem(flat, 2.0), nan=7.0), 7.0), "flat stays flat"
 
 
+def test_forcing_mode():
+    import warnings
+    fm = C.ForcingMode.from_name("etp")
+    assert (fm.use_etp, fm.use_etp_ts, fm.label) == (True, False, C.FORCING_LABELS["etp"])
+    ts = C.ForcingMode.from_name("etp_ts")
+    assert ts.use_etp and ts.use_etp_ts and ts.name == "etp_ts"
+    with warnings.catch_warnings(record=True) as w:
+        warnings.simplefilter("always")
+        era = C.ForcingMode.from_name("era5")
+        assert not era.use_etp and not era.use_etp_ts
+        assert any(issubclass(x.category, DeprecationWarning) for x in w), "era5 is deprecated"
+        w.clear()
+        C.ForcingMode.from_name("era5", warn=False)
+        assert not w
+    try:
+        C.ForcingMode.from_name("nope")
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("unknown forcing must raise")
+    try:
+        fm.name = "etp_ts"                       # immutable: no hidden global-style mutation
+    except Exception:                            # noqa: BLE001 (FrozenInstanceError)
+        pass
+    else:
+        raise AssertionError("ForcingMode must be frozen")
+    assert C.FORCING_MODE_DEFAULT in C.FORCING_LABELS
+
+
 if __name__ == "__main__":
     for name, fn in sorted(globals().items()):
         if name.startswith("test_") and callable(fn):

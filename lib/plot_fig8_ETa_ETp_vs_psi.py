@@ -21,7 +21,7 @@ shallow depths instead of [0, 1, 2] m.)
 Requires a new artefact, etp_output.nc (per-surface-node ETp forcing,
 dims datetime x node), written by Agramon_withLAI_withETp.py right after
 out_dir is created — alongside psi_output.nc / sw_output.nc / et_output.nc.
-If a scenario predates that patch, rerun it (USE_ETP_FORCING must be True)
+If a scenario predates that patch, rerun it (use --forcing etp or etp_ts)
 before this script can use it.
 
 Usage
@@ -102,7 +102,7 @@ def load_etp_forcing(out_dir: Path) -> xr.Dataset:
             f"'etp_output.nc' not found in {out_dir}.\n"
             "  -> This artefact is written by the ETp-persistence patch in "
             "Agramon_withLAI_withETp.py (right after out_dir is created). "
-            "Rerun this scenario with USE_ETP_FORCING=True to generate it."
+            "Rerun this scenario with --forcing etp or etp_ts to generate it."
         )
     return xr.open_dataset(etp_nc)
 

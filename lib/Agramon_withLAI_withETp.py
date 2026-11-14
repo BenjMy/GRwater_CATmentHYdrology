@@ -36,7 +36,7 @@ Usage
     python Agramon_withLAI_withETp.py --zroot-factors 0.1 0.3 1.0 1.5 2.5
     python Agramon_withLAI_withETp.py --permx 1e-5 --permy-ratio 1.0 --permz-ratio 0.1
 
-Forcing switch (``--forcing``, default set by FORCING_MODE below)
+Forcing switch (``--forcing``, default FORCING_MODE_DEFAULT in agramon_config)
 -----------------------------------------------------------------
       "etp"    : satellite ETp raster + satellite rain raster (default)
       "etp_ts" : ETp from the Agramon ET CSV time series (one value per day,
@@ -61,54 +61,6 @@ from scipy.ndimage import gaussian_filter
 from pyCATHY import meshtools as mt
 
 
-# ── Forcing switch ─────────────────────────────────────────────────────────────
-#   "era5"   → ERA5 point series (original withLAI behaviour)
-#   "etp"    → satellite ETp raster + satellite rain raster (PathET files)
-#   "etp_ts" → ETp from the Agramon ET CSV time series (uniform over all
-#              pixels, treatment selected by --dem-plot) + satellite rain raster
-FORCING_MODE = "etp"
-
-FORCING_LABELS = {
-    "era5": "ERA5",
-    "etp": "satellite ETp + rain",
-    "etp_ts": "ETp time series (CSV) + satellite rain",
-}
-if FORCING_MODE not in FORCING_LABELS:
-    raise ValueError(
-        f"FORCING_MODE must be one of {list(FORCING_LABELS)}, got {FORCING_MODE!r}"
-    )
-
-# "etp" and "etp_ts" share the whole per-node ETp/rain machinery below (the
-# only difference is how ds_etp is built), so the existing
-# `if USE_ETP_FORCING:` branches keep working for both.
-USE_ETP_FORCING = FORCING_MODE in ("etp", "etp_ts")
-USE_ETP_TS_FORCING = FORCING_MODE == "etp_ts"
-
-
-def apply_forcing_mode(mode: str) -> None:
-    """
-    Switch the forcing mode at runtime (``--forcing`` CLI flag).
-
-    FORCING_MODE / USE_ETP_FORCING / USE_ETP_TS_FORCING are module globals
-    read inside run_pipeline(), so they are updated together here, before
-    any forcing is loaded. The module-level FORCING_MODE stays the default
-    when ``--forcing`` is not given.
-    """
-    global FORCING_MODE, USE_ETP_FORCING, USE_ETP_TS_FORCING
-    if mode not in FORCING_LABELS:
-        raise ValueError(f"forcing must be one of {list(FORCING_LABELS)}, got {mode!r}")
-    if mode == "era5":
-        warnings.warn(
-            "--forcing era5 is deprecated (quick-test only) and will be "
-            "removed; use 'etp' or 'etp_ts' (see REFACTORING.md, step 3.3).",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-    FORCING_MODE = mode
-    USE_ETP_FORCING = mode in ("etp", "etp_ts")
-    USE_ETP_TS_FORCING = mode == "etp_ts"
-
-
 from utils import Agramon_utils as AgUtils
 from utils import ks_fire_utils as KsFire
 from agramon_ks import (FIRE_DATE_DEFAULT, ks_banner_label, ks_config_from_args,
@@ -123,6 +75,9 @@ from agramon_checks import (
 )
 from agramon_config import (
     ETP_TS_COLUMN_DEFAULT,
+    FORCING_LABELS,
+    FORCING_MODE_DEFAULT,
+    ForcingMode,
     EO_PATH,
     LAI_PATH,
     N_VEG_CLASSES,
@@ -339,7 +294,7 @@ def _parse_args() -> argparse.Namespace:
                              "satellite ETp/rain starts 2016-10-01, so 2016 "
                              "is skipped automatically)")
 
-    sim.add_argument("--forcing", choices=list(FORCING_LABELS), default=FORCING_MODE,
+    sim.add_argument("--forcing", choices=list(FORCING_LABELS), default=FORCING_MODE_DEFAULT,
                      help="Atmospheric forcing: era5 = ERA5 point series | "
                           "etp = satellite ETp raster + rain raster | "
                           "etp_ts = ETp CSV time series (uniform over pixels, "
@@ -464,6 +419,7 @@ class RunInputs:
     ds_etp: Any             # xarray.Dataset or None (ERA5 mode)
     ds_era5: Any            # xarray.Dataset or None (ETp modes)
     etp_ts_fid: Any         # treatment id used in "etp_ts" mode
+    forcing: ForcingMode    # immutable forcing choice (was module globals, 2.13)
     scenario_dirname: str
     md_log: MarkdownLog
 
@@ -474,11 +430,11 @@ def setup_inputs(args: argparse.Namespace) -> RunInputs:
     Steps [1/9]-[3/9] of the pipeline: resolve labels and the run banner,
     load shapefiles, forcing and LAI, log the simulation (CSV + markdown).
 
-    Moved verbatim out of ``run_pipeline``. It stays in this module (not in
-    ``agramon_*.py``) because it reads ``FORCING_MODE`` / ``USE_ETP_*``,
-    which ``apply_forcing_mode`` sets as globals of this module (see
-    REFACTORING.md 2.13). ``apply_forcing_mode`` must be called first.
+    Moved verbatim out of ``run_pipeline``. The forcing choice is an immutable
+    ``ForcingMode`` built here from ``--forcing`` and returned in ``RunInputs.forcing``
+    (it replaces the former module globals, REFACTORING.md 2.13).
     """
+    fm = ForcingMode.from_name(args.forcing)
     show_plots = not args.no_plots
 
     # ── 1. Resolve DEM source ─────────────────────────────────
@@ -506,7 +462,7 @@ def setup_inputs(args: argparse.Namespace) -> RunInputs:
     # Banner labels are built here (not inline in the f-strings) so the code
     # stays valid on Python < 3.12, where an f-string replacement field can't
     # span lines or reuse the enclosing quote character.
-    forcing_label = FORCING_LABELS[FORCING_MODE]
+    forcing_label = fm.label
     if args.permx is None:
         banner_permx_label = "pyCATHY default"
     else:
@@ -544,12 +500,12 @@ def setup_inputs(args: argparse.Namespace) -> RunInputs:
     print("\n[2/9] Loading forcing datasets and LAI …")
     ds_LAI = load_monthly_lai(LAI_PATH)
 
-    if USE_ETP_FORCING:
+    if fm.use_etp:
         ds_rain = load_rain()
         # Satellite forcing is defined from 2016-10-01 (see pick_default_spinup_year);
         # the rain file also contains earlier years the CSV ETp doesn't cover.
         ds_rain = ds_rain.sel(time=slice("2016-10-01", None))
-        if USE_ETP_TS_FORCING:
+        if fm.use_etp_ts:
             df_et = load_all(PathET)
             ds_etp = build_etp_ds_from_timeseries(
                 df_et, ds_rain,
@@ -594,7 +550,7 @@ def setup_inputs(args: argparse.Namespace) -> RunInputs:
         pcana=feddes["pcana"], pcref=feddes["pcref"], pcwlt=feddes["pcwlt"],
         pz=feddes["pz"], omgc=feddes["omgc"],
         feddes_crop=feddes["feddes_crop"],
-        forcing_mode=FORCING_MODE,
+        forcing_mode=fm.name,
         etp_ts_column=args.etp_ts_column,
         etp_ts_feature_id=etp_ts_fid,
         ks_fire=ks_key(args),
@@ -609,7 +565,7 @@ def setup_inputs(args: argparse.Namespace) -> RunInputs:
         args.no_spinup, args.spinup_cycles, args.pmin, args.ic_mode,
         forcing_tag="_".join(t for t in (
             (f"forcing-etpts-{args.etp_ts_column.removeprefix('ET_0_')}"
-             f"-fid{etp_ts_fid}" if USE_ETP_TS_FORCING else ""),
+             f"-fid{etp_ts_fid}" if fm.use_etp_ts else ""),
             ks_tag(args)) if t),
     )
 
@@ -624,7 +580,7 @@ def setup_inputs(args: argparse.Namespace) -> RunInputs:
         md_log_path,
         title=f"Simulation Log — {scenario_dirname} (dem-plot {args.dem_plot})",
     )
-    if USE_ETP_FORCING:
+    if fm.use_etp:
         md_log.fixes_applied([
             "ETa net-forcing artefact floor: `apply_eta_artefact_floor()` adds "
             "an `ACT. ETRA_patched` column, flooring cells where CATHY reports "
@@ -635,7 +591,7 @@ def setup_inputs(args: argparse.Namespace) -> RunInputs:
         ])
     md_log.section("Run configuration")
     md_log.meta({
-        "Forcing source": FORCING_LABELS[FORCING_MODE],
+        "Forcing source": fm.label,
         "Period": f"{args.start_year} – {args.end_year - 1}",
         "Target CRS": TARGET_CRS,
         "ZROOT / PMIN / SCF": f"{args.zroot} m / {args.pmin} m / {scf_label}",
@@ -674,6 +630,7 @@ def setup_inputs(args: argparse.Namespace) -> RunInputs:
         ds_etp=ds_etp,
         ds_era5=ds_era5,
         etp_ts_fid=etp_ts_fid,
+        forcing=fm,
         scenario_dirname=scenario_dirname,
         md_log=md_log,
     )
@@ -813,15 +770,15 @@ def build_atmbc(args: argparse.Namespace, inp: RunInputs,
     forcing arrays.
 
     Moved verbatim out of ``run_pipeline``. It stays in this module because
-    it reads ``USE_ETP_FORCING`` / ``USE_ETP_TS_FORCING`` (module globals set
-    by ``apply_forcing_mode``, see REFACTORING.md 2.13) and calls
+    it reads the run's ``ForcingMode`` (``inp.forcing``, REFACTORING.md 2.13) and calls
     ``save_forcing_diagnostics``.
 
     ``ETp_nodes``, ``rain_nodes`` and ``n_surf`` are only bound by the ETp
     branch. In ERA5 mode the original code left them unbound (and every later
-    read is guarded by ``USE_ETP_FORCING``); here they are ``None`` so they
+    read is guarded by ``fm.use_etp``); here they are ``None`` so they
     can be returned.
     """
+    fm                = inp.forcing
     show_plots        = inp.show_plots
     gdf_Agramon       = inp.gdf_Agramon
     ds_rain           = inp.ds_rain
@@ -849,7 +806,7 @@ def build_atmbc(args: argparse.Namespace, inp: RunInputs,
         "Mesh CRS": TARGET_CRS,
     })
 
-    if USE_ETP_FORCING:
+    if fm.use_etp:
         # ── Map ETp and rain to mesh surface nodes ────────────
         # FIX: `simu.grid3d` can be stale (only updated as a side effect of
         # certain internal calls, not by read_outputs()). Use the `grid3d`
@@ -904,7 +861,7 @@ def build_atmbc(args: argparse.Namespace, inp: RunInputs,
                 f"{PathET / 'agramon_treatments_ET.csv'} "
                 f"(feature_id={etp_ts_fid}, "
                 f"column={args.etp_ts_column}; same value for every pixel)"
-                if USE_ETP_TS_FORCING else str(etp_path)),
+                if fm.use_etp_ts else str(etp_path)),
             "Rain source file": str(rain_path),
             "Native CRS (source)": NATIVE_CRS,
             "Target CRS (mesh)": TARGET_CRS,
@@ -993,9 +950,8 @@ def build_atmbc(args: argparse.Namespace, inp: RunInputs,
 def run_pipeline(args: argparse.Namespace) -> None:
     """Execute the full pyCATHY + LAI + ETp simulation pipeline."""
 
-    apply_forcing_mode(args.forcing)
-
     inp = setup_inputs(args)
+    fm = inp.forcing
 
     ks_cfg = ks_config_from_args(args)   # per-month post-fire Ks (off by default)
     feddes           = inp.feddes
@@ -1158,7 +1114,7 @@ def run_pipeline(args: argparse.Namespace) -> None:
     # re-running the satellite-to-mesh mapping (mt.map_grid_to_mesh).
     # Only meaningful in the ETp-forcing branch — ERA5-forced runs never
     # build a per-node ETp array.
-    if USE_ETP_FORCING and ETp_nodes is not None:
+    if fm.use_etp and ETp_nodes is not None:
         etp_out_path = out_dir / "etp_output.nc"
         xr.DataArray(
             ETp_nodes,
@@ -1169,7 +1125,7 @@ def run_pipeline(args: argparse.Namespace) -> None:
                 "units": "m/s",
                 "description": (
                     "Potential ET forcing per surface node, as mapped from "
-                    + ("the uniform CSV ETp time series" if USE_ETP_TS_FORCING
+                    + ("the uniform CSV ETp time series" if fm.use_etp_ts
                        else "the satellite ET0 raster")
                     + " onto the mesh (node index "
                     "matches the first n_surf rows of grid3d['mesh3d_nodes'])."
@@ -1274,7 +1230,7 @@ def run_pipeline(args: argparse.Namespace) -> None:
         # needed by both the ETa artefact floor (12.10) and the sanity
         # checks (12.9b). Computed once here so both reuse the same mask.
         idx_month = None
-        if USE_ETP_FORCING:
+        if fm.use_etp:
             month_mask = np.array([
                 pd.Timestamp(t).year == dt.year and pd.Timestamp(t).month == dt.month
                 for t in valid_times
@@ -1287,7 +1243,7 @@ def run_pipeline(args: argparse.Namespace) -> None:
         outdir_etp.mkdir(exist_ok=True)
         fig2, ax2 = plt.subplots(figsize=(8, 4))
         ax2.plot(nv_month)
-        ax2.set_title(f"Net flux ({'ETp' if USE_ETP_FORCING else 'ERA5'}) - {dt:%Y-%m}")
+        ax2.set_title(f"Net flux ({'ETp' if fm.use_etp else 'ERA5'}) - {dt:%Y-%m}")
         ax2.set_ylabel("m/s")
         fig2.savefig(outdir_etp / f"forcing_{dt:%Y%m}.png", dpi=150, bbox_inches="tight")
         plt.close(fig2)
@@ -1324,7 +1280,7 @@ def run_pipeline(args: argparse.Namespace) -> None:
             grid3d = simu.read_outputs("grid3d")
             n_surf_real = int(grid3d["nnod"])
 
-            if USE_ETP_FORCING and n_surf_real != n_surf:
+            if fm.use_etp and n_surf_real != n_surf:
                 print(f"  Refreshing ETp/rain node mapping: n_surf "
                       f"{n_surf} → {n_surf_real} (grid finalized by "
                       f"preprocessor)")
@@ -1499,7 +1455,7 @@ def run_pipeline(args: argparse.Namespace) -> None:
 
             # FIX: floor the net-forcing ETa artefact at ETp for this month
             # (adds 'ACT. ETRA_patched'; 'ACT. ETRA' stays unmodified).
-            if USE_ETP_FORCING:
+            if fm.use_etp:
                 df_et, n_eta_patched, n_eta_net_neg = apply_eta_artefact_floor(
                     df_et, t_month, ETp_nodes, rain_nodes, idx_month,
                     net_neg_mode=args.eta_net_neg_mode,
@@ -1592,8 +1548,8 @@ def run_pipeline(args: argparse.Namespace) -> None:
                 df_rec=df_rec,
                 t_month=t_month,
                 idx_month=idx_month,
-                ETp_nodes=ETp_nodes if USE_ETP_FORCING else None,
-                rain_nodes=rain_nodes if USE_ETP_FORCING else None,
+                ETp_nodes=ETp_nodes if fm.use_etp else None,
+                rain_nodes=rain_nodes if fm.use_etp else None,
             )
         except Exception as exc:
             sanity_warnings = []

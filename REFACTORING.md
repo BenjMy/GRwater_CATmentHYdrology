@@ -141,7 +141,7 @@ The main script re-imports these names, so `from Agramon_withLAI_withETp import 
 | 2.10 | Replace `print` banners by `logging` | ⬜ |
 | 2.11 | Split `results_plotter.py` (4,400 lines) by figure family (hydro, ET, LAI, recharge, GIFs) | ⬜ |
 | 2.12 | Unit tests for pure functions (LAI → veg class, Ks recovery, ETa artefact floor, scenario dirname, sanity checks) + regression test for the `--dem-plot 2` empty-mesh crash | ⬜ |
-| 2.13 | Global mutable state: `FORCING_MODE`, `USE_ETP_FORCING`, `USE_ETP_TS_FORCING` are module globals set by `apply_forcing_mode`; replace by a field of the run configuration | ⬜ |
+| 2.13 | Global mutable state: `FORCING_MODE`, `USE_ETP_FORCING`, `USE_ETP_TS_FORCING` are module globals set by `apply_forcing_mode`; replace by a field of the run configuration | ✅ frozen `ForcingMode` (`agramon_config.py`: `name`, `label`, `use_etp`, `use_etp_ts`), built in `setup_inputs`, carried in `RunInputs.forcing`; `apply_forcing_mode` and the globals are gone; the `era5` DeprecationWarning is kept. Checked: pyflakes, import + CLI parse under stubs, unit test; not run with CATHY |
 | 2.14 | Hard-coded machine paths (`Nextcloud/...`) → config/env (same as 2.4) | ⬜ |
 
 ### 3.3 `run_pipeline` split: progress map (static analysis)

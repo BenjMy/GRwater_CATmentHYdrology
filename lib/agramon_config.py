@@ -11,6 +11,8 @@ Nothing in here runs code with side effects beyond resolving paths.
 """
 
 import argparse
+import warnings
+from dataclasses import dataclass
 from pathlib import Path
 
 
@@ -178,3 +180,53 @@ def feddes_params_from_args(args: argparse.Namespace) -> dict[str, float | None]
         "feddes_crop": args.feddes_crop,
         "feddes_crop_ref": lit_ref,
     }
+
+
+# ── Forcing mode (replaces the former module globals, REFACTORING.md 2.13) ─────
+#   "era5"   -> ERA5 point series (deprecated, quick-test only)
+#   "etp"    -> satellite ETp raster + satellite rain raster (PathET files)
+#   "etp_ts" -> ETp from the Agramon ET CSV time series (uniform over all pixels,
+#               treatment selected by --dem-plot) + satellite rain raster
+FORCING_MODE_DEFAULT = "etp"
+FORCING_LABELS = {
+    "era5": "ERA5",
+    "etp": "satellite ETp + rain",
+    "etp_ts": "ETp time series (CSV) + satellite rain",
+}
+
+
+@dataclass(frozen=True)
+class ForcingMode:
+    """Immutable forcing choice of one run (``--forcing``), carried in ``RunInputs``.
+
+    "etp" and "etp_ts" share the whole per-node ETp/rain machinery (they differ only in
+    how ``ds_etp`` is built), hence ``use_etp`` is True for both.
+    """
+    name: str
+
+    def __post_init__(self):
+        if self.name not in FORCING_LABELS:
+            raise ValueError(f"forcing must be one of {list(FORCING_LABELS)}, got {self.name!r}")
+
+    @classmethod
+    def from_name(cls, name: str, warn: bool = True) -> "ForcingMode":
+        fm = cls(name)
+        if warn and name == "era5":
+            warnings.warn(
+                "--forcing era5 is deprecated (quick-test only) and will be removed; "
+                "use 'etp' or 'etp_ts' (see REFACTORING.md, step 3.3).",
+                DeprecationWarning, stacklevel=2)
+        return fm
+
+    @property
+    def label(self) -> str:
+        return FORCING_LABELS[self.name]
+
+    @property
+    def use_etp(self) -> bool:
+        return self.name in ("etp", "etp_ts")
+
+    @property
+    def use_etp_ts(self) -> bool:
+        return self.name == "etp_ts"
+
