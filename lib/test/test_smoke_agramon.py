@@ -384,6 +384,26 @@ def test_bc_and_forcing_containers():
             raise AssertionError(bad)
 
 
+def test_export_mesh_props(tmp_path=None):
+    import os, tempfile, types, datetime as dtm
+    import Agramon_withLAI_withETp as A
+    d = tempfile.mkdtemp(); old = os.getcwd(); os.chdir(d)
+    try:
+        vtk = os.path.join(d, "proj", "vtk"); os.makedirs(vtk)
+        open(os.path.join(vtk, "proj.vtk"), "w").write("x")
+        calls = []
+        ok = types.SimpleNamespace(workdir=d, project_name="proj",
+                                   map_soil_root_to_mesh=lambda: calls.append(1))
+        A.export_mesh_props(ok, dtm.datetime(2020, 7, 1))
+        assert calls == [1] and os.path.exists("mesh_props/proj_202007.vtk")
+        A._MESH_PROPS_WARNED = False
+        old_py = types.SimpleNamespace(workdir=d, project_name="proj")
+        A.export_mesh_props(old_py, dtm.datetime(2020, 8, 1))   # must not raise
+        assert A._MESH_PROPS_WARNED and not os.path.exists("mesh_props/proj_202008.vtk")
+    finally:
+        os.chdir(old)
+
+
 if __name__ == "__main__":
     for name, fn in sorted(globals().items()):
         if name.startswith("test_") and callable(fn):

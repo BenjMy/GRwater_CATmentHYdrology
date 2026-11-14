@@ -46,6 +46,7 @@ Forcing switch (``--forcing``, default FORCING_MODE_DEFAULT in agramon_config)
 """
 
 import argparse
+import shutil
 import warnings
 from dataclasses import dataclass
 from pathlib import Path
@@ -328,6 +329,13 @@ def _parse_args() -> argparse.Namespace:
     dem.add_argument("--dem-plot",   type=int, default=3, choices=range(1, 14), metavar="N",
                      help="Plot index (1-13, matches gdf_Agramon's fid_1 column) used to "
                           "clip the DEM (loaded from --dem-tif) to that plot's footprint")
+    dem.add_argument("--mesh-props", action="store_true",
+                     help="Each month, write soil (PERMX, POROS, ...) and root "
+                          "(ZROOT, root_zone, root_beta) node properties onto the "
+                          "mesh and keep a copy of the .vtk in ./mesh_props/. "
+                          "Needs a pyCATHY with simu.map_soil_root_to_mesh() "
+                          "(branch mesh-vtk-properties); output only, the "
+                          "simulation is unchanged.")
     dem.add_argument("--dem-folder", default=None, metavar="PATH",
                      help="Legacy override: full path to .adf raster folder "
                           "(unused now that --dem-tif is the DEM source)")
@@ -953,6 +961,29 @@ def build_atmbc(args: argparse.Namespace, inp: RunInputs,
     )
 
 
+_MESH_PROPS_WARNED = False
+
+
+def export_mesh_props(simu, dt, outdir="mesh_props"):
+    """
+    Write soil/root properties on the mesh and keep a monthly .vtk copy.
+    Never stops the run: a missing method (old pyCATHY) or any failure is
+    reported once and the simulation carries on.
+    """
+    global _MESH_PROPS_WARNED
+    try:
+        if not hasattr(simu, "map_soil_root_to_mesh"):
+            raise AttributeError("this pyCATHY has no map_soil_root_to_mesh()")
+        simu.map_soil_root_to_mesh()
+        src = Path(simu.workdir) / simu.project_name / "vtk" / f"{simu.project_name}.vtk"
+        Path(outdir).mkdir(exist_ok=True)
+        shutil.copy2(src, Path(outdir) / f"{simu.project_name}_{dt:%Y%m}.vtk")
+    except Exception as e:  # noqa: BLE001
+        if not _MESH_PROPS_WARNED:
+            print(f"  [mesh-props] skipped: {e}")
+            _MESH_PROPS_WARNED = True
+
+
 def run_pipeline(args: argparse.Namespace) -> None:
     """Execute the full pyCATHY + LAI + ETp simulation pipeline."""
 
@@ -1208,6 +1239,8 @@ def run_pipeline(args: argparse.Namespace) -> None:
                                      feddes_crop=feddes["feddes_crop"],
                                      )
         active_zones_prev = active_zones
+        if getattr(args, "mesh_props", False):
+            export_mesh_props(simu, dt)
 
         # 12.4  Subset ATMBC to current month
         t_month, nv_month = subset_atmbc_for_month(
