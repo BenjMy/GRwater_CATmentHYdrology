@@ -206,6 +206,8 @@ def build_command(sc: Scenario, root: Path, a: argparse.Namespace) -> list[str]:
         cmd += WET_ARGS     # wetter forcing + IC (scenario args and --extra can override)
     if a.quick:
         cmd += QUICK_ARGS   # 5x5 grid
+    if a.slope is not None:
+        cmd += ["--slope", str(a.slope)]
     cmd += sc.args          # scenario-specific
     cmd += a.extra          # global overrides last, so they win (argparse: last value wins)
     return cmd
@@ -286,6 +288,11 @@ def _parse_args(argv=None) -> argparse.Namespace:
     p.add_argument("--quick", action="store_true",
                    help="quick test: 5x5 synthetic DEM (" + " ".join(QUICK_ARGS) + "). Uses its "
                         "own root (suffix _quick) so it never mixes with the 20x20 runs")
+    p.add_argument("--slope", type=float, default=None, metavar="M/M",
+                   help="DEM slope (m/m) for every run, e.g. 0.05 for 5 %%. Uses its own root "
+                        "(suffix _slope<M/M>) so slopes never mix; compare slopes by running "
+                        "once per slope, e.g. for s in 0 0.05 0.15; do python scenario.py "
+                        "--slope $s ...; done")
     p.add_argument("--start-year", type=int, default=2020)
     p.add_argument("--end-year", type=int, default=2024,
                    help="exclusive (2024 -> simulates 2020-2023, 3.5 yr after the fire)")
@@ -326,6 +333,8 @@ def main(argv=None) -> int:
     base = a.root or (WET_ROOT if a.wet else DEFAULT_ROOT)
     if a.quick and not a.root:
         base = base.with_name(base.name + "_quick")
+    if a.slope is not None and not a.root:
+        base = base.with_name(base.name + f"_slope{a.slope:g}")
     root = base.expanduser().resolve()
 
     if a.compare_only:

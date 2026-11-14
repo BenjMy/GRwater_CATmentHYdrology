@@ -86,12 +86,26 @@ PATH_ET = Path.home() / "Nextcloud" / "GRwater" / "data" / "satellite" / "Agramo
 
 # ── Pure helpers (no pyCATHY needed -> usable in the smoke test) ─────────────
 
-def synthetic_dem(n: int = 20, res: float = 10.0, seed: int = 0) -> np.ndarray:
-    """Flat DEM at elevation 1 m; the (0, 0) corner is 1 - 1e-3 to fake an outlet cell.
-    (res and seed kept for call compatibility.)"""
+def synthetic_dem(n: int = 20, res: float = 10.0, seed: int = 0, slope: float = 0.0) -> np.ndarray:
+    """Synthetic DEM, single outlet at the (0, 0) corner (1 - 1e-3 m).
+    slope = 0 (default): flat at 1 m, exactly as before.
+    slope > 0 (m/m, 0.1 = 10 %): plane rising along the row index, so row 0 is the lowest
+    side and the outlet; the elevation step per cell is slope * res.
+    (seed kept for call compatibility.)"""
     z = np.ones((n, n), dtype=float)
-    z[0, 0] = 1.0 - 1e-3
+    if slope:
+        z += slope * res * np.arange(n, dtype=float)[:, None]
+    z[0, 0] = z[0, 0] - 1e-3
     return z
+
+
+def column_depth(nodes, n_surf: int) -> float:
+    """Soil column thickness (m) from the 3-D mesh nodes (first n_surf = surface nodes).
+    Total z range minus the surface relief: exact for a flat DEM and for a
+    terrain-following mesh (layers parallel to the surface), so a sloped DEM does not
+    inflate the thickness. Assumes the first n_surf nodes are the surface."""
+    z = np.asarray(nodes, float)[:, 2]
+    return float(np.ptp(z) - np.ptp(z[:n_surf]))
 
 
 _KS_EQUATIONS = {
@@ -699,6 +713,9 @@ def _parse_args(argv=None) -> argparse.Namespace:
     p.add_argument("--start-year", type=int, default=2020)
     p.add_argument("--end-year", type=int, default=2022, help="exclusive")
     p.add_argument("--n", type=int, default=20, help="synthetic DEM size (n x n)")
+    p.add_argument("--slope", type=float, default=0.0, metavar="M/M",
+                   help="DEM slope (m/m, 0.1 = 10 %%) along one axis, single outlet at the "
+                        "lowest side; 0 = flat (default)")
     p.add_argument("--res", type=float, default=1.0, help="DEM pixel size (m); 20x20 -> 20 m x 20 m")
     p.add_argument("--lai-recovery-rate", type=float, default=0.8, metavar="YR^-1",
                    help="rate of the synthetic post-fire LAI recovery")
@@ -782,6 +799,12 @@ def smoke_test() -> None:
     fd = datetime.strptime(args.ks_fire_date, "%Y-%m-%d").date()
 
     dem = synthetic_dem(20, 10.0)
+    assert np.allclose(dem[1:, :], 1.0) and dem[0, 0] == 1.0 - 1e-3, "flat DEM unchanged"
+    ds = synthetic_dem(5, 2.0, slope=0.1)
+    assert abs(ds[4, 2] - ds[3, 2] - 0.2) < 1e-9, "elevation step = slope*res"
+    assert ds.argmin() == 0, "single outlet at (0, 0)"
+    _nodes = np.array([[0, 0, 1.0], [1, 1, 1.4], [0, 0, -2.0], [1, 1, -1.6]])
+    assert abs(column_depth(_nodes, 2) - 3.0) < 1e-9, "column depth ignores surface relief"
     assert dem.shape == (20, 20) and np.isfinite(dem).all()
     assert dem[0, 0] == 1.0 - 1e-3 and np.isclose(dem.ravel()[1:], 1.0).all(), "flat DEM + outlet corner"
     assert dem.argmin() == 0, "outlet must be the unique lowest cell"
@@ -1056,7 +1079,9 @@ def run_pipeline(args: argparse.Namespace) -> None:
 
     # 3. Synthetic DEM -> mesh -------------------------------------------------
     print("[2/6] Synthetic DEM + mesh …")
-    dem = synthetic_dem(args.n, args.res)
+    dem = synthetic_dem(args.n, args.res, slope=args.slope)
+    if args.slope:
+        print(f"  DEM slope {args.slope:g} m/m ({100 * args.slope:g} %), single outlet at the lowest corner")
     simu = AG.initialise_project(args.path2prj, args.start_year, args.end_year,
                                  args.zroot, args.pmin, scenario)
     # (re)create outputs/figures: pyCATHY may have reset the project folder
@@ -1100,7 +1125,7 @@ def run_pipeline(args: argparse.Namespace) -> None:
     ETp_nodes, rain_nodes = _nodes(n_surf)
 
     # 4. ICs / BCs -------------------------------------------------------------
-    col_depth = float(np.ptp(np.asarray(grid3d["mesh3d_nodes"], float)[:, 2]))
+    col_depth = column_depth(grid3d["mesh3d_nodes"], n_surf)
     ic_kw = ic_settings(args, col_depth)
     print("  Initial condition: " + (f"hydrostatic, water table {ic_kw['WTPOSITION']:g} m "
           f"above the grid base" if ic_kw["INDP"] == 3
@@ -1132,7 +1157,7 @@ def run_pipeline(args: argparse.Namespace) -> None:
             asm["psi"], asm["sw"], asm["et"], asm["rech"], grid3d, et_var=ET_VAR,
             et_scale=ET_SCALE, rain_mmd=rain_mmd, etp_mmd=etp_mmd, lai_hist=lai_hist,
             ks_df=pd.DataFrame(ks_rows))
-        meta = {"scenario": scenario, "mode": cfg.mode, "two_layers": bool(args.two_layers),
+        meta = {"scenario": scenario, "mode": cfg.mode, "two_layers": bool(args.two_layers), "slope": args.slope,
                 "failed_months": failed_months, "complete": complete,
                 "months_simulated": len(psi_rec), "months_planned": len(months)}
         SA.save_run_analysis(out_dir, fig_dir, ts, info, meta, pd.Timestamp(fire_date),

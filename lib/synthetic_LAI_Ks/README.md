@@ -186,6 +186,22 @@ python scenario.py --wet --extra --rain-scale 5 --ic-head -0.5     # even wetter
 prints the resulting annual rain and ETp. The default period is now 2020-2023
 (`--end-year 2024`, 3.5 years after the 2020-07-01 fire).
 
+### DEM slope (`--slope`)
+
+The default DEM is flat (outlet = one cell 1 mm lower). `--slope S` (m/m, 0.1 = 10 %) tilts it
+along the row index: row 0 is the lowest side and the single outlet; the elevation step per
+cell is `S * --res`. Each slope has its own root (`..._slope<S>`), so slopes never mix:
+
+```bash
+for s in 0 0.05 0.15; do python scenario.py --wet --slope $s --only control_2L lai_2L; done
+python scenario.py --quick --slope 0.1 --only control --dry-run     # check the command
+```
+
+Caveats: the hydrostatic IC (`--ic-wt-depth`) puts a horizontal water table at (column
+thickness - depth) above the grid base, so on a slope it is that deep only on average; the
+column thickness assumes a terrain-following mesh (checked only for the flat DEM). Compare
+slopes by pointing `synthetic_ksfire_analysis.py --root` at each slope root.
+
 ### Arguments for every run (`--extra`)
 
 Everything after `--extra` is appended to the command of **every** scenario. It goes last,
@@ -250,6 +266,7 @@ python scenario.py --config scenarios.toml --only control control_2L sev_low_2L 
 | `--top-depth M` / `--top-layers N` | burned topsoil thickness / number of strata |
 | `--permx M/S` | static Ks (control only) |
 | `--permx-deep M/S` | Ks of the stable subsoil |
+| `--slope M/M` | DEM slope, single outlet (0 = flat) |
 | `--ic-head M` / `--ic-wtposition M` | uniform or hydrostatic initial condition |
 | `--dtmin`, `--dtmax`, `--deltat` | CATHY solver time-step settings |
 | `--max-consecutive-fail N` | stop after N months in a row that fail |

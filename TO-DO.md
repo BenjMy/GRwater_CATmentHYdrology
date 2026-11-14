@@ -112,7 +112,7 @@ ZROOT_SETS=("0.3 0.6 2.0 3.0 5.0")
 - [x] 🟡 `--wet` IC now hydrostatic, water table 2.5 m below surface (`--ic-wt-depth`), was uniform −1 m (saturated column). **Rerun the wet batch to check**; mesh is 3 m deep so "2 m" is ~1.7 m (labelled)
 - [x] 🟡 Diagnosed: cumulative ETa ≈ cumulative ETp (hundreds of mm) hides Δ of a few mm; added a cumulative-Δ row. In the committed dry runs ETa == ETp every month (Δ = 0), now flagged by a NOTE. Not verified on the wet runs (not in the repo)
 - [x] 🟡 `scenario.py --quick` (`--n 5`, root suffix `_quick`); not run end-to-end here (no pyCATHY in the session)
-- [ ] New study: different DEM slopes (single outlet)
+- [x] 🟡 Different DEM slopes: `--slope` (single run) / `scenario.py --slope` (own root per slope); not run end-to-end (no pyCATHY). Check terrain-following mesh and the water-table IC on a slope, then run 0 / 5 / 15 % and compare roots
 
 ### 3.2 `test_validation_tomas` (validation site, `lib/test_validation_tomas/`)
 State: **waiting for actual ETa data from Hector** (existing data do not cover the right area). Inputs from the EB model are `.nc` (or `.csv` if a homogeneous spatial time series).
