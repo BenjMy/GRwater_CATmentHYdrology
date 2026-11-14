@@ -119,6 +119,10 @@ Main script went from **3,901 to 2,774 lines** (the +164 since the module split 
 | `agramon_checks.py` | `apply_eta_artefact_floor`, `add_datetime_col`, `check_monthly_sanity` |
 | `agramon_runlog.py` | `MarkdownLog`, `log_simulation`, `build_scenario_dirname` |
 | `agramon_outputs.py` | `save_combined_outputs` (was a closure; its ten captured names are now arguments) |
+| `agramon_spinup.py` | `pick_default_spinup_year`, `run_spinup` (moved unchanged; 2.5) |
+| `agramon_diagnostics.py` | `save_forcing_diagnostics` (moved unchanged; 2.6) |
+| `agramon_ks.py` | per-month post-fire Ks, run key (3.4) |
+| `agramon_config.py` (added) / `agramon_forcing.py` (added) | `zroot_factors_from_args`, `feddes_params_from_args` (lazy pyCATHY import) / `subset_atmbc_for_month` |
 
 The main script re-imports these names, so `from Agramon_withLAI_withETp import load_dem_from_tif` (used by `withLAI_results.py`) keeps working.
 
@@ -128,8 +132,8 @@ The main script re-imports these names, so `from Agramon_withLAI_withETp import 
 | 2.2 | **Split `run_pipeline`** into `setup_inputs`, `setup_mesh_and_dem`, `build_atmbc`, `configure_model`, `run_monthly_loop`, `save_outputs`, passing state in a small dataclass instead of ~160 locals | 🟡 4 of 6 extracted (`save_outputs` closure, `setup_inputs`, `setup_mesh_and_dem`, `build_atmbc`) |
 | 2.3 | Move DEM/mesh/BC code (`load_dem_from_tif`, `smooth_dem`, `setup_dem`, `configure_boundary_conditions`, `initialise_project`) to `agramon_mesh.py`; keep a re-export for `withLAI_results.py` | ⬜ |
 | 2.4 | Replace machine auto-detection in `agramon_config.py` (username check, hard-coded Nextcloud paths) with env vars or a config file | ⬜ |
-| 2.5 | Move `run_spinup` / `pick_default_spinup_year` to `agramon_spinup.py` | ⬜ |
-| 2.6 | Move `save_forcing_diagnostics` (350 lines of plotting) to a diagnostics module | ⬜ |
+| 2.5 | Move `run_spinup` / `pick_default_spinup_year` to `agramon_spinup.py` | ✅ moved unchanged with the helpers it needs; the main script re-exports the names. Checked: pyflakes, import under stubs, smoke test; not run with CATHY |
+| 2.6 | Move `save_forcing_diagnostics` (350 lines of plotting) to a diagnostics module | ✅ `agramon_diagnostics.py`, re-exported; same checks as 2.5 |
 | 2.7 | Scenario config files (TOML/YAML) instead of ~40 forwarded CLI flags in the 900-line shell runner; `to_run_paper.md` becomes a list of config files | 🟡 `lib/paper_scenarios.toml` + `lib/run_paper_scenarios.py` wrap the existing shell runner (flags unchanged); the shell runner itself and the Python CLI are not replaced yet |
 | 2.8 | Single source for defaults: CLI default period (`--start-year 2022 --end-year 2022`) is empty while the batch runner uses 2016–2026; shell and Python defaults differ; default `ZROOT_FACTORS` (`0.05 0.25 1.0 1.5 2.0`) differ from paper runs (`0.3 0.6 2.0 3.0 5.0`) | ❓ choose the defaults |
 | 2.9 | Typed containers (`Forcing`, `BCConfig`, `KsFireConfig`) instead of long tuples/kwargs; document shapes and units of `ETp_nodes`/`rain_nodes` | ⬜ |

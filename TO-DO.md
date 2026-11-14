@@ -188,6 +188,34 @@ Presets (Thomas 2021 Table 1, 2016 Fish Fire, loamy sand, mm/hr): `upper_bound`,
 
 ---
 
+### 5.4 Planned: systematic soil and root properties in the mesh `.vtk` (pyCATHY)
+**Goal.** The mesh `.vtk` should carry, as named arrays, every property that drives a run, so
+it can be inspected in ParaView/pyvista, checked against the CATHY input files, and compared
+between scenarios (burned vs control, Ks scenarios):
+- **Soil** per soil zone / cell: `PERMX`, `PERMY`, `PERMZ` (Ks, incl. post-fire Ks per month, §5.3), porosity, van Genuchten parameters (`VGN`, `VGRMC`, `VGPSAT`), specific storage, soil zone id.
+- **Roots / vegetation**: vegetation class, `ZROOT` (root depth, from the LAI-class factors), Feddes parameters (`PCANA`, `PCREF`, `PCWLT`, `PZ`, `OMGC`), LAI of the month, and a root-density / root-fraction profile over depth.
+- Existing initial-condition fields (`ic`, ψ) keep working through the same mechanism.
+
+**Current state.** A part of this exists in `pyCATHY` through the initial condition: `update_ic`
+calls `map_prop2mesh()`, which maps an array onto the cached mesh (`mesh_pv_attributes`). It is
+not systematic (only IC, no common interface for soil and root properties), not well written
+(known bugs: `~isinstance(...)` instead of `not isinstance(...)`, so per-node arrays are
+broadcast as scalars; the cached mesh goes stale when the preprocessor changes the grid size,
+giving "'ic' has length N but the mesh has M points"), and the main script works around it
+(`create_mesh_vtk()` is called again after the first preprocessor run).
+
+**To do (rewrite properly, in `pyCATHY` first, then use it from the Agramon and synthetic scripts).**
+- One explicit API: `mesh.set_property(name, values, location="point"|"cell")`, with checks of
+  size and location against the **current** mesh, and a clear error instead of silent broadcasting.
+- Derive the property arrays from the same tables used to write the CATHY inputs (soil table,
+  vegetation map, Feddes table) so the `.vtk` and the inputs cannot disagree.
+- No stale cache: invalidate and rebuild the mesh whenever the grid changes (after the
+  preprocessor), instead of a manual refresh in the main script.
+- Time-varying properties (LAI, `ZROOT`, post-fire Ks): update the arrays monthly and write
+  one `.vtk` per month (or a time series) for the figures.
+- Tests: unit tests for the size/location checks and a round trip (write → read → equal) on a small synthetic mesh.
+- Decide where the code lives (`pycathy_wrapper` or `lib/agramon_mesh_props.py` as a first step) and how it relates to the open `map_prop2mesh` fixes (§6, Model / science).
+
 ## 6. Paper progress tracker
 
 ### Model / science
@@ -204,6 +232,7 @@ Presets (Thomas 2021 Table 1, 2016 Fish Fire, loamy sand, mm/hr): `upper_bound`,
 - [ ] ⬜ Replace placeholder dNBR→Ks relation if burn-severity mode is used
 - [ ] 🟡 `pyCATHY` wrapper fixes for BCs (`update_nansfdirbc`, `update_nansfneubc`, `update_sfbc`): in progress
 - [ ] 🟡 Validate `pyCATHY` fixes for the `map_prop2mesh` bug and the stale `mesh_pv_attributes` cache
+- [ ] ⬜ Fill the mesh `.vtk` systematically with soil and root properties; rewrite the existing IC-based mapping properly (§5.4)
 - [ ] ⬜ Hydrological recovery metrics (§4)
 
 ### Simulations (confirm which are completed and checked)
@@ -263,6 +292,7 @@ Presets (Thomas 2021 Table 1, 2016 Fish Fire, loamy sand, mm/hr): `upper_bound`,
 ## 9. Log of what has been done (for future AI requests)
 - Refactoring Phase 1–2 partly done on branch `refactor-agramon-modules`: details and checks in `REFACTORING.md`.
 - `README_paper.md` merged into this file and `REFACTORING.md` (2026-11-13); keep only these two files.
+- 2026-11-14: new task added by the author: systematic soil and root properties in the mesh `.vtk`, rewrite of the existing `update_ic`/`map_prop2mesh` mapping (§5.4). Not started.
 - 2026-11-13: §3.1 implemented (see ticks); only "new study: different DEM slopes" remains. Checked: py_compile, `--smoke-test`, comparison rebuilt on committed dry runs. Not checked: full CATHY runs (`--quick`, `--wet`).
 
 ## 10. References to cite

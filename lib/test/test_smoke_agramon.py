@@ -29,6 +29,23 @@ except ImportError:
     stub.uCATHY = types.SimpleNamespace()
     sys.modules["geoutils"] = stub
 
+# heavy / private dependencies of the data-loading modules: stub whichever are missing so the
+# pure helpers stay testable anywhere (a real install is used when present)
+from unittest import mock  # noqa: E402
+
+for _m in ("pyvista", "rioxarray", "geopandas", "scipy", "scipy.ndimage", "pyCATHY",
+           "pyCATHY.meshtools", "pyCATHY.cathy_tools", "pyCATHY.cathy_utils", "pyCATHY.petro",
+           "pyCATHY.plotters", "pyCATHY.importers", "rasterio", "shapely"):
+    try:
+        __import__(_m)
+    except ImportError:
+        sys.modules[_m] = mock.MagicMock()
+
+try:                                    # Agramon_utils pulls a long chain of optional packages
+    import utils.Agramon_utils  # noqa: F401
+except Exception:                       # noqa: BLE001  (any import-time failure)
+    sys.modules["utils.Agramon_utils"] = mock.MagicMock()
+
 import agramon_config as C                      # noqa: E402
 from agramon_checks import apply_eta_artefact_floor   # noqa: E402
 from agramon_lai import lai_to_veg_map          # noqa: E402
@@ -36,6 +53,10 @@ from agramon_runlog import build_scenario_dirname      # noqa: E402
 import ks_fire_utils as K                       # noqa: E402
 import run_paper_scenarios as RP                # noqa: E402
 import agramon_ks as AK                         # noqa: E402
+import agramon_spinup as SP                     # noqa: E402
+import agramon_diagnostics as DG                # noqa: E402
+from agramon_forcing import subset_atmbc_for_month  # noqa: E402
+from agramon_config import feddes_params_from_args, zroot_factors_from_args  # noqa: E402
 from datetime import datetime                   # noqa: E402
 
 
@@ -195,6 +216,20 @@ def test_agramon_ks():
             pass
         else:
             raise AssertionError(f"{bad} must raise")
+
+
+def test_moved_helpers():
+    """Functions moved out of the main script (REFACTORING 2.3-2.6) keep their behaviour."""
+    # spin-up year: skip an incomplete first year (satellite forcing starts in October)
+    v = pd.date_range("2016-10-01", "2019-12-31", freq="MS")
+    assert SP.pick_default_spinup_year(v.values) == 2017
+    assert callable(SP.run_spinup) and callable(DG.save_forcing_diagnostics)
+    ns = argparse.Namespace(zroot_factors=[0.3, 0.6, 2.0, 3.0, 5.0])
+    assert zroot_factors_from_args(ns) == {1: 0.3, 2: 0.6, 3: 2.0, 4: 3.0, 5: 5.0}
+    fp = feddes_params_from_args(argparse.Namespace(
+        feddes_crop=None, pcana=5.0, pcref=None, pcwlt=None, pz=None, omgc=None))
+    assert fp["pcana"] == 5.0 and fp["pcref"] is None and fp["feddes_crop"] is None, fp
+    assert callable(subset_atmbc_for_month)
 
 
 if __name__ == "__main__":

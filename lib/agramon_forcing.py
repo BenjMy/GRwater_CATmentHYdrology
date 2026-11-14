@@ -279,3 +279,26 @@ def build_etp_ds_from_timeseries(
           f"(plot {plot_id})  column={column}  "
           f"mean={vals.mean():.2f} mm/day  range=[{vals.min():.2f}, {vals.max():.2f}]")
     return ds_etp
+
+
+def subset_atmbc_for_month(t_atmbc, net_flux: np.ndarray,
+                           valid_times: np.ndarray,
+                           year: int, month: int):
+    """
+    Subset the full ATMBC vectors to a single calendar month
+    and re-zero the time axis so it starts at 0.
+
+    net_flux may be 1-D (n_steps,) or 2-D (n_steps, n_nodes).
+    Returns (None, None) when no data exist for that month.
+    """
+    mask = np.array([
+        pd.Timestamp(t).year == year and pd.Timestamp(t).month == month
+        for t in valid_times
+    ])
+    idx = np.where(mask)[0]
+    if len(idx) == 0:
+        return None, None
+    t_sub  = np.array(t_atmbc)[idx]
+    nv_sub = net_flux[idx]        # works for both 1-D and 2-D
+    t_sub  = (t_sub - t_sub[0]).tolist()
+    return t_sub, nv_sub
