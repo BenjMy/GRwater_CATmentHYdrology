@@ -1,0 +1,198 @@
+# paper_scenarios.toml - Agramon paper runs (replaces the copy-paste blocks of to_run_paper.md)
+# =========================================================================================
+# One table per scenario. [name.args]: CLI options of run_scenarii_withETp_withLAI_ALL.sh
+#   scalar -> "--key value" | list -> "--key v1 v2 ..." (multi-value flags) | true -> "--key"
+# [name.loop] (optional): one runner call per combination (cartesian product) of the listed
+#   options; each entry is a scalar or a list (a list is ONE value, e.g. a root-depth set).
+# Write numbers as strings so they reach the shell exactly as typed ("1e-4", "-1e35").
+#   python run_paper_scenarios.py --list
+#   python run_paper_scenarios.py --only paper_good --dry-run
+# Root-depth sets: baseline 0.1 0.3 1.0 1.5 2.5 | deeper 0.3 0.6 2.0 3.0 5.0 | uniform 2.5 (x5)
+
+[baseline_zroot_dem3]
+description = "dem 3, PMIN -1e34/-15, baseline vs uniform 2.5 root depth, Ks 1e-4 (first block of to_run_paper.md)"
+tags = ["baseline", "zroot"]
+[baseline_zroot_dem3.args]
+dem-plot = ["3"]
+pmin = ["-1e34", "-15"]
+outlet = "closed"
+bottom = "closed"
+ic = "pressure"
+permx = "1e-4"
+[baseline_zroot_dem3.loop]
+zroot-factors = [["0.1", "0.3", "1.0", "1.5", "2.5"], ["2.5", "2.5", "2.5", "2.5", "2.5"]]
+
+[baseline_zroot_dem32]
+description = "dem 3 and 2, PMIN -1e34/-15, baseline vs deeper rooting, Ks 1e-4"
+tags = ["baseline", "zroot"]
+[baseline_zroot_dem32.args]
+dem-plot = ["3", "2"]
+pmin = ["-1e34", "-15"]
+outlet = "closed"
+bottom = "closed"
+ic = "pressure"
+permx = "1e-4"
+[baseline_zroot_dem32.loop]
+zroot-factors = [["0.1", "0.3", "1.0", "1.5", "2.5"], ["0.3", "0.6", "2.0", "3.0", "5.0"]]
+
+[deep_pmin_m15_m1e34]
+description = "dem 3, deeper rooting, PMIN -15 and -1e34, Ks 1e-4"
+tags = ["pmin"]
+[deep_pmin_m15_m1e34.args]
+dem-plot = ["3"]
+pmin = ["-15", "-1e34"]
+outlet = "closed"
+bottom = "closed"
+ic = "pressure"
+permx = "1e-4"
+zroot-factors = ["0.3", "0.6", "2.0", "3.0", "5.0"]
+
+[deep_pmin_m150]
+description = "dem 3, deeper rooting, PMIN -150, Ks 1e-4"
+tags = ["pmin"]
+[deep_pmin_m150.args]
+dem-plot = ["3"]
+pmin = ["-150"]
+outlet = "closed"
+bottom = "closed"
+ic = "pressure"
+permx = "1e-4"
+zroot-factors = ["0.3", "0.6", "2.0", "3.0", "5.0"]
+
+[deep_pcana5_pmin_m1e34]
+description = "dem 3, deeper rooting, PMIN -1e34, PCANA 5, Ks 1e-4"
+tags = ["pmin", "feddes"]
+[deep_pcana5_pmin_m1e34.args]
+dem-plot = ["3"]
+pmin = ["-1e34"]
+outlet = "closed"
+bottom = "closed"
+ic = "pressure"
+permx = "1e-4"
+zroot-factors = ["0.3", "0.6", "2.0", "3.0", "5.0"]
+pcana = "5"
+
+[deep_pcana5_pmin_m50]
+description = "dem 3, deeper rooting, PMIN -50, PCANA 5, Ks 1e-4"
+tags = ["pmin", "feddes"]
+[deep_pcana5_pmin_m50.args]
+dem-plot = ["3"]
+pmin = ["-50"]
+outlet = "closed"
+bottom = "closed"
+ic = "pressure"
+permx = "1e-4"
+zroot-factors = ["0.3", "0.6", "2.0", "3.0", "5.0"]
+pcana = "5"
+
+[ks6e4_pmin_m50]
+description = "dem 3, deeper rooting, PMIN -50, Ks 6e-4"
+tags = ["ks", "pmin"]
+[ks6e4_pmin_m50.args]
+dem-plot = ["3"]
+pmin = ["-50"]
+outlet = "closed"
+bottom = "closed"
+ic = "pressure"
+permx = "6e-4"
+zroot-factors = ["0.3", "0.6", "2.0", "3.0", "5.0"]
+
+# "Good one" of to_run_paper.md. The old shell recipe passed "${KS_VALUES}", which expands
+# to the FIRST element only (1e-4); the loop below really runs the three Ks values.
+[paper_good]
+description = "dem 3, PMIN -50/-1e35, outlet+bottom both, IC both (-100 m), Ks 1e-4/6e-4/1e-3, deeper rooting"
+tags = ["paper", "ks", "pmin", "bc"]
+[paper_good.args]
+dem-plot = ["3"]
+pmin = ["-50", "-1e35"]
+outlet = "both"
+bottom = "both"
+ic = "both"
+ic-pressure-head = "-100"
+zroot-factors = ["0.3", "0.6", "2.0", "3.0", "5.0"]
+[paper_good.loop]
+permx = ["1e-4", "6e-4", "1e-3"]
+
+[ks6e4_wt_ic_scf1]
+description = "dem 3, PMIN -50/-1e35, IC both with water table -1 and head -100, SCF 1, Ks 6e-4"
+tags = ["ks", "ic", "scf"]
+[ks6e4_wt_ic_scf1.args]
+dem-plot = ["3"]
+pmin = ["-50", "-1e35"]
+outlet = "closed"
+bottom = "closed"
+ic = "both"
+ic-wtposition = "-1"
+ic-pressure-head = "-100"
+permx = "6e-4"
+zroot-factors = ["0.3", "0.6", "2.0", "3.0", "5.0"]
+scf = "1"
+
+[ks6e4_pressure_m100_scf1]
+description = "dem 3, PMIN -50/-1e35, pressure IC -100 m, SCF 1, Ks 6e-4"
+tags = ["ks", "ic", "scf"]
+[ks6e4_pressure_m100_scf1.args]
+dem-plot = ["3"]
+pmin = ["-50", "-1e35"]
+outlet = "closed"
+bottom = "closed"
+ic = "pressure"
+ic-pressure-head = "-100"
+permx = "6e-4"
+zroot-factors = ["0.3", "0.6", "2.0", "3.0", "5.0"]
+scf = "1"
+
+[ks_sweep_dem3_1]
+description = "dem 3 and 1, PMIN -1e34/-15, IC both, Ks 1e-6 and 1e-4, deeper rooting"
+tags = ["ks"]
+[ks_sweep_dem3_1.args]
+dem-plot = ["3", "1"]
+pmin = ["-1e34", "-15"]
+outlet = "closed"
+bottom = "closed"
+ic = "both"
+zroot-factors = ["0.3", "0.6", "2.0", "3.0", "5.0"]
+[ks_sweep_dem3_1.loop]
+permx = ["1e-6", "1e-4"]
+
+# SCF 0 / 0.5: SCF was designed as 0 (PMIN threshold) or 1 (Feddes); 0.5 is experimental
+# (see TO-DO.md 5.1), not for main results.
+[scf_0_5]
+description = "SCF 0.5 (experimental), dem 3, PMIN -1e34, Ks 1e-4"
+tags = ["scf", "experimental"]
+[scf_0_5.args]
+dem-plot = ["3"]
+pmin = ["-1e34"]
+outlet = "closed"
+bottom = "closed"
+ic = "pressure"
+permx = "1e-4"
+zroot-factors = ["0.3", "0.6", "2.0", "3.0", "5.0"]
+scf = "0.5"
+
+[scf_0]
+description = "SCF 0 (PMIN-threshold approach), dem 3, PMIN -50, Ks 1e-4"
+tags = ["scf"]
+[scf_0.args]
+dem-plot = ["3"]
+pmin = ["-50"]
+outlet = "closed"
+bottom = "closed"
+ic = "pressure"
+permx = "1e-4"
+zroot-factors = ["0.3", "0.6", "2.0", "3.0", "5.0"]
+scf = "0"
+
+[spinup_3cycles]
+description = "spin-up on, 3 cycles, dem 3, PMIN -1e34, Ks 1e-4"
+tags = ["spinup"]
+[spinup_3cycles.args]
+dem-plot = ["3"]
+pmin = ["-1e34"]
+outlet = "closed"
+bottom = "closed"
+ic = "pressure"
+permx = "1e-4"
+zroot-factors = ["0.3", "0.6", "2.0", "3.0", "5.0"]
+spinup = "on"
+spinup-cycles = "3"

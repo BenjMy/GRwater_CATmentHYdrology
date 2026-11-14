@@ -122,7 +122,7 @@ State: **waiting for actual ETa data from Hector** (existing data do not cover t
 
 ### 3.3 Agramon (real field site, `lib/`)
 Test: Ks-vs-LAI scenarios (as in the synthetic case); CATHY code versions (withLAI vs classic, different Fortran sources); ETp inputs (computed from SW, wet/dry). Validate with EB-model ETa (pyTSEB).
-- [ ] Improve `to_run_paper.md` (→ becomes a list of scenario config files, see `REFACTORING.md` 2.7)
+- [x] ✅ `to_run_paper.md` → `lib/paper_scenarios.toml` + `lib/run_paper_scenarios.py` (`--list`, `--only`, `--dry-run`; loops expand every Ks value, fixes the `"${KS_VALUES}"` bug). Not yet run against the real shell runner; dry-run checked, still to compare with the commands you ran
 - [ ] Plots showing validation (if not already existing)
 - [ ] New nearby **control** subcatchment unaffected by fire; compare ETa/recharge with the affected ones
 - [x] ✅ Quick smoke test of the pure helpers: `lib/test/test_smoke_agramon.py` (LAI→class, SCF, ETa floor, folder names, Ks maths; no pyCATHY/data). A pipeline-level smoke run still needs pyCATHY

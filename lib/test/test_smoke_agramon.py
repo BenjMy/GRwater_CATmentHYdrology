@@ -34,6 +34,7 @@ from agramon_checks import apply_eta_artefact_floor   # noqa: E402
 from agramon_lai import lai_to_veg_map          # noqa: E402
 from agramon_runlog import build_scenario_dirname      # noqa: E402
 import ks_fire_utils as K                       # noqa: E402
+import run_paper_scenarios as RP                # noqa: E402
 
 
 def test_config():
@@ -125,6 +126,26 @@ def test_ks_utils():
         pass
     else:
         raise AssertionError("lai_ul == lai_ll must raise")
+
+
+def test_paper_scenarios():
+    sc = RP.load_config(RP.DEFAULT_CONFIG)
+    assert len(sc) >= 10 and all(s.args for s in sc.values())
+    good = RP.expand(sc["paper_good"])
+    assert len(good) == 3, "paper_good must run all three Ks values (old shell recipe ran one)"
+    assert [c[c.index("--permx") + 1] for c in good] == ["1e-4", "6e-4", "1e-3"]
+    assert good[0][good[0].index("--pmin") + 1:good[0].index("--pmin") + 3] == ["-50", "-1e35"]
+    z = RP.expand(sc["baseline_zroot_dem3"])
+    assert len(z) == 2 and z[1][z[1].index("--zroot-factors") + 1:][:5] == ["2.5"] * 5
+    assert RP._flag("force", True) == ["--force"] and RP._flag("force", False) == []
+    assert [s.name for s in RP.select(sc, None, [])] == ["paper_good"], "default tag = paper"
+    assert "paper_good" not in [s.name for s in RP.select(sc, ["all"], ["paper"])]
+    try:
+        RP.select(sc, ["nope"], [])
+    except SystemExit:
+        pass
+    else:
+        raise AssertionError("unknown scenario must stop")
 
 
 if __name__ == "__main__":

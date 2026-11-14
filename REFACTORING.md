@@ -130,7 +130,7 @@ The main script re-imports these names, so `from Agramon_withLAI_withETp import 
 | 2.4 | Replace machine auto-detection in `agramon_config.py` (username check, hard-coded Nextcloud paths) with env vars or a config file | ⬜ |
 | 2.5 | Move `run_spinup` / `pick_default_spinup_year` to `agramon_spinup.py` | ⬜ |
 | 2.6 | Move `save_forcing_diagnostics` (350 lines of plotting) to a diagnostics module | ⬜ |
-| 2.7 | Scenario config files (TOML/YAML) instead of ~40 forwarded CLI flags in the 900-line shell runner; `to_run_paper.md` becomes a list of config files | ⬜ |
+| 2.7 | Scenario config files (TOML/YAML) instead of ~40 forwarded CLI flags in the 900-line shell runner; `to_run_paper.md` becomes a list of config files | 🟡 `lib/paper_scenarios.toml` + `lib/run_paper_scenarios.py` wrap the existing shell runner (flags unchanged); the shell runner itself and the Python CLI are not replaced yet |
 | 2.8 | Single source for defaults: CLI default period (`--start-year 2022 --end-year 2022`) is empty while the batch runner uses 2016–2026; shell and Python defaults differ; default `ZROOT_FACTORS` (`0.05 0.25 1.0 1.5 2.0`) differ from paper runs (`0.3 0.6 2.0 3.0 5.0`) | ❓ choose the defaults |
 | 2.9 | Typed containers (`Forcing`, `BCConfig`, `KsFireConfig`) instead of long tuples/kwargs; document shapes and units of `ETp_nodes`/`rain_nodes` | ⬜ |
 | 2.10 | Replace `print` banners by `logging` | ⬜ |

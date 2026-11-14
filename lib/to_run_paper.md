@@ -1,3 +1,8 @@
+# NOTE: the runs below are now listed in `paper_scenarios.toml` and run with
+#   python run_paper_scenarios.py --list | --only <name|tag> [--dry-run]
+# (the "${KS_VALUES}" first-element-only bug of the shell recipes is fixed there).
+# This file is kept as the historical notes (ideas, bugs, developer discussion).
+
 # RUN
 # -------------------------------------------------
 
