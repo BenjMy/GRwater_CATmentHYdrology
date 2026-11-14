@@ -121,6 +121,7 @@ Main script went from **3,901 to 2,774 lines** (the +164 since the module split 
 | `agramon_outputs.py` | `save_combined_outputs` (was a closure; its ten captured names are now arguments) |
 | `agramon_spinup.py` | `pick_default_spinup_year`, `run_spinup` (moved unchanged; 2.5) |
 | `agramon_diagnostics.py` | `save_forcing_diagnostics` (moved unchanged; 2.6) |
+| `agramon_mesh.py` | `load_dem_from_tif`, `initialise_project`, `smooth_dem`, `setup_dem`, `configure_boundary_conditions` (moved unchanged; 2.3) |
 | `agramon_ks.py` | per-month post-fire Ks, run key (3.4) |
 | `agramon_config.py` (added) / `agramon_forcing.py` (added) | `zroot_factors_from_args`, `feddes_params_from_args` (lazy pyCATHY import) / `subset_atmbc_for_month` |
 
@@ -130,7 +131,7 @@ The main script re-imports these names, so `from Agramon_withLAI_withETp import 
 | # | Task | Status |
 |---|---|---|
 | 2.2 | **Split `run_pipeline`** into `setup_inputs`, `setup_mesh_and_dem`, `build_atmbc`, `configure_model`, `run_monthly_loop`, `save_outputs`, passing state in a small dataclass instead of ~160 locals | 🟡 4 of 6 extracted (`save_outputs` closure, `setup_inputs`, `setup_mesh_and_dem`, `build_atmbc`) |
-| 2.3 | Move DEM/mesh/BC code (`load_dem_from_tif`, `smooth_dem`, `setup_dem`, `configure_boundary_conditions`, `initialise_project`) to `agramon_mesh.py`; keep a re-export for `withLAI_results.py` | ⬜ |
+| 2.3 | Move DEM/mesh/BC code (`load_dem_from_tif`, `smooth_dem`, `setup_dem`, `configure_boundary_conditions`, `initialise_project`) to `agramon_mesh.py`; keep a re-export for `withLAI_results.py` | ✅ moved unchanged; re-exported (also used by the synthetic study). `_check_crs_alignment` / `load_shapefiles` stay in the main script. Checked: pyflakes, import under stubs, `smooth_dem` test; not run with CATHY. Base for the mesh-`.vtk` properties task (`TO-DO.md` 5.4) |
 | 2.4 | Replace machine auto-detection in `agramon_config.py` (username check, hard-coded Nextcloud paths) with env vars or a config file | ⬜ |
 | 2.5 | Move `run_spinup` / `pick_default_spinup_year` to `agramon_spinup.py` | ✅ moved unchanged with the helpers it needs; the main script re-exports the names. Checked: pyflakes, import under stubs, smoke test; not run with CATHY |
 | 2.6 | Move `save_forcing_diagnostics` (350 lines of plotting) to a diagnostics module | ✅ `agramon_diagnostics.py`, re-exported; same checks as 2.5 |

@@ -55,6 +55,7 @@ import run_paper_scenarios as RP                # noqa: E402
 import agramon_ks as AK                         # noqa: E402
 import agramon_spinup as SP                     # noqa: E402
 import agramon_diagnostics as DG                # noqa: E402
+import agramon_mesh as MS                       # noqa: E402
 from agramon_forcing import subset_atmbc_for_month  # noqa: E402
 from agramon_config import feddes_params_from_args, zroot_factors_from_args  # noqa: E402
 from datetime import datetime                   # noqa: E402
@@ -230,6 +231,23 @@ def test_moved_helpers():
         feddes_crop=None, pcana=5.0, pcref=None, pcwlt=None, pz=None, omgc=None))
     assert fp["pcana"] == 5.0 and fp["pcref"] is None and fp["feddes_crop"] is None, fp
     assert callable(subset_atmbc_for_month)
+
+
+def test_smooth_dem():
+    if isinstance(sys.modules.get("scipy.ndimage"), mock.MagicMock):
+        print("  (skipped: scipy not installed)")
+        return
+    dem = np.arange(36, dtype=float).reshape(6, 6)
+    dem[0, :2] = np.nan
+    dem[5, 4:] = np.nan
+    assert MS.smooth_dem(dem, 0) is dem, "sigma <= 0 is a no-op"
+    out = MS.smooth_dem(dem, 1.0)
+    assert out.shape == dem.shape and np.array_equal(np.isnan(out), np.isnan(dem)), "mask unchanged"
+    assert not np.array_equal(out[~np.isnan(out)], dem[~np.isnan(dem)]), "values do change"
+    assert np.nanmin(dem) <= np.nanmin(out) and np.nanmax(out) <= np.nanmax(dem), "no overshoot"
+    flat = np.full((4, 4), 7.0)
+    flat[0, 0] = np.nan
+    assert np.allclose(np.nan_to_num(MS.smooth_dem(flat, 2.0), nan=7.0), 7.0), "flat stays flat"
 
 
 if __name__ == "__main__":
