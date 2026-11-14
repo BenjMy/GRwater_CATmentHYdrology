@@ -420,6 +420,31 @@ def test_run_pipeline_split():
     assert "for dt, lai_2d in iter_monthly_lai" in inspect.getsource(A.run_monthly_loop)
 
 
+def test_agramon_monthly_readers():
+    import types, datetime as dtm
+    import pandas as pd
+    import agramon_monthly as MR
+    dt = dtm.datetime(2020, 7, 1)
+
+    class Boom:
+        def read_outputs(self, k):
+            raise RuntimeError("no file")
+
+    recs, stats = [], {}
+    assert MR.read_sw_month(Boom(), dt, recs, stats, None) is None and not recs
+    assert MR.read_recharge_month(Boom(), dt, recs, stats, None) is None
+    assert MR.read_et_month(Boom(), dt, recs, stats, None, None, use_etp=False,
+                            t_month=None, ETp_nodes=None, rain_nodes=None,
+                            idx_month=None, eta_net_neg_mode="x") is None
+    MR.read_hgraph_month(Boom(), dt, recs, None)           # must not raise
+    assert not recs and not stats
+    ok = types.SimpleNamespace(
+        read_outputs=lambda k: pd.DataFrame({"time": [0.0, 86400.0], "Q": [1.0, 2.0]}))
+    hg = []
+    MR.read_hgraph_month(ok, dt, hg, None)
+    assert len(hg) == 1 and "time_sec" in hg[0].columns
+
+
 if __name__ == "__main__":
     for name, fn in sorted(globals().items()):
         if name.startswith("test_") and callable(fn):
