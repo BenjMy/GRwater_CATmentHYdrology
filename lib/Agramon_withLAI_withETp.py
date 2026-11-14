@@ -112,6 +112,9 @@ def apply_forcing_mode(mode: str) -> None:
 
 
 from utils import Agramon_utils as AgUtils
+from utils import ks_fire_utils as KsFire
+from agramon_ks import (FIRE_DATE_DEFAULT, ks_banner_label, ks_config_from_args,
+                        ks_for_month, ks_tag)
 from pyCATHY import cathy_tools, cathy_utils
 from pyCATHY.petro import Feddes_litterature  # literature-based Feddes lookup
 
@@ -453,6 +456,9 @@ def _parse_args() -> argparse.Namespace:
                           "recharge_output.nc files in outputs/<scenario>/ "
                           "are always refreshed after every month regardless.")
 
+    # post-fire Ks recovery (opt-in; default 'off' = static --permx, unchanged behaviour)
+    KsFire.add_ks_fire_args(p)
+    p.set_defaults(ks_fire_date=FIRE_DATE_DEFAULT)
     return p.parse_args()
 
 
@@ -1587,6 +1593,7 @@ def setup_inputs(args: argparse.Namespace) -> RunInputs:
             f"  |  PERMY ratio {args.permy_ratio}"
             f"  |  PERMZ ratio {args.permz_ratio}"
         )
+    ks_cfg = ks_config_from_args(args)      # validates --ks-fire-* now, not at month 1
     spinup_banner_label = (
         "disabled" if args.no_spinup else f"{args.spinup_cycles} cycle(s)"
     )
@@ -1601,6 +1608,7 @@ def setup_inputs(args: argparse.Namespace) -> RunInputs:
           f"(bare/sparse/moderate/dense/very_dense)")
     print(f"  Feddes (FP)    : {feddes_label}")
     print(f"  PERMX (Ks)     : {banner_permx_label}")
+    print(f"  Post-fire Ks   : {ks_banner_label(ks_cfg)}")
     print(f"  DEM source     : {dem_tif_path}")
     print(f"  Log file       : {args.log_file}")
     print(f"  Spin-up        : {spinup_banner_label}")
@@ -1676,8 +1684,10 @@ def setup_inputs(args: argparse.Namespace) -> RunInputs:
     scenario_dirname = build_scenario_dirname(
         sim_index, args.dem_plot, args.outlet_flux, args.bottom_flux,
         args.no_spinup, args.spinup_cycles, args.pmin, args.ic_mode,
-        forcing_tag=(f"forcing-etpts-{args.etp_ts_column.removeprefix('ET_0_')}"
-                     f"-fid{etp_ts_fid}" if USE_ETP_TS_FORCING else ""),
+        forcing_tag="_".join(t for t in (
+            (f"forcing-etpts-{args.etp_ts_column.removeprefix('ET_0_')}"
+             f"-fid{etp_ts_fid}" if USE_ETP_TS_FORCING else ""),
+            ks_tag(args)) if t),
     )
 
     # ── Markdown run log ───────────────────────────────────────
@@ -2063,6 +2073,8 @@ def run_pipeline(args: argparse.Namespace) -> None:
     apply_forcing_mode(args.forcing)
 
     inp = setup_inputs(args)
+
+    ks_cfg = ks_config_from_args(args)   # per-month post-fire Ks (off by default)
     feddes           = inp.feddes
     gdf_Agramon      = inp.gdf_Agramon
     ds_LAI           = inp.ds_LAI
@@ -2308,7 +2320,7 @@ def run_pipeline(args: argparse.Namespace) -> None:
                                      pmin=args.pmin,
                                      scf=args.scf,
                                      zroot_factors=zroot_factors_from_args(args),
-                                     permx=args.permx,
+                                     permx=ks_for_month(ks_cfg, dt, lai_2d, args.permx),
                                      permy_ratio=args.permy_ratio,
                                      permz_ratio=args.permz_ratio,
                                      pcana=feddes["pcana"], pcref=feddes["pcref"],

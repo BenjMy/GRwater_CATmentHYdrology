@@ -35,6 +35,8 @@ from agramon_lai import lai_to_veg_map          # noqa: E402
 from agramon_runlog import build_scenario_dirname      # noqa: E402
 import ks_fire_utils as K                       # noqa: E402
 import run_paper_scenarios as RP                # noqa: E402
+import agramon_ks as AK                         # noqa: E402
+from datetime import datetime                   # noqa: E402
 
 
 def test_config():
@@ -146,6 +148,45 @@ def test_paper_scenarios():
         pass
     else:
         raise AssertionError("unknown scenario must stop")
+
+
+def _ks_args(argv):
+    p = argparse.ArgumentParser()
+    K.add_ks_fire_args(p)
+    p.set_defaults(ks_fire_date=AK.FIRE_DATE_DEFAULT)
+    return p.parse_args(argv)
+
+
+def test_agramon_ks():
+    mm = K.mm_hr_to_m_s
+    lai = np.array([[1.0, 2.0], [np.nan, 3.0]])
+    off = AK.ks_config_from_args(_ks_args([]))
+    assert AK.ks_for_month(off, datetime(2021, 1, 1), lai, 1e-4) == 1e-4, "off -> static permx"
+    assert AK.ks_for_month(off, datetime(2021, 1, 1), lai, None) is None
+    # time mode: unburned before the fire, burned minimum at the fire, recovering after
+    a = _ks_args(["--ks-fire-mode", "time", "--ks-fire-preset", "overall_average"])
+    cfg = AK.ks_config_from_args(a)
+    pre = AK.ks_for_month(cfg, datetime(2019, 6, 1), lai, None)
+    at = AK.ks_for_month(cfg, datetime(2020, 7, 1), lai, None)
+    post = AK.ks_for_month(cfg, datetime(2023, 7, 1), lai, None)
+    assert np.isclose(pre, mm(37.5)) and np.isclose(at, mm(13.0)), (pre, at)
+    assert at < post <= pre + 1e-12, "Ks recovers after the fire, never above unburned"
+    assert AK.ks_tag(a) == "ks-time-overall_average" and AK.ks_tag(_ks_args([])) == ""
+    # lai mode: domain-mean LAI (NaN ignored) mapped linearly onto the anchors
+    a = _ks_args(["--ks-fire-mode", "lai", "--ks-fire-ll", "1e-6", "--ks-fire-ul", "1e-5",
+                  "--ks-fire-lai-ll", "0", "--ks-fire-lai-ul", "4"])
+    cfg = AK.ks_config_from_args(a)
+    assert np.isclose(AK.ks_for_month(cfg, datetime(2021, 1, 1), lai, None), 1e-6 + 9e-6 * 2.0 / 4)
+    assert AK.ks_for_month(cfg, datetime(2019, 1, 1), lai, None) == 1e-5, "pre-fire -> unburned"
+    assert "mode=lai" in AK.ks_banner_label(cfg)
+    # incomplete configs fail at startup, not at the first month
+    for bad in (["--ks-fire-mode", "time"], ["--ks-fire-mode", "lai", "--ks-fire-ul", "1e-5"]):
+        try:
+            AK.ks_config_from_args(_ks_args(bad))
+        except ValueError:
+            pass
+        else:
+            raise AssertionError(f"{bad} must raise")
 
 
 if __name__ == "__main__":

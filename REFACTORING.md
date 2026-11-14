@@ -38,7 +38,7 @@ If the tip is not the commit the user expects, ask before continuing. The sessio
 | `results_plotter.py` | Shared plotting module (hydro, ET, LAI, recharge, hydrograph, node maps, fire-window and weekly variants, Fig. 8-style stack). |
 | `agramon_config.py`, `agramon_forcing.py`, `agramon_lai.py`, `agramon_checks.py`, `agramon_runlog.py`, `agramon_outputs.py` | **New modules** split from the main script (see §3.1). Must sit in the same folder as the main script (`lib/`). |
 | `analysis_ET_compare.py` | Compares EO energy-balance ETa (TSEB) vs CATHY water-balance ETa, plus comparison against the treatments CSV for `etp_ts` runs. |
-| `ks_fire_utils.py` | Post-fire Ks modes (`time`, `lai`, `burn_severity`) and presets; **not yet imported by the main script** (task 3.4). Science in `TO-DO.md` §5.3. |
+| `ks_fire_utils.py` | Post-fire Ks modes (`time`, `lai`, `burn_severity`) and presets; imported by the main script through `agramon_ks.py` (task 3.4, opt-in). Science in `TO-DO.md` §5.3. |
 
 Referenced in code but **not in the upload** (check they are in the repo): `withLAI_results.py` (post-processing driver), `geoutils` (`uCATHY`), `plot_fig8_ETa_ETp_vs_psi.py`.
 
@@ -185,7 +185,7 @@ Findings:
 | 3.1 | Define `ForcingProvider` and move the three modes behind it | ⬜ |
 | 3.2 | Define `CathyBackend`; implement `scf_lai` (current behaviour) first, then `with_irr` (rain via irrigation file, no ETa floor), then A/B test (`TO-DO.md` §5.2). Read the `CATHY_src_WithIrrigation` / wrapper code before fixing the interface | ⬜ |
 | 3.3 | **ERA5:** deprecated (`DeprecationWarning` on `--forcing era5`; `etp` stays default). Removal list: `load_era5`, the `era5` entry of `FORCING_LABELS`/`--forcing`, `ds_era5` loading, the "ERA5 point time-series" branch in `build_atmbc` (and the `datetime64[ns]` assumption), ERA5 labels in plotting code. ERA5 could stay as a small test fixture | 🟡 deprecated, ❓ remove when you confirm |
-| 3.4 | Wire `ks_fire_utils` into the monthly loop (`compute_permx_for_month` → `update_soil_for_active_zones(permx=...)`; CLI helpers `add_ks_fire_args`, `ks_fire_config_from_args` exist) and define the Ks scenario list (preset × mode). Decide surface-layer-only vs all zones (`TO-DO.md` §5.3) | ⬜ |
+| 3.4 | Wire `ks_fire_utils` into the monthly loop (`compute_permx_for_month` → `update_soil_for_active_zones(permx=...)`; CLI helpers `add_ks_fire_args`, `ks_fire_config_from_args` exist) and define the Ks scenario list (preset × mode). Decide surface-layer-only vs all zones (`TO-DO.md` §5.3) | 🟡 wired (opt-in) via `lib/agramon_ks.py`: `--ks-fire-mode off|time|lai|burn_severity` (+ `--ks-fire-*`) in the main script, per-month PERMX in the monthly soil update, unburned Ks before the fire date, Ks tag in the folder name, config validated at startup. All zones (like `--permx`); surface-only not implemented. **Not yet in the shell runner** (it does not forward `--ks-fire-*`, and its skip-if-done check rebuilds folder names without the Ks tag): call the Python script directly. Ks scenario list (preset × mode) still to define. Not run with CATHY |
 
 ---
 
