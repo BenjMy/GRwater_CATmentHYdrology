@@ -125,7 +125,7 @@ Test: Ks-vs-LAI scenarios (as in the synthetic case); CATHY code versions (withL
 - [ ] Improve `to_run_paper.md` (→ becomes a list of scenario config files, see `REFACTORING.md` 2.7)
 - [ ] Plots showing validation (if not already existing)
 - [ ] New nearby **control** subcatchment unaffected by fire; compare ETa/recharge with the affected ones
-- [ ] Quick smoke-test files
+- [x] ✅ Quick smoke test of the pure helpers: `lib/test/test_smoke_agramon.py` (LAI→class, SCF, ETa floor, folder names, Ks maths; no pyCATHY/data). A pipeline-level smoke run still needs pyCATHY
 - [ ] Report `.md` with hypotheses tested
 
 ### 3.4 Input data format (EB model; inspected with `inspect-nc` in `geoUtils/data_tests/agramon`)
