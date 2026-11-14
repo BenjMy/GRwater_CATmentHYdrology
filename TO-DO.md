@@ -296,6 +296,7 @@ giving "'ic' has length N but the mesh has M points"), and the main script works
 - 2026-11-14: REFACTORING 2.9 done: `BCConfig` (outlet/bottom flux, IC mode) and `Forcing` (shapes/units documented and checked in `__post_init__`); `AtmbcSetup` now wraps `Forcing`, old attributes kept as properties. Smoke test extended; not run end-to-end.
 - 2026-11-14: §5.4 first step in pycathy_wrapper, branch `mesh-vtk-properties` (9f2a61c): new `pyCATHY/mesh_properties.py` (`set_mesh_property`, checked point/cell/field, rejects NaN), `update_mesh_vtk`/`map_prop2mesh` now write real point data instead of `field_data`; 4 pytest tests. Still to do: soil/root arrays from the CATHY tables, monthly .vtk, drop the stale-cache path.
 - 2026-11-14: §5.4 step 2: pycathy_wrapper `mesh-vtk-properties` (917f8dc) adds `add_soil_properties`/`add_root_properties` (ZROOT, root_zone, Feddes root_beta), `interpolate_to_points` (ERT) and `simu.map_soil_root_to_mesh()`. Agramon: opt-in `--mesh-props` writes them monthly to `./mesh_props/*.vtk` (skips with a message on an old pyCATHY). Next: xarray (layer, y, x) master + node mapping; check on a real run.
+- 2026-11-14: REFACTORING 2.2: monthly loop + final outputs extracted from `run_pipeline` into `run_monthly_loop` (verbatim, AST-checked); test_run_pipeline_split added.
 - 2026-11-13: §3.1 implemented (see ticks); only "new study: different DEM slopes" remains. Checked: py_compile, `--smoke-test`, comparison rebuilt on committed dry runs. Not checked: full CATHY runs (`--quick`, `--wet`).
 
 ## 10. References to cite

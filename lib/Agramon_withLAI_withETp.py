@@ -984,34 +984,29 @@ def export_mesh_props(simu, dt, outdir="mesh_props"):
             _MESH_PROPS_WARNED = True
 
 
-def run_pipeline(args: argparse.Namespace) -> None:
-    """Execute the full pyCATHY + LAI + ETp simulation pipeline."""
+def run_monthly_loop(args: argparse.Namespace, inp: RunInputs, ms: MeshSetup,
+                     atm: AtmbcSetup, ks_cfg, ds_LAI_raster,
+                     first_iteration: bool, spinup_done: bool) -> None:
+    """
+    Steps [11]-[14] of the pipeline: storage containers, the monthly
+    LAI -> vegetation-map -> CATHY loop, and the final combined outputs.
 
-    inp = setup_inputs(args)
-    fm = inp.forcing
-
-    ks_cfg = ks_config_from_args(args)   # per-month post-fire Ks (off by default)
+    Moved verbatim out of ``run_pipeline`` (REFACTORING.md 2.2); the
+    locals it used are unpacked from the containers below.
+    ``first_iteration`` / ``spinup_done`` come from the spin-up step
+    and ``ds_LAI_raster`` is the LAI interpolated on the DEM grid.
+    """
+    fm               = inp.forcing
     feddes           = inp.feddes
-    gdf_Agramon      = inp.gdf_Agramon
-    ds_LAI           = inp.ds_LAI
     ds_rain          = inp.ds_rain
     ds_etp           = inp.ds_etp
     scenario_dirname = inp.scenario_dirname
     md_log           = inp.md_log
-
-    # ── [4/9]–[7/9] DEM, CATHY project, mesh, preprocessor ────
-    ms = setup_mesh_and_dem(args, inp)
     simu              = ms.simu
-    raster_DEM        = ms.raster_DEM
     raster_DEM_masked = ms.raster_DEM_masked
-    res_x             = ms.res_x
-    res_y             = ms.res_y
     grid3d            = ms.grid3d
     N                 = ms.N
     M                 = ms.M
-
-    # ── [8/9] ATMBC forcing arrays ────────────────────────────
-    atm = build_atmbc(args, inp, ms)
     ds_mesh     = atm.ds_mesh
     n_surf      = atm.n_surf
     ETp_nodes   = atm.ETp_nodes
@@ -1019,106 +1014,6 @@ def run_pipeline(args: argparse.Namespace) -> None:
     net_flux    = atm.net_flux
     t_atmbc     = atm.t_atmbc
     valid_times = atm.valid_times
-
-    # ── 10. ICs, BCs ──────────────────────────────────────────
-    # FIX: set ICs once here; BCs are built once, up front.
-    bc = BCConfig.from_args(args)
-    print(f"  IC             : {bc.ic_label}")
-    bc.apply_ic(simu)
-    # FIX (sfbc EOF crash): configure_boundary_conditions used to be fed
-    # list(simu.read_inputs("atmbc")["time"]) here - but at this point in
-    # the pipeline simu.update_atmbc() has NEVER been called yet (it's
-    # only called later, once per month, inside the main loop), so that
-    # read back whatever short placeholder/template atmbc file pyCATHY
-    # wrote during mesh setup (~1 day's worth of entries). update_sfbc()
-    # writes exactly one BC block per entry in the time list it's given,
-    # and unlike nansfdirbc/nansfneubc's reader (bcnxt.f, which has an
-    # END= label and just freezes on EOF), the seepage-face reader
-    # (sfvnxt.f) has no END= handling and hard-crashes with a Fortran
-    # "End of file" runtime error once the solver's TIME runs past the
-    # last declared block - which happened right around the 1-day mark,
-    # matching the crash log exactly.
-    #
-    # Fix: build the BC files from a synthetic time axis instead of
-    # reading (the wrong) atmbc file off disk. Content here is identical
-    # at every block ("no-flow") regardless of spacing, so all that's
-    # needed is an axis that outlasts any single month's local run - each
-    # run_processor() call starts its own clock at 0 (see
-    # subset_atmbc_for_month's re-zeroing), so this only needs to cover
-    # one calendar month, not the whole multi-year forcing period.
-    bc_time_axis = np.arange(0, 32 * 86400, 86400).tolist()  # 32 daily blocks
-    outlet_side, outlet_node_id = configure_boundary_conditions(
-        simu, bc_time_axis,
-        outlet_flux=bc.outlet_flux,
-        outlet_side=bc.outlet_side,
-        bottom_flux=bc.bottom_flux,
-        res_x=res_x, res_y=res_y,
-    )
-    md_log.meta({
-        "Resolved outlet side": outlet_side,
-        "Outlet diagnostic node": outlet_node_id,
-        "Bottom flux": bc.bottom_label,
-    })
-
-    # Interpolate LAI onto DEM raster grid once, outside the loop
-    print("  Interpolating LAI timeseries → DEM raster grid …")
-    x_t, y_t = raster_DEM.x.values, raster_DEM.y.values
-    lai_lin  = ds_LAI.interp(x=xr.DataArray(x_t, dims="x"),
-                             y=xr.DataArray(y_t, dims="y"), method="linear")
-    lai_near = ds_LAI.reindex(x=x_t, y=y_t, method="nearest")
-    ds_LAI_raster = lai_lin.fillna(lai_near)
-
-    # Diagnostics on the LAI interpolation (stdout only); off by default.
-    if args.debug:
-        x0, x1 = float(raster_DEM.x.min()), float(raster_DEM.x.max())
-        y0, y1 = float(raster_DEM.y.min()), float(raster_DEM.y.max())
-        raw = ds_LAI["LAI"].isel(time=1).where(
-            (ds_LAI.x > x0-20) & (ds_LAI.x < x1+20) &
-            (ds_LAI.y > y0-20) & (ds_LAI.y < y1+20), drop=True)
-        print("raw LAI patch shape:", raw.shape, "| NaN fraction:", float(np.isnan(raw).mean()))
-        print(np.isnan(raw.values).astype(int))        # 1 = NaN in the source LAI
-
-        valid = raster_DEM_masked != -9999
-        v = ds_LAI_raster["LAI"].isel(time=1).values
-        print("NaN inside DEM footprint after interp:", int(np.isnan(v[valid]).sum()), "of", int(valid.sum()))
-        print("NaN outside footprint:", int(np.isnan(v[~valid]).sum()), "of", int((~valid).sum()))
-
-
-        print(gdf_Agramon[["fid_1"] + [c for c in ("PlotID",) if c in gdf_Agramon]].to_string())
-
-        lai_any = ds_LAI["LAI"].notnull().any("time").astype(float)   # LAI exists in ≥1 month
-        lai_all = ds_LAI["LAI"].notnull().all("time").astype(float)   # LAI exists in every month
-        for fid, g in gdf_Agramon.groupby("fid_1"):
-            a = lai_any.rio.clip(g.geometry, all_touched=True, drop=True)
-            b = lai_all.rio.clip(g.geometry, all_touched=True, drop=True)
-            print(f"fid_1={fid:>2}  bounds={[round(v) for v in g.total_bounds]}  "
-                  f"LAI valid in ≥1 month: {np.nanmean(a):.0%} | in all months: {np.nanmean(b):.0%}")
-
-    print(f"  ds_LAI_raster shape : {ds_LAI_raster['LAI'].shape}")
-    md_log.bullet(f"ds_LAI_raster shape: {ds_LAI_raster['LAI'].shape}")
-
-    # ── 10b. Spin-up (pre-2016 equilibration) ─────────────────
-    first_iteration = True
-    spinup_done     = False
-    if not args.no_spinup:
-        print("\n[Spin-up] Equilibrating initial pressure-head field "
-              "(spin-up antes de 2016) …")
-        first_iteration, spinup_done = run_spinup(
-            simu=simu,
-            args=args,
-            t_atmbc=t_atmbc,
-            net_flux=net_flux,
-            valid_times=valid_times,
-            ds_LAI_raster=ds_LAI_raster,
-            first_iteration=first_iteration,
-            outlet_node_id=outlet_node_id,
-            md_log=md_log,
-        )
-    else:
-        print("\n[Spin-up] Disabled (--no-spinup) — starting cold from "
-              "the uniform IC.")
-        md_log.section("Spin-up (warm-up)")
-        md_log.bullet("Disabled (`--no-spinup`) — starting cold from the uniform IC.")
 
     # ── 11. Storage containers ────────────────────────────────
     df_psi = None
@@ -1689,6 +1584,134 @@ def run_pipeline(args: argparse.Namespace) -> None:
         "Months skipped": n_months_skipped,
         "Output directory": str(out_dir),
     })
+
+
+def run_pipeline(args: argparse.Namespace) -> None:
+    """Execute the full pyCATHY + LAI + ETp simulation pipeline."""
+
+    inp = setup_inputs(args)
+
+    ks_cfg = ks_config_from_args(args)   # per-month post-fire Ks (off by default)
+    gdf_Agramon      = inp.gdf_Agramon
+    ds_LAI           = inp.ds_LAI
+    md_log           = inp.md_log
+
+    # ── [4/9]–[7/9] DEM, CATHY project, mesh, preprocessor ────
+    ms = setup_mesh_and_dem(args, inp)
+    simu              = ms.simu
+    raster_DEM        = ms.raster_DEM
+    raster_DEM_masked = ms.raster_DEM_masked
+    res_x             = ms.res_x
+    res_y             = ms.res_y
+
+    # ── [8/9] ATMBC forcing arrays ────────────────────────────
+    atm = build_atmbc(args, inp, ms)
+    net_flux    = atm.net_flux
+    t_atmbc     = atm.t_atmbc
+    valid_times = atm.valid_times
+
+    # ── 10. ICs, BCs ──────────────────────────────────────────
+    # FIX: set ICs once here; BCs are built once, up front.
+    bc = BCConfig.from_args(args)
+    print(f"  IC             : {bc.ic_label}")
+    bc.apply_ic(simu)
+    # FIX (sfbc EOF crash): configure_boundary_conditions used to be fed
+    # list(simu.read_inputs("atmbc")["time"]) here - but at this point in
+    # the pipeline simu.update_atmbc() has NEVER been called yet (it's
+    # only called later, once per month, inside the main loop), so that
+    # read back whatever short placeholder/template atmbc file pyCATHY
+    # wrote during mesh setup (~1 day's worth of entries). update_sfbc()
+    # writes exactly one BC block per entry in the time list it's given,
+    # and unlike nansfdirbc/nansfneubc's reader (bcnxt.f, which has an
+    # END= label and just freezes on EOF), the seepage-face reader
+    # (sfvnxt.f) has no END= handling and hard-crashes with a Fortran
+    # "End of file" runtime error once the solver's TIME runs past the
+    # last declared block - which happened right around the 1-day mark,
+    # matching the crash log exactly.
+    #
+    # Fix: build the BC files from a synthetic time axis instead of
+    # reading (the wrong) atmbc file off disk. Content here is identical
+    # at every block ("no-flow") regardless of spacing, so all that's
+    # needed is an axis that outlasts any single month's local run - each
+    # run_processor() call starts its own clock at 0 (see
+    # subset_atmbc_for_month's re-zeroing), so this only needs to cover
+    # one calendar month, not the whole multi-year forcing period.
+    bc_time_axis = np.arange(0, 32 * 86400, 86400).tolist()  # 32 daily blocks
+    outlet_side, outlet_node_id = configure_boundary_conditions(
+        simu, bc_time_axis,
+        outlet_flux=bc.outlet_flux,
+        outlet_side=bc.outlet_side,
+        bottom_flux=bc.bottom_flux,
+        res_x=res_x, res_y=res_y,
+    )
+    md_log.meta({
+        "Resolved outlet side": outlet_side,
+        "Outlet diagnostic node": outlet_node_id,
+        "Bottom flux": bc.bottom_label,
+    })
+
+    # Interpolate LAI onto DEM raster grid once, outside the loop
+    print("  Interpolating LAI timeseries → DEM raster grid …")
+    x_t, y_t = raster_DEM.x.values, raster_DEM.y.values
+    lai_lin  = ds_LAI.interp(x=xr.DataArray(x_t, dims="x"),
+                             y=xr.DataArray(y_t, dims="y"), method="linear")
+    lai_near = ds_LAI.reindex(x=x_t, y=y_t, method="nearest")
+    ds_LAI_raster = lai_lin.fillna(lai_near)
+
+    # Diagnostics on the LAI interpolation (stdout only); off by default.
+    if args.debug:
+        x0, x1 = float(raster_DEM.x.min()), float(raster_DEM.x.max())
+        y0, y1 = float(raster_DEM.y.min()), float(raster_DEM.y.max())
+        raw = ds_LAI["LAI"].isel(time=1).where(
+            (ds_LAI.x > x0-20) & (ds_LAI.x < x1+20) &
+            (ds_LAI.y > y0-20) & (ds_LAI.y < y1+20), drop=True)
+        print("raw LAI patch shape:", raw.shape, "| NaN fraction:", float(np.isnan(raw).mean()))
+        print(np.isnan(raw.values).astype(int))        # 1 = NaN in the source LAI
+
+        valid = raster_DEM_masked != -9999
+        v = ds_LAI_raster["LAI"].isel(time=1).values
+        print("NaN inside DEM footprint after interp:", int(np.isnan(v[valid]).sum()), "of", int(valid.sum()))
+        print("NaN outside footprint:", int(np.isnan(v[~valid]).sum()), "of", int((~valid).sum()))
+
+
+        print(gdf_Agramon[["fid_1"] + [c for c in ("PlotID",) if c in gdf_Agramon]].to_string())
+
+        lai_any = ds_LAI["LAI"].notnull().any("time").astype(float)   # LAI exists in ≥1 month
+        lai_all = ds_LAI["LAI"].notnull().all("time").astype(float)   # LAI exists in every month
+        for fid, g in gdf_Agramon.groupby("fid_1"):
+            a = lai_any.rio.clip(g.geometry, all_touched=True, drop=True)
+            b = lai_all.rio.clip(g.geometry, all_touched=True, drop=True)
+            print(f"fid_1={fid:>2}  bounds={[round(v) for v in g.total_bounds]}  "
+                  f"LAI valid in ≥1 month: {np.nanmean(a):.0%} | in all months: {np.nanmean(b):.0%}")
+
+    print(f"  ds_LAI_raster shape : {ds_LAI_raster['LAI'].shape}")
+    md_log.bullet(f"ds_LAI_raster shape: {ds_LAI_raster['LAI'].shape}")
+
+    # ── 10b. Spin-up (pre-2016 equilibration) ─────────────────
+    first_iteration = True
+    spinup_done     = False
+    if not args.no_spinup:
+        print("\n[Spin-up] Equilibrating initial pressure-head field "
+              "(spin-up antes de 2016) …")
+        first_iteration, spinup_done = run_spinup(
+            simu=simu,
+            args=args,
+            t_atmbc=t_atmbc,
+            net_flux=net_flux,
+            valid_times=valid_times,
+            ds_LAI_raster=ds_LAI_raster,
+            first_iteration=first_iteration,
+            outlet_node_id=outlet_node_id,
+            md_log=md_log,
+        )
+    else:
+        print("\n[Spin-up] Disabled (--no-spinup) — starting cold from "
+              "the uniform IC.")
+        md_log.section("Spin-up (warm-up)")
+        md_log.bullet("Disabled (`--no-spinup`) — starting cold from the uniform IC.")
+
+    run_monthly_loop(args, inp, ms, atm, ks_cfg, ds_LAI_raster,
+                     first_iteration, spinup_done)
 
 
 # ── Entry point ───────────────────────────────────────────────────────────────

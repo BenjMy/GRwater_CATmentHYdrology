@@ -404,6 +404,17 @@ def test_export_mesh_props(tmp_path=None):
         os.chdir(old)
 
 
+def test_run_pipeline_split():
+    import inspect
+    import Agramon_withLAI_withETp as A
+    params = list(inspect.signature(A.run_monthly_loop).parameters)
+    assert params == ["args", "inp", "ms", "atm", "ks_cfg", "ds_LAI_raster",
+                      "first_iteration", "spinup_done"], params
+    src = inspect.getsource(A.run_pipeline)
+    assert "run_monthly_loop(" in src and "for dt, lai_2d in iter_monthly_lai" not in src
+    assert "for dt, lai_2d in iter_monthly_lai" in inspect.getsource(A.run_monthly_loop)
+
+
 if __name__ == "__main__":
     for name, fn in sorted(globals().items()):
         if name.startswith("test_") and callable(fn):
