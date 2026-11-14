@@ -22,6 +22,9 @@ from agramon_lai import (
     smooth_veg_map,
     update_soil_for_active_zones,
 )
+from agramon_log import get_logger
+
+log = get_logger(__name__)
 
 if TYPE_CHECKING:            # type hint only; agramon_runlog needs the private geoutils
     from agramon_runlog import MarkdownLog
@@ -93,7 +96,7 @@ def run_spinup(
         to warm-start ICs from disk even before its own first run).
     """
     spinup_year = args.spinup_year or pick_default_spinup_year(valid_times)
-    print(f"  Spin-up cycle year : {spinup_year}  |  cycles : {args.spinup_cycles}")
+    log.info(f"  Spin-up cycle year : {spinup_year}  |  cycles : {args.spinup_cycles}")
     if md_log is not None:
         md_log.section("Spin-up (warm-up)")
         md_log.meta({
@@ -108,7 +111,7 @@ def run_spinup(
             iter_monthly_lai(ds_LAI_raster.isel(time=slice(1, None)))
         ))
     except StopIteration:
-        print("  WARNING: no LAI data available — skipping spin-up.")
+        log.warning("  WARNING: no LAI data available — skipping spin-up.")
         if md_log is not None:
             md_log.warn("No LAI data available — spin-up skipped entirely.")
         return first_iteration, False
@@ -171,7 +174,7 @@ def run_spinup(
                         simu.create_mesh_vtk(verbose=False)
                         mesh_refreshed = True
                     except Exception as exc:
-                        print(f"  WARNING: could not refresh mesh before "
+                        log.warning(f"  WARNING: could not refresh mesh before "
                               f"spin-up IC warm start ({exc}).")
                         if md_log is not None:
                             md_log.warn(f"Mesh refresh failed in spin-up: {exc}")
@@ -180,7 +183,7 @@ def run_spinup(
                 psi_ini  = df_psi.iloc[-1].values
                 simu.update_ic(INDP=1, pressure_head_ini=psi_ini)
 
-            print(f"  [spin-up {cycle}/{args.spinup_cycles}] "
+            log.info(f"  [spin-up {cycle}/{args.spinup_cycles}] "
                   f"{spinup_year}-{month:02d} …")
             # MAXVEG already fixed to N_VEG_CLASSES before the loop; no need
             # to re-set it here every cycle (it was previously re-set to a
@@ -196,7 +199,7 @@ def run_spinup(
                     verbose=False,
                 )
             except Exception as exc:
-                print(f"  WARNING: spin-up run failed for "
+                log.warning(f"  WARNING: spin-up run failed for "
                       f"{spinup_year}-{month:02d} ({exc}) — stopping spin-up early.")
                 if md_log is not None:
                     md_log.table_row([cycle, f"{spinup_year}-{month:02d}",
@@ -217,7 +220,7 @@ def run_spinup(
                     )
                     psi_outlet_str = f"{psi_outlet:.4f}"
                 except Exception as exc:
-                    print(f"  WARNING: could not read outlet psi for "
+                    log.warning(f"  WARNING: could not read outlet psi for "
                           f"{spinup_year}-{month:02d} ({exc})")
                     psi_outlet_str = "read failed"
 
@@ -253,7 +256,7 @@ def run_spinup(
                             f"({list(last_by_cycle.round(4))}) — this looks like "
                             "accumulation from a closed boundary, not equilibration. "
                             "Re-check the outlet BC.")
-                print(f"  DIAGNOSTIC WARNING: {verdict}")
+                log.info(f"  DIAGNOSTIC WARNING: {verdict}")
                 if md_log is not None:
                     md_log.warn(verdict)
             else:
@@ -261,24 +264,24 @@ def run_spinup(
                             f"{list(last_by_cycle.round(4))} — not monotonically "
                             "rising, consistent with equilibration rather than "
                             "closed-boundary drift.")
-                print(f"  DIAGNOSTIC: {verdict}")
+                log.info(f"  DIAGNOSTIC: {verdict}")
                 if md_log is not None:
                     md_log.bullet(f"✓ {verdict}")
-        print("  Spin-up outlet-psi diagnostic saved → "
+        log.info("  Spin-up outlet-psi diagnostic saved → "
               "spinup_outlet_psi_diagnostic.{csv,png}")
         if md_log is not None:
             md_log.bullet("Diagnostic detail saved → "
                            "`spinup_outlet_psi_diagnostic.csv` / `.png`")
 
     if not spinup_ran:
-        print(f"  WARNING: no forcing found for spin-up year {spinup_year} "
+        log.warning(f"  WARNING: no forcing found for spin-up year {spinup_year} "
               f"— spin-up skipped.")
         if md_log is not None:
             md_log.warn(f"No forcing found for spin-up year {spinup_year} "
                          f"— spin-up skipped.")
         return first_iteration, False
 
-    print(f"  Spin-up complete ({args.spinup_cycles} cycle(s) of {spinup_year}).")
+    log.info(f"  Spin-up complete ({args.spinup_cycles} cycle(s) of {spinup_year}).")
     if md_log is not None:
         md_log.bullet(f"Spin-up complete: {args.spinup_cycles} cycle(s) of "
                        f"{spinup_year}.")

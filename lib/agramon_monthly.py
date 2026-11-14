@@ -20,6 +20,9 @@ from pyCATHY import cathy_utils
 from agramon_checks import add_datetime_col, apply_eta_artefact_floor
 from agramon_config import N_VEG_CLASSES, TARGET_CRS
 from agramon_lai import lai_to_veg_map, smooth_veg_map
+from agramon_log import get_logger
+
+log = get_logger(__name__)
 
 
 def read_sw_month(simu, dt, sw_records, month_stats, monthly_dir):
@@ -47,9 +50,9 @@ def read_sw_month(simu, dt, sw_records, month_stats, monthly_dir):
                     .to_netcdf(monthly_dir / f"sw_{dt:%Y%m}.nc")
                 )
             except Exception as exc:
-                print(f"  Warning: could not save monthly SW for {dt:%Y-%m} ({exc})")
+                log.warning(f"  Warning: could not save monthly SW for {dt:%Y-%m} ({exc})")
     except Exception as exc:
-        print(f"  Warning: could not read SW for {dt:%Y-%m} ({exc})")
+        log.warning(f"  Warning: could not read SW for {dt:%Y-%m} ({exc})")
     return sw_month_df
 
 
@@ -70,7 +73,7 @@ def read_et_month(simu, dt, et_records, month_stats, monthly_dir, md_log, *,
                 net_neg_mode=eta_net_neg_mode,
             )
             if n_eta_patched or n_eta_net_neg:
-                print(f"  ETa patch: {n_eta_patched} cells (net ≥ 0 artefact) + "
+                log.info(f"  ETa patch: {n_eta_patched} cells (net ≥ 0 artefact) + "
                       f"{n_eta_net_neg} cells (net < 0, mode={eta_net_neg_mode}) "
                       f"for {dt:%Y-%m}")
             md_log.bullet(f"{dt:%Y-%m}: ETa artefact floor patched "
@@ -92,9 +95,9 @@ def read_et_month(simu, dt, et_records, month_stats, monthly_dir, md_log, *,
             try:
                 et_xr.to_netcdf(monthly_dir / f"et_{dt:%Y%m}.nc")
             except Exception as exc:
-                print(f"  Warning: could not save monthly ET for {dt:%Y-%m} ({exc})")
+                log.warning(f"  Warning: could not save monthly ET for {dt:%Y-%m} ({exc})")
     except Exception as exc:
-        print(f"  Warning: could not read ET for {dt:%Y-%m} ({exc})")
+        log.warning(f"  Warning: could not read ET for {dt:%Y-%m} ({exc})")
     return df_et
 
 
@@ -116,9 +119,9 @@ def read_recharge_month(simu, dt, all_recharge_recs, month_stats, monthly_dir):
             try:
                 xr_rec.to_netcdf(monthly_dir / f"recharge_{dt:%Y%m}.nc")
             except Exception as exc:
-                print(f"  Warning: could not save monthly recharge for {dt:%Y-%m} ({exc})")
+                log.warning(f"  Warning: could not save monthly recharge for {dt:%Y-%m} ({exc})")
     except Exception as exc:
-        print(f"  Warning: could not read recharge for {dt:%Y-%m} ({exc})")
+        log.warning(f"  Warning: could not read recharge for {dt:%Y-%m} ({exc})")
     return df_rec
 
 
@@ -133,9 +136,9 @@ def read_hgraph_month(simu, dt, all_hgraph_recs, monthly_dir):
             try:
                 df_hgraph.to_csv(monthly_dir / f"hgraph_{dt:%Y%m}.csv", index=False)
             except Exception as exc:
-                print(f"  Warning: could not save monthly hgraph for {dt:%Y-%m} ({exc})")
+                log.warning(f"  Warning: could not save monthly hgraph for {dt:%Y-%m} ({exc})")
     except Exception as exc:
-        print(f"  Warning: could not read hgraph for {dt:%Y-%m} ({exc})")
+        log.warning(f"  Warning: could not read hgraph for {dt:%Y-%m} ({exc})")
 
 
 def read_psi_month(simu, dt, psi_records, month_stats, monthly_dir, md_log, t_month):
@@ -151,7 +154,7 @@ def read_psi_month(simu, dt, psi_records, month_stats, monthly_dir, md_log, t_mo
         last_psi_t   = df_psi.index[-1]
         last_month_t = t_month[-1]
         if last_psi_t < last_month_t:
-            print(f"  WARNING: PSI last index ({last_psi_t}) is behind "
+            log.warning(f"  WARNING: PSI last index ({last_psi_t}) is behind "
                   f"t_month[-1] ({last_month_t}) for {dt:%Y-%m} — "
                   f"solver did not converge; keeping last known state and continuing.")
             solver_status = f"⚠ not converged ({last_psi_t} < {last_month_t})"
@@ -161,7 +164,7 @@ def read_psi_month(simu, dt, psi_records, month_stats, monthly_dir, md_log, t_mo
             # Do not append new psi_records; psi_ini will reuse previous last row
             # on the next iteration (len(psi_records) > 0 guard still holds).
         else:
-            print(f"  time index ic: {last_psi_t} ✓ (t_month[-1]: {last_month_t})")
+            log.info(f"  time index ic: {last_psi_t} ✓ (t_month[-1]: {last_month_t})")
             df_psi["datetime"] = cathy_utils.change_x2date(df_psi.index, dt)
             psi_month_df = (
                 df_psi.reset_index(drop=True)
@@ -183,9 +186,9 @@ def read_psi_month(simu, dt, psi_records, month_stats, monthly_dir, md_log, t_mo
                         .to_netcdf(monthly_dir / f"psi_{dt:%Y%m}.nc")
                     )
                 except Exception as exc:
-                    print(f"  Warning: could not save monthly PSI for {dt:%Y-%m} ({exc})")
+                    log.warning(f"  Warning: could not save monthly PSI for {dt:%Y-%m} ({exc})")
     except Exception as exc:
-        print(f"  WARNING: could not read PSI for {dt:%Y-%m} ({exc}) — "
+        log.warning(f"  WARNING: could not read PSI for {dt:%Y-%m} ({exc}) — "
               f"keeping last known state and continuing.")
         solver_status = f"✗ PSI read failed: {exc}"
         md_log.warn(f"{dt:%Y-%m}: could not read PSI ({exc}) — "
@@ -207,12 +210,12 @@ def report_month_stats(dt, month_stats, solver_status, md_log, stats_records, ou
             return "n/a"
         return f"{v:.3e}{unit}" if sci else f"{v:.3f}{unit}"
 
-    print(f"  stats     | psi mean: {_fmt('psi_mean', ' m')} "
+    log.info(f"  stats     | psi mean: {_fmt('psi_mean', ' m')} "
           f"(min {_fmt('psi_min', ' m')}, max {_fmt('psi_max', ' m')}) | "
           f"sw mean: {_fmt('sw_mean')} | "
           f"ETa mean: {_fmt('eta_mean', ' m/s', sci=True)} | "
           f"recharge mean: {_fmt('recharge_mean', ' m/s', sci=True)}")
-    print(f"  sanity    | SW out-of-bounds: {month_stats.get('sw_out_of_bounds_n', 'n/a')} | "
+    log.info(f"  sanity    | SW out-of-bounds: {month_stats.get('sw_out_of_bounds_n', 'n/a')} | "
           f"PSI extreme: {month_stats.get('psi_extreme_n', 'n/a')} | "
           f"ETa>ETp: {month_stats.get('eta_exceeds_etp_n', 'n/a')} | "
           f"water balance residual: {_fmt('water_balance_residual_mm', ' mm')}")
@@ -227,7 +230,7 @@ def report_month_stats(dt, month_stats, solver_status, md_log, stats_records, ou
     try:
         pd.DataFrame(stats_records).to_csv(out_dir / "monthly_stats.csv", index=False)
     except Exception as exc:
-        print(f"  Warning: could not refresh monthly_stats.csv after {dt:%Y-%m} ({exc})")
+        log.warning(f"  Warning: could not refresh monthly_stats.csv after {dt:%Y-%m} ({exc})")
 
 
 

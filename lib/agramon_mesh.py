@@ -19,6 +19,9 @@ from scipy.ndimage import gaussian_filter
 from pyCATHY import cathy_tools
 
 from agramon_config import TARGET_CRS
+from agramon_log import get_logger
+
+log = get_logger(__name__)
 
 
 def load_dem_from_tif(
@@ -93,12 +96,12 @@ def load_dem_from_tif(
     if not tif_path.is_file():
         raise FileNotFoundError(f"DEM GeoTIFF not found: {tif_path}")
 
-    print(f"  DEM source (tif) : {tif_path}")
+    log.info(f"  DEM source (tif) : {tif_path}")
     raster_DEM = rxr.open_rasterio(tif_path, masked=True).isel(band=0)
 
     if raster_DEM.rio.crs is None:
         raster_DEM = raster_DEM.rio.write_crs("EPSG:25830")
-        print("  DEM CRS was missing — assumed EPSG:25830")
+        log.info("  DEM CRS was missing — assumed EPSG:25830")
 
     # Handle CRS transformation and resampling together
     needs_reproject = str(raster_DEM.rio.crs) != target_crs
@@ -107,15 +110,15 @@ def load_dem_from_tif(
     if needs_reproject or needs_resample:
         dst_crs = target_crs if needs_reproject else raster_DEM.rio.crs
         kwargs = {"resolution": resample_resolution} if needs_resample else {}
-        print(f"  Transforming DEM to {dst_crs} at {resample_resolution} m" if needs_resample
+        log.info(f"  Transforming DEM to {dst_crs} at {resample_resolution} m" if needs_resample
               else f"  Transforming DEM to {dst_crs}")
         raster_DEM = raster_DEM.rio.reproject(dst_crs, **kwargs)
 
-    print(f"  DEM CRS : {raster_DEM.rio.crs}")
+    log.info(f"  DEM CRS : {raster_DEM.rio.crs}")
 
     res_x = abs(float(raster_DEM.rio.resolution()[0]))
     res_y = abs(float(raster_DEM.rio.resolution()[1]))
-    print(f"  DEM resolution : {res_x:.2f} × {res_y:.2f} m")
+    log.info(f"  DEM resolution : {res_x:.2f} × {res_y:.2f} m")
 
     # Select and clip to gdf_clip bounding box + buffer if provided
     if gdf_clip is not None:
@@ -124,17 +127,17 @@ def load_dem_from_tif(
             raise ValueError("Cannot specify both 'fid' and 'plot_id'. Use one or the other.")
         if fid is not None:
             gdf_clip = gdf_clip[gdf_clip["fid_1"] == fid].copy()
-            print(f"  Selected fid={fid} from gdf_clip ({len(gdf_clip)} features)")
+            log.info(f"  Selected fid={fid} from gdf_clip ({len(gdf_clip)} features)")
         elif plot_id is not None:
             gdf_clip = gdf_clip[gdf_clip["PlotID"] == plot_id].copy()
-            print(f"  Selected PlotID={plot_id} from gdf_clip ({len(gdf_clip)} features)")
+            log.info(f"  Selected PlotID={plot_id} from gdf_clip ({len(gdf_clip)} features)")
 
         if len(gdf_clip) == 0:
             raise ValueError(f"No features found in gdf_clip for {'fid' if fid is not None else 'PlotID'}={fid if fid is not None else plot_id}")
 
         if str(gdf_clip.crs) != target_crs:
             gdf_clip = gdf_clip.to_crs(target_crs)
-            print(f"  Reprojected gdf_clip to {target_crs}")
+            log.info(f"  Reprojected gdf_clip to {target_crs}")
 
         if gbuffer is None:
             gbuffer = res_x  # Default: 1 pixel of current resolution
@@ -143,7 +146,7 @@ def load_dem_from_tif(
         miny -= gbuffer
         maxx += gbuffer
         maxy += gbuffer
-        print(f"  Clipping DEM to gdf_clip bbox + {gbuffer:.2f} m buffer")
+        log.info(f"  Clipping DEM to gdf_clip bbox + {gbuffer:.2f} m buffer")
         #raster_DEM = raster_DEM.rio.clip_box(minx, miny, maxx, maxy)
         raster_DEM = raster_DEM.rio.clip(gdf_clip.geometry, all_touched=True)
 
@@ -174,8 +177,8 @@ def load_dem_from_tif(
 
     raster_DEM_masked = np.where(np.isnan(raster_DEM), -9999, raster_DEM.values)
 
-    print(f"  DEM shape      : {raster_DEM_masked.shape}")
-    print(f"  xllcorner={xllcorner:.2f}, yllcorner={yllcorner:.2f}")
+    log.info(f"  DEM shape      : {raster_DEM_masked.shape}")
+    log.info(f"  xllcorner={xllcorner:.2f}, yllcorner={yllcorner:.2f}")
 
     if show:
         valid = raster_DEM_masked[raster_DEM_masked != -9999]
@@ -202,7 +205,7 @@ def initialise_project(path2prj: str, start_year: int, end_year: int,
     sim_dir = Path(path2prj) / scenario_dirname
     sim_dir.mkdir(parents=True, exist_ok=True)
     simu = cathy_tools.CATHY(dirName=str(sim_dir))
-    print(f"  Working directory  : {sim_dir}")
+    log.info(f"  Working directory  : {sim_dir}")
     return simu
 
 
@@ -379,7 +382,7 @@ def configure_boundary_conditions(
     overlap_mask = np.isin(outlet_node_ids, bottom_node_ids)
     if overlap_mask.any():
         overlap_nodes = outlet_node_ids[overlap_mask]
-        print(f"  WARNING: {len(overlap_nodes)} node(s) belong to both the "
+        log.warning(f"  WARNING: {len(overlap_nodes)} node(s) belong to both the "
               f"outlet side and the mesh bottom (e.g. a bottom corner also "
               f"on the lateral outlet edge): {sorted(overlap_nodes.tolist())}. "
               f"bottom_flux wins for these nodes (outlet contribution "
@@ -409,18 +412,18 @@ def configure_boundary_conditions(
 
     outlet_total_area = sum(outlet_areas.values())
     if len(all_nodes) == 0:
-        print("  BCs: Dirichlet + seepage-face + Neumann all closed "
+        log.info("  BCs: Dirichlet + seepage-face + Neumann all closed "
               "(no_flow) - outlet_flux and bottom_flux both zero.")
     else:
-        print(f"  BCs: Dirichlet + seepage-face closed; Neumann outflow on "
+        log.info(f"  BCs: Dirichlet + seepage-face closed; Neumann outflow on "
               f"outlet side '{resolved_side}': {outlet_flux:.1e} m/s x exact "
               f"per-node face area (side total {outlet_total_area:.3g} m^2 "
               f"over {len(outlet_node_ids)} nodes). Outlet diagnostic node: "
               f"{outlet_node_id}.")
     if bottom_active:
-        print(f"  Free bottom drainage: {bottom_flux:.1e} m/s x nodal "
+        log.info(f"  Free bottom drainage: {bottom_flux:.1e} m/s x nodal "
               f"area {bottom_nodal_area:.3g} m^2, over {n_bottom_nodes} "
               f"bottom nodes.")
     else:
-        print("  Bottom: closed (no-flow).")
+        log.info("  Bottom: closed (no-flow).")
     return resolved_side, outlet_node_id

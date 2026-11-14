@@ -490,6 +490,42 @@ def test_agramon_monthly_prep_helpers():
         os.chdir(old)
 
 
+def test_agramon_log():
+    import contextlib, io, logging, tempfile
+    from pathlib import Path
+    import agramon_log as L
+    log = L.get_logger("agramon_test")
+    buf = io.StringIO()
+    with contextlib.redirect_stdout(buf):
+        L.setup_logging("INFO")
+        log.info("  hello")
+        log.warning("  Warning: x")
+        log.debug("hidden")
+    assert buf.getvalue() == "  hello\n  Warning: x\n", repr(buf.getvalue())   # same as print
+    buf = io.StringIO()
+    f = Path(tempfile.mkdtemp()) / "sub" / "run.log"
+    with contextlib.redirect_stdout(buf):
+        L.setup_logging("WARNING", str(f)); L.setup_logging("WARNING", str(f))  # idempotent
+        log.info("quiet"); log.error("boom")
+    assert buf.getvalue() == "boom\n" and "ERROR" in f.read_text() and "quiet" not in f.read_text()
+    assert len([h for h in logging.getLogger("agramon").handlers
+                if isinstance(h, logging.FileHandler)]) == 1
+    try:
+        L.setup_logging("LOUD")
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("bad level accepted")
+    L.setup_logging("INFO")
+    # no bare print() left in the converted modules except the 3 multi-arg debug dumps
+    import ast
+    for mod in ("agramon_forcing", "agramon_lai", "agramon_mesh", "agramon_monthly",
+                "agramon_runlog", "agramon_spinup"):
+        tree = ast.parse(open(Path(__file__).resolve().parents[1] / f"{mod}.py").read())
+        assert not [n for n in ast.walk(tree) if isinstance(n, ast.Call)
+                    and getattr(n.func, "id", "") == "print"], mod
+
+
 if __name__ == "__main__":
     for name, fn in sorted(globals().items()):
         if name.startswith("test_") and callable(fn):

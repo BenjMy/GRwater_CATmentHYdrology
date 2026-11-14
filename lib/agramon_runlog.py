@@ -17,6 +17,9 @@ import numpy as np
 import pandas as pd
 
 from geoutils import uCATHY
+from agramon_log import get_logger
+
+log = get_logger(__name__)
 
 
 class MarkdownLog:
@@ -43,7 +46,7 @@ class MarkdownLog:
                 fh.write(f"_Started: {datetime.now():%Y-%m-%d %H:%M:%S}_\n\n")
         except OSError as exc:
             # Logging failures should never abort the simulation itself.
-            print(f"  WARNING: could not open markdown log at {self.path} ({exc}) "
+            log.warning(f"  WARNING: could not open markdown log at {self.path} ({exc}) "
                   f"— continuing without it.")
 
     def _write(self, text: str) -> None:
@@ -51,7 +54,7 @@ class MarkdownLog:
             with open(self.path, "a") as fh:
                 fh.write(text)
         except OSError as exc:
-            print(f"  WARNING: markdown log write failed ({exc}).")
+            log.warning(f"  WARNING: markdown log write failed ({exc}).")
 
     def section(self, title: str) -> None:
         self._write(f"\n## {title}\n\n")
@@ -191,7 +194,7 @@ def log_simulation(log_path: Path, start_year: int, end_year: int,
         "ks_fire":           ks_fire,
     }
     sim_index = uCATHY.log_simulation(log_path, params)
-    print(f"  sim_index = {sim_index}  (withLAI={with_lai})")
+    log.info(f"  sim_index = {sim_index}  (withLAI={with_lai})")
     return sim_index
 
 

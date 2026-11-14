@@ -301,6 +301,7 @@ giving "'ic' has length N but the mesh has M points"), and the main script works
 - 2026-11-14: REFACTORING 2.2: SW/ET/recharge/hgraph readers (12.9-12.11a) moved to `lib/agramon_monthly.py` (verbatim; only `args.save_monthly`/`fm.use_etp`/`args.eta_net_neg_mode` became parameters). Tests added.
 - 2026-11-14: REFACTORING 2.2: PSI reader (12.8) and `report_month_stats` (12.12b) moved to `agramon_monthly.py` (AST-checked); dead commented-out PSI block dropped. Remaining: 12.1-12.5 soil/LAI prep.
 - 2026-11-14: REFACTORING 2.2: `prepare_month_vegetation`, `month_forcing_indices`, `plot_month_forcing` moved to `agramon_monthly.py` (AST-checked). Left in the loop: 12.6 (mutates n_surf/ETp_nodes/rain_nodes) and 12.11c.
+- 2026-11-14: REFACTORING 2.10 done: `agramon_log.py`; prints in agramon_* + main script converted to `log.*` (stdout output unchanged by default, warnings/errors now real levels); new `--log-level` / `--log-file`.
 - 2026-11-13: §3.1 implemented (see ticks); only "new study: different DEM slopes" remains. Checked: py_compile, `--smoke-test`, comparison rebuilt on committed dry runs. Not checked: full CATHY runs (`--quick`, `--wet`).
 
 ## 10. References to cite

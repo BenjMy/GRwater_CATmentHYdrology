@@ -16,6 +16,9 @@ from scipy.ndimage import binary_dilation, gaussian_filter, label as sp_label
 from scipy.stats import mode
 
 from agramon_config import LAI_THRESHOLDS, N_VEG_CLASSES, ZROOT_FACTORS, scf_label_for
+from agramon_log import get_logger
+
+log = get_logger(__name__)
 
 
 def lai_to_veg_map(simu, lai_2d: np.ndarray) -> tuple[np.ndarray, dict[int, int]]:
@@ -202,7 +205,7 @@ def update_soil_for_active_zones(
             if col in df_spp.columns:
                 df_spp[col] = val
             else:
-                print(f"    WARNING: SPP_map has no '{col}' column — "
+                log.warning(f"    WARNING: SPP_map has no '{col}' column — "
                       f"--permx/--permy-ratio/--permz-ratio ignored for it.")
         permx_label = (f"PERMX={permx:.3e}, PERMY={overrides['PERMY']:.3e}, "
                        f"PERMZ={overrides['PERMZ']:.3e} m/s")
@@ -222,9 +225,9 @@ def update_soil_for_active_zones(
             df_spp[col] = val
             vg_label_parts.append(f"{col}={val:.4g}")
         else:
-            print(f"    WARNING: SPP_map has no '{col}' column — override ignored for it.")
+            log.warning(f"    WARNING: SPP_map has no '{col}' column — override ignored for it.")
     if (df_spp["VGRMCCELL"] >= df_spp["POROS"]).any():
-        print("    WARNING: VGRMCCELL >= POROS for at least one zone — "
+        log.warning("    WARNING: VGRMCCELL >= POROS for at least one zone — "
               "residual water content exceeds porosity, fix before running.")
     vg_label = ", ".join(vg_label_parts) if vg_label_parts else "pyCATHY default"
 
@@ -246,7 +249,7 @@ def update_soil_for_active_zones(
             df_fp[col] = val
             fp_label_parts.append(f"{col}={val:.4g}")
         else:
-            print(f"    WARNING: FP_map has no '{col}' column — override ignored for it.")
+            log.warning(f"    WARNING: FP_map has no '{col}' column — override ignored for it.")
     if feddes_crop is not None:
         fp_label_parts.append(f"crop={feddes_crop} (literature)")
     fp_label = ", ".join(fp_label_parts) if fp_label_parts else "pyCATHY default"
@@ -254,7 +257,7 @@ def update_soil_for_active_zones(
     simu.update_soil(FP_map=df_fp, SPP_map=df_spp, PMIN=pmin, SCF=scf)
     semantic_active = sorted(inv_remap.get(z, z) for z in active_zones)
     scf_label = scf_label_for(scf)
-    print(f"    → Soil updated | table rows: {n_zones} (all zones, fixed) "
+    log.info(f"    → Soil updated | table rows: {n_zones} (all zones, fixed) "
           f"| spatially active this month: {sorted(active_zones)} "
           f"(semantic: {semantic_active}) | PMIN: {pmin:g} m | SCF: {scf_label} | "
           f"Ks: {permx_label} | retention curve: {vg_label} | "

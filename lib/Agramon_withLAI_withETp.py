@@ -126,6 +126,9 @@ from agramon_lai import (
 )
 from agramon_outputs import save_combined_outputs
 from agramon_runlog import MarkdownLog, build_scenario_dirname, log_simulation
+from agramon_log import get_logger, setup_logging
+
+log = get_logger(__name__)
 
 
 # ── CLI ───────────────────────────────────────────────────────────────────────
@@ -332,6 +335,12 @@ def _parse_args() -> argparse.Namespace:
     dem.add_argument("--dem-plot",   type=int, default=3, choices=range(1, 14), metavar="N",
                      help="Plot index (1-13, matches gdf_Agramon's fid_1 column) used to "
                           "clip the DEM (loaded from --dem-tif) to that plot's footprint")
+    lg = p.add_argument_group("Logging")
+    lg.add_argument("--log-level", default="INFO",
+                    choices=["DEBUG", "INFO", "WARNING", "ERROR"],
+                    help="Console/log verbosity (default INFO = same output as before)")
+    lg.add_argument("--log-file", default=None, metavar="PATH",
+                    help="Also write timestamped log records to this file")
     dem.add_argument("--mesh-props", action="store_true",
                      help="Each month, write soil (PERMX, POROS, ...) and root "
                           "(ZROOT, root_zone, root_beta) node properties onto the "
@@ -384,9 +393,9 @@ def _parse_args() -> argparse.Namespace:
 
 def _check_crs_alignment(label_a: str, crs_a, label_b: str, crs_b) -> None:
     if str(crs_a) != str(crs_b):
-        print(f"  ⚠ CRS mismatch: {label_a}={crs_a} vs {label_b}={crs_b}")
+        log.warning(f"  ⚠ CRS mismatch: {label_a}={crs_a} vs {label_b}={crs_b}")
     else:
-        print(f"  ✓ CRS aligned ({label_a} & {label_b}): {crs_a}")
+        log.info(f"  ✓ CRS aligned ({label_a} & {label_b}): {crs_a}")
 
 
 # ── Pipeline steps ────────────────────────────────────────────────────────────
@@ -400,9 +409,9 @@ def load_shapefiles():
     if gdf.crs is None:
         raise ValueError("Shapefile has no CRS — assign one before proceeding.")
     if str(gdf.crs) != TARGET_CRS:
-        print(f"  Reprojecting shapefiles {gdf.crs} → {TARGET_CRS}")
+        log.info(f"  Reprojecting shapefiles {gdf.crs} → {TARGET_CRS}")
         gdf = gdf.to_crs(TARGET_CRS)
-    print(f"  Shapefile CRS : {gdf.crs}")
+    log.info(f"  Shapefile CRS : {gdf.crs}")
     return gdf
 
 
@@ -490,28 +499,28 @@ def setup_inputs(args: argparse.Namespace) -> RunInputs:
         "disabled" if args.no_spinup else f"{args.spinup_cycles} cycle(s)"
     )
 
-    print("\n" + "=" * 60)
-    print("  LT Subsurface Hydrology with LAI + ETp — pyCATHY")
-    print(f"  Forcing source : {forcing_label}")
-    print(f"  Period         : {args.start_year} – {args.end_year - 1}")
-    print(f"  Target CRS     : {TARGET_CRS}")
-    print(f"  ZROOT          : {args.zroot} m  |  PMIN : {args.pmin} m  |  SCF : {scf_label}")
-    print(f"  ZROOT factors  : {args.zroot_factors} "
+    log.info("\n" + "=" * 60)
+    log.info("  LT Subsurface Hydrology with LAI + ETp — pyCATHY")
+    log.info(f"  Forcing source : {forcing_label}")
+    log.info(f"  Period         : {args.start_year} – {args.end_year - 1}")
+    log.info(f"  Target CRS     : {TARGET_CRS}")
+    log.info(f"  ZROOT          : {args.zroot} m  |  PMIN : {args.pmin} m  |  SCF : {scf_label}")
+    log.info(f"  ZROOT factors  : {args.zroot_factors} "
           f"(bare/sparse/moderate/dense/very_dense)")
-    print(f"  Feddes (FP)    : {feddes_label}")
-    print(f"  PERMX (Ks)     : {banner_permx_label}")
-    print(f"  Post-fire Ks   : {ks_banner_label(ks_cfg)}")
-    print(f"  DEM source     : {dem_tif_path}")
-    print(f"  Log file       : {args.log_file}")
-    print(f"  Spin-up        : {spinup_banner_label}")
-    print("=" * 60)
+    log.info(f"  Feddes (FP)    : {feddes_label}")
+    log.info(f"  PERMX (Ks)     : {banner_permx_label}")
+    log.info(f"  Post-fire Ks   : {ks_banner_label(ks_cfg)}")
+    log.info(f"  DEM source     : {dem_tif_path}")
+    log.info(f"  Log file       : {args.log_file}")
+    log.info(f"  Spin-up        : {spinup_banner_label}")
+    log.info("=" * 60)
 
     # ── 2. Shapefiles ─────────────────────────────────────────
-    print("\n[1/9] Loading shapefiles …")
+    log.info("\n[1/9] Loading shapefiles …")
     gdf_Agramon = load_shapefiles()
 
     # ── 3. Forcing datasets + LAI ─────────────────────────────
-    print("\n[2/9] Loading forcing datasets and LAI …")
+    log.info("\n[2/9] Loading forcing datasets and LAI …")
     ds_LAI = load_monthly_lai(LAI_PATH)
 
     if fm.use_etp:
@@ -536,7 +545,7 @@ def setup_inputs(args: argparse.Namespace) -> RunInputs:
         ds_rain = None
 
     # ── 4. Log simulation ─────────────────────────────────────
-    print("\n[3/9] Logging simulation parameters …")
+    log.info("\n[3/9] Logging simulation parameters …")
     log_path  = Path(".").resolve() / args.log_file
     # Treatment actually used in "etp_ts" mode (same rule as
     # build_etp_ds_from_timeseries: explicit --etp-ts-feature-id, else plot-1).
@@ -679,7 +688,7 @@ def setup_mesh_and_dem(args: argparse.Namespace, inp: RunInputs) -> MeshSetup:
     md_log           = inp.md_log
 
     # ── 5. DEM ────────────────────────────────────────────────
-    print("\n[4/9] Loading and masking DEM …")
+    log.info("\n[4/9] Loading and masking DEM …")
     raster_DEM, raster_DEM_masked, xllcorner, yllcorner, res_x, res_y = load_dem_from_tif(
         dem_tif_path,
         gdf_clip=gdf_Agramon,
@@ -709,7 +718,7 @@ def setup_mesh_and_dem(args: argparse.Namespace, inp: RunInputs) -> MeshSetup:
             "smooth_dem changed the valid-pixel (NaN mask) footprint — "
             "this must never happen"
         )
-        print(f"  DEM smoothed: gaussian sigma={args.dem_smooth_sigma} px "
+        log.info(f"  DEM smoothed: gaussian sigma={args.dem_smooth_sigma} px "
               f"(shape unchanged: {shape_before})")
 
     md_log.section("Setup")
@@ -730,24 +739,24 @@ def setup_mesh_and_dem(args: argparse.Namespace, inp: RunInputs) -> MeshSetup:
     })
 
     # ── 6. Initialise CATHY project ───────────────────────────
-    print("\n[5/9] Initialising CATHY project …")
+    log.info("\n[5/9] Initialising CATHY project …")
     simu = initialise_project(args.path2prj, args.start_year, args.end_year,
                               args.zroot, args.pmin, scenario_dirname)
 
     # ── 7. DEM → mesh ─────────────────────────────────────────
-    print("\n[6/9] Feeding DEM into CATHY and building VTK mesh …")
+    log.info("\n[6/9] Feeding DEM into CATHY and building VTK mesh …")
     setup_dem(simu, raster_DEM_masked,
               xllcorner=xllcorner, yllcorner=yllcorner,
               delta_x=res_x, delta_y=res_y,
               show=show_plots)
 
     # ── 8. Preprocessor + grid dims ───────────────────────────
-    print("\n[7/9] Running CATHY preprocessor …")
+    log.info("\n[7/9] Running CATHY preprocessor …")
     simu.run_preprocessor(verbose=False)
     grid3d = simu.read_outputs("grid3d")
     N = int(simu.hapin["N"])
     M = int(simu.hapin["M"])
-    print(f"  Grid : {N} rows × {M} cols")
+    log.info(f"  Grid : {N} rows × {M} cols")
     md_log.bullet(f"Grid: {N} rows × {M} cols")
 
     return MeshSetup(
@@ -815,11 +824,11 @@ def build_atmbc(args: argparse.Namespace, inp: RunInputs,
     n_surf     = None
 
     # ── 9. Build ATMBC forcing arrays ─────────────────────────
-    print("\n[8/9] Building ATMBC forcing arrays …")
+    log.info("\n[8/9] Building ATMBC forcing arrays …")
 
     ds_mesh = mt.build_mesh_dataset(simu, raster_DEM_masked=raster_DEM_masked)
-    print(f"  Mesh x : {float(ds_mesh.x.min()):.1f} – {float(ds_mesh.x.max()):.1f}")
-    print(f"  Mesh y : {float(ds_mesh.y.min()):.1f} – {float(ds_mesh.y.max()):.1f}")
+    log.info(f"  Mesh x : {float(ds_mesh.x.min()):.1f} – {float(ds_mesh.x.max()):.1f}")
+    log.info(f"  Mesh y : {float(ds_mesh.y.min()):.1f} – {float(ds_mesh.y.max()):.1f}")
     md_log.meta({
         "Mesh x range": f"[{float(ds_mesh.x.min()):.1f}, {float(ds_mesh.x.max()):.1f}] m",
         "Mesh y range": f"[{float(ds_mesh.y.min()):.1f}, {float(ds_mesh.y.max()):.1f}] m",
@@ -862,7 +871,7 @@ def build_atmbc(args: argparse.Namespace, inp: RunInputs,
         t_atmbc     = (common_time - t0) / np.timedelta64(1, "s")    # seconds
         valid_times = common_time
 
-        print(f"  ATMBC steps (ETp) : {len(t_atmbc)}  |  flux range : "
+        log.info(f"  ATMBC steps (ETp) : {len(t_atmbc)}  |  flux range : "
               f"[{net_flux_1d.min():.2e}, {net_flux_1d.max():.2e}] m/s")
 
         # FIX: full provenance record for the forcing data — native/target
@@ -949,7 +958,7 @@ def build_atmbc(args: argparse.Namespace, inp: RunInputs,
         valid_times = daily_ts["pev"].valid_time.values
         t_atmbc     = [(float(t - _t0) / 1e9) for t in valid_times]  # ns → s
         net_flux    = np.array(daily_ts["tp"]) + np.array(daily_ts["pev"])
-        print(f"  ATMBC steps (ERA5) : {len(t_atmbc)}  |  flux range : "
+        log.info(f"  ATMBC steps (ERA5) : {len(t_atmbc)}  |  flux range : "
               f"[{net_flux.min():.2e}, {net_flux.max():.2e}] m")
         md_log.meta({
             "ATMBC steps (ERA5)": len(t_atmbc),
@@ -983,7 +992,7 @@ def export_mesh_props(simu, dt, outdir="mesh_props"):
         shutil.copy2(src, Path(outdir) / f"{simu.project_name}_{dt:%Y%m}.vtk")
     except Exception as e:  # noqa: BLE001
         if not _MESH_PROPS_WARNED:
-            print(f"  [mesh-props] skipped: {e}")
+            log.info(f"  [mesh-props] skipped: {e}")
             _MESH_PROPS_WARNED = True
 
 
@@ -1018,7 +1027,7 @@ def configure_model(args: argparse.Namespace, inp: RunInputs, ms: MeshSetup,
     # ── 10. ICs, BCs ──────────────────────────────────────────
     # FIX: set ICs once here; BCs are built once, up front.
     bc = BCConfig.from_args(args)
-    print(f"  IC             : {bc.ic_label}")
+    log.info(f"  IC             : {bc.ic_label}")
     bc.apply_ic(simu)
     # FIX (sfbc EOF crash): configure_boundary_conditions used to be fed
     # list(simu.read_inputs("atmbc")["time"]) here - but at this point in
@@ -1056,7 +1065,7 @@ def configure_model(args: argparse.Namespace, inp: RunInputs, ms: MeshSetup,
     })
 
     # Interpolate LAI onto DEM raster grid once, outside the loop
-    print("  Interpolating LAI timeseries → DEM raster grid …")
+    log.info("  Interpolating LAI timeseries → DEM raster grid …")
     x_t, y_t = raster_DEM.x.values, raster_DEM.y.values
     lai_lin  = ds_LAI.interp(x=xr.DataArray(x_t, dims="x"),
                              y=xr.DataArray(y_t, dims="y"), method="linear")
@@ -1071,7 +1080,7 @@ def configure_model(args: argparse.Namespace, inp: RunInputs, ms: MeshSetup,
             (ds_LAI.x > x0-20) & (ds_LAI.x < x1+20) &
             (ds_LAI.y > y0-20) & (ds_LAI.y < y1+20), drop=True)
         print("raw LAI patch shape:", raw.shape, "| NaN fraction:", float(np.isnan(raw).mean()))
-        print(np.isnan(raw.values).astype(int))        # 1 = NaN in the source LAI
+        log.info(np.isnan(raw.values).astype(int))        # 1 = NaN in the source LAI
 
         valid = raster_DEM_masked != -9999
         v = ds_LAI_raster["LAI"].isel(time=1).values
@@ -1079,24 +1088,24 @@ def configure_model(args: argparse.Namespace, inp: RunInputs, ms: MeshSetup,
         print("NaN outside footprint:", int(np.isnan(v[~valid]).sum()), "of", int((~valid).sum()))
 
 
-        print(gdf_Agramon[["fid_1"] + [c for c in ("PlotID",) if c in gdf_Agramon]].to_string())
+        log.info(gdf_Agramon[["fid_1"] + [c for c in ("PlotID",) if c in gdf_Agramon]].to_string())
 
         lai_any = ds_LAI["LAI"].notnull().any("time").astype(float)   # LAI exists in ≥1 month
         lai_all = ds_LAI["LAI"].notnull().all("time").astype(float)   # LAI exists in every month
         for fid, g in gdf_Agramon.groupby("fid_1"):
             a = lai_any.rio.clip(g.geometry, all_touched=True, drop=True)
             b = lai_all.rio.clip(g.geometry, all_touched=True, drop=True)
-            print(f"fid_1={fid:>2}  bounds={[round(v) for v in g.total_bounds]}  "
+            log.info(f"fid_1={fid:>2}  bounds={[round(v) for v in g.total_bounds]}  "
                   f"LAI valid in ≥1 month: {np.nanmean(a):.0%} | in all months: {np.nanmean(b):.0%}")
 
-    print(f"  ds_LAI_raster shape : {ds_LAI_raster['LAI'].shape}")
+    log.info(f"  ds_LAI_raster shape : {ds_LAI_raster['LAI'].shape}")
     md_log.bullet(f"ds_LAI_raster shape: {ds_LAI_raster['LAI'].shape}")
 
     # ── 10b. Spin-up (pre-2016 equilibration) ─────────────────
     first_iteration = True
     spinup_done     = False
     if not args.no_spinup:
-        print("\n[Spin-up] Equilibrating initial pressure-head field "
+        log.info("\n[Spin-up] Equilibrating initial pressure-head field "
               "(spin-up antes de 2016) …")
         first_iteration, spinup_done = run_spinup(
             simu=simu,
@@ -1110,7 +1119,7 @@ def configure_model(args: argparse.Namespace, inp: RunInputs, ms: MeshSetup,
             md_log=md_log,
         )
     else:
-        print("\n[Spin-up] Disabled (--no-spinup) — starting cold from "
+        log.info("\n[Spin-up] Disabled (--no-spinup) — starting cold from "
               "the uniform IC.")
         md_log.section("Spin-up (warm-up)")
         md_log.bullet("Disabled (`--no-spinup`) — starting cold from the uniform IC.")
@@ -1193,7 +1202,7 @@ def run_monthly_loop(args: argparse.Namespace, inp: RunInputs, ms: MeshSetup,
                 ),
             },
         ).to_netcdf(etp_out_path)
-        print(f"  ETp forcing saved -> {etp_out_path}")
+        log.info(f"  ETp forcing saved -> {etp_out_path}")
 
     # Per-month outputs are written here as soon as each month finishes,
     # so a crash mid-run still leaves usable files on disk instead of
@@ -1208,7 +1217,7 @@ def run_monthly_loop(args: argparse.Namespace, inp: RunInputs, ms: MeshSetup,
         monthly_dir.mkdir(parents=True, exist_ok=True)
 
     # ── 12. Main LAI loop — one CATHY run per calendar month ──
-    print("\n── Starting LAI → vegetation-map loop ──────────────────────────────")
+    log.info("\n── Starting LAI → vegetation-map loop ──────────────────────────────")
     md_log.section("Monthly simulation loop")
     md_log.table_header(["Month", "LAI mean", "LAI min–max", "Net flux mean (mm/day)",
                           "Veg zones", "Vegetated %", "LAI updated", "Solver"])
@@ -1250,7 +1259,7 @@ def run_monthly_loop(args: argparse.Namespace, inp: RunInputs, ms: MeshSetup,
             t_atmbc, net_flux, valid_times, dt.year, dt.month
         )
         if t_month is None:
-            print(f"  {dt:%Y-%m-%d} | No forcing data — skipping")
+            log.info(f"  {dt:%Y-%m-%d} | No forcing data — skipping")
             n_months_skipped += 1
             md_log.table_row([f"{dt:%Y-%m}", "—", "—", "—", "—", "—", "—",
                                "skipped (no forcing)"])
@@ -1306,7 +1315,7 @@ def run_monthly_loop(args: argparse.Namespace, inp: RunInputs, ms: MeshSetup,
             n_surf_real = int(grid3d["nnod"])
 
             if fm.use_etp and n_surf_real != n_surf:
-                print(f"  Refreshing ETp/rain node mapping: n_surf "
+                log.info(f"  Refreshing ETp/rain node mapping: n_surf "
                       f"{n_surf} → {n_surf_real} (grid finalized by "
                       f"preprocessor)")
                 n_surf = n_surf_real
@@ -1353,7 +1362,7 @@ def run_monthly_loop(args: argparse.Namespace, inp: RunInputs, ms: MeshSetup,
 
 
         # 12.7  Run processor
-        print(f"\n  Running processor for {dt:%Y-%m} "
+        log.info(f"\n  Running processor for {dt:%Y-%m} "
               f"(LAI updated: {lai_updated}) …")
 
         # MAXVEG already fixed to N_VEG_CLASSES once before the loop; no
@@ -1402,7 +1411,7 @@ def run_monthly_loop(args: argparse.Namespace, inp: RunInputs, ms: MeshSetup,
                     attrs={"crs": TARGET_CRS},
                 ).to_netcdf(monthly_dir / f"lai_{dt:%Y%m}.nc")
             except Exception as exc:
-                print(f"  Warning: could not save monthly LAI for {dt:%Y-%m} ({exc})")
+                log.warning(f"  Warning: could not save monthly LAI for {dt:%Y-%m} ({exc})")
 
         # 12.11c  Sanity checks (physical bounds + approximate water balance)
         try:
@@ -1419,16 +1428,16 @@ def run_monthly_loop(args: argparse.Namespace, inp: RunInputs, ms: MeshSetup,
             )
         except Exception as exc:
             sanity_warnings = []
-            print(f"  Warning: sanity checks failed for {dt:%Y-%m} ({exc})")
+            log.warning(f"  Warning: sanity checks failed for {dt:%Y-%m} ({exc})")
 
         for w in sanity_warnings:
-            print(f"  ⚠ sanity: {w}")
+            log.warning(f"  ⚠ sanity: {w}")
             md_log.warn(w)
 
         # 12.12  Progress summary
         semantic_zones = sorted(inv_remap.get(z, z) for z in active_zones)
         n_veg = int((veg_map > 1).sum())
-        print(f"  {dt:%Y-%m-%d} | zones (semantic): {semantic_zones} | "
+        log.info(f"  {dt:%Y-%m-%d} | zones (semantic): {semantic_zones} | "
               f"vegetated px: {n_veg}/{N*M} ({100*n_veg/(N*M):.1f} %) | "
               f"LAI updated: {lai_updated}")
 
@@ -1450,9 +1459,9 @@ def run_monthly_loop(args: argparse.Namespace, inp: RunInputs, ms: MeshSetup,
                 all_hgraph_recs, M, N,
             )
         except Exception as exc:
-            print(f"  Warning: could not refresh combined outputs after {dt:%Y-%m} ({exc})")
+            log.warning(f"  Warning: could not refresh combined outputs after {dt:%Y-%m} ({exc})")
 
-    print("\n── Loop complete (partial runs saved if any months were skipped) ────────")
+    log.info("\n── Loop complete (partial runs saved if any months were skipped) ────────")
 
     # ── 13/14. Final refresh of the combined outputs (veg history, PSI,
     # SW, ET, recharge) — same helper called after every month in the
@@ -1463,26 +1472,26 @@ def run_monthly_loop(args: argparse.Namespace, inp: RunInputs, ms: MeshSetup,
         psi_records, sw_records, all_recharge_recs,
         all_hgraph_recs, M, N,
     )
-    print(f"veg_map_history saved → {out_dir / 'veg_map_history.pkl'}")
+    log.info(f"veg_map_history saved → {out_dir / 'veg_map_history.pkl'}")
     if et_records:
-        print(f"ET saved → {out_dir / 'et_output.nc'}")
+        log.info(f"ET saved → {out_dir / 'et_output.nc'}")
     if psi_records:
-        print(f"PSI saved → {out_dir / 'psi_output.nc'}")
+        log.info(f"PSI saved → {out_dir / 'psi_output.nc'}")
     if sw_records:
-        print(f"SW saved → {out_dir / 'sw_output.nc'}")
+        log.info(f"SW saved → {out_dir / 'sw_output.nc'}")
     if all_recharge_recs:
-        print(f"Recharge saved → {out_dir / 'recharge_output.nc'}")
+        log.info(f"Recharge saved → {out_dir / 'recharge_output.nc'}")
     if lai_history:
-        print(f"LAI saved → {out_dir / 'lai_output.nc'}")
+        log.info(f"LAI saved → {out_dir / 'lai_output.nc'}")
     if all_hgraph_recs:
-        print(f"Hydrograph saved → {out_dir / 'hgraph_output.csv'}")
+        log.info(f"Hydrograph saved → {out_dir / 'hgraph_output.csv'}")
 
-    print("\n" + "=" * 60)
-    print("  SIMULATION COMPLETE (partial if any months were skipped)")
-    print(f"  Project   : {simu.project_name}")
-    print(f"  Workdir   : {simu.workdir}")
-    print(f"  Outputs   : {out_dir}")
-    print("=" * 60)
+    log.info("\n" + "=" * 60)
+    log.info("  SIMULATION COMPLETE (partial if any months were skipped)")
+    log.info(f"  Project   : {simu.project_name}")
+    log.info(f"  Workdir   : {simu.workdir}")
+    log.info(f"  Outputs   : {out_dir}")
+    log.info("=" * 60)
 
     # FIX: close() was previously never called — the markdown log had no
     # run-summary section, no elapsed time, and no final footer. Now every
@@ -1498,6 +1507,7 @@ def run_monthly_loop(args: argparse.Namespace, inp: RunInputs, ms: MeshSetup,
 
 def run_pipeline(args: argparse.Namespace) -> None:
     """Execute the full pyCATHY + LAI + ETp simulation pipeline."""
+    setup_logging(getattr(args, "log_level", "INFO"), getattr(args, "log_file", None))
 
     inp = setup_inputs(args)
 

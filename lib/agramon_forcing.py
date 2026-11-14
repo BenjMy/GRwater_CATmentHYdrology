@@ -39,15 +39,15 @@ def load_monthly_lai(lai_input_dir: Path) -> xr.Dataset:
 
     if ds_lai.rio.crs is None:
         ds_lai = ds_lai.rio.write_crs("EPSG:32630")
-        print("  LAI CRS assigned : EPSG:32630")
-    print(f"  LAI native CRS   : {ds_lai.rio.crs}")
+        log.info("  LAI CRS assigned : EPSG:32630")
+    log.info(f"  LAI native CRS   : {ds_lai.rio.crs}")
 
     if str(ds_lai.rio.crs) != TARGET_CRS:
-        print(f"  Reprojecting LAI {ds_lai.rio.crs} → {TARGET_CRS}")
+        log.info(f"  Reprojecting LAI {ds_lai.rio.crs} → {TARGET_CRS}")
         ds_lai = ds_lai.rio.reproject(TARGET_CRS)
-    print(f"  LAI final CRS    : {ds_lai.rio.crs}")
-    print(f"  LAI x range      : {float(ds_lai.x.min()):.1f} – {float(ds_lai.x.max()):.1f}")
-    print(f"  LAI y range      : {float(ds_lai.y.min()):.1f} – {float(ds_lai.y.max()):.1f}")
+    log.info(f"  LAI final CRS    : {ds_lai.rio.crs}")
+    log.info(f"  LAI x range      : {float(ds_lai.x.min()):.1f} – {float(ds_lai.x.max()):.1f}")
+    log.info(f"  LAI y range      : {float(ds_lai.y.min()):.1f} – {float(ds_lai.y.max()):.1f}")
     return ds_lai
 
 
@@ -55,9 +55,9 @@ def load_era5(start_year: int, end_year: int) -> xr.Dataset:
     """Load ERA5 climate forcing."""
     ds = AgUtils.load_era5_series(root_path=EO_PATH, start_year=start_year, end_year=end_year)
     if ds is not None:
-        print(f"  Loaded ERA5 : {start_year} – {end_year - 1}")
+        log.info(f"  Loaded ERA5 : {start_year} – {end_year - 1}")
     else:
-        print("  No ERA5 datasets loaded — check EO_PATH.")
+        log.info("  No ERA5 datasets loaded — check EO_PATH.")
     return ds
 
 
@@ -65,9 +65,9 @@ def _finalise_ds(ds: xr.Dataset, label: str) -> xr.Dataset:
     """Write CRS + spatial dims after load or reproject."""
     ds = ds.rio.write_crs(TARGET_CRS, inplace=False)
     ds = ds.rio.set_spatial_dims(x_dim="x", y_dim="y", inplace=False)
-    print(f"  {label} final CRS : {ds.rio.crs}")
-    print(f"  {label} x range   : {float(ds.x.min()):.1f} – {float(ds.x.max()):.1f}")
-    print(f"  {label} y range   : {float(ds.y.min()):.1f} – {float(ds.y.max()):.1f}")
+    log.info(f"  {label} final CRS : {ds.rio.crs}")
+    log.info(f"  {label} x range   : {float(ds.x.min()):.1f} – {float(ds.x.max()):.1f}")
+    log.info(f"  {label} y range   : {float(ds.y.min()):.1f} – {float(ds.y.max()):.1f}")
     return ds
 
 
@@ -79,10 +79,10 @@ def _load_nc(path: Path, label: str) -> xr.Dataset:
     )
     ds = ds.rio.write_crs(NATIVE_CRS, inplace=False)
     ds = ds.rio.set_spatial_dims(x_dim="x", y_dim="y", inplace=False)
-    print(f"  {label} native CRS : {ds.rio.crs}")
+    log.info(f"  {label} native CRS : {ds.rio.crs}")
 
     if str(ds.rio.crs) != TARGET_CRS:
-        print(f"  Reprojecting {label}  {ds.rio.crs} → {TARGET_CRS}")
+        log.info(f"  Reprojecting {label}  {ds.rio.crs} → {TARGET_CRS}")
         ds = ds.rio.reproject(TARGET_CRS)
 
     return _finalise_ds(ds, label)
@@ -275,7 +275,7 @@ def build_etp_ds_from_timeseries(
                     "long_name": f"ETp time series ({source}, feature_id={fid}, {column})"}
 
     ds_etp = etp_da.to_dataset(name=etp_var)
-    print(f"  ETp time series : source={source}  feature_id={fid} "
+    log.info(f"  ETp time series : source={source}  feature_id={fid} "
           f"(plot {plot_id})  column={column}  "
           f"mean={vals.mean():.2f} mm/day  range=[{vals.min():.2f}, {vals.max():.2f}]")
     return ds_etp
@@ -308,6 +308,9 @@ def subset_atmbc_for_month(t_atmbc, net_flux: np.ndarray,
 # Typed forcing container (REFACTORING.md 2.9)
 # ─────────────────────────────────────────────────────────────
 from dataclasses import dataclass
+from agramon_log import get_logger
+
+log = get_logger(__name__)
 
 
 @dataclass(frozen=True)
