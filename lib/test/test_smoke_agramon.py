@@ -299,6 +299,53 @@ def test_results_plotter_split():
         assert (Path(d) / "recharge_LAI_loop.png").stat().st_size > 1000
 
 
+def test_dem_empty_polygon_regression():
+    """Regression for the '--dem-plot 2 crashes' bug (REFACTORING.md): a polygon whose clip holds
+    no valid DEM pixel used to die with 'zero-size array to reduction operation minimum';
+    it must now raise a ValueError that names the cause. Needs real rasterio/rioxarray/geopandas."""
+    import tempfile
+    for m in ("rasterio", "rioxarray", "geopandas"):
+        if isinstance(sys.modules.get(m), mock.MagicMock):
+            print(f"  (skipped: {m} not installed)")
+            return
+    import geopandas as gpd
+    import rasterio
+    from rasterio.transform import from_origin
+    from shapely.geometry import box
+
+    x0, y0, res, n = 600000.0, 4400000.0, 5.0, 30
+    dem = np.full((n, n), np.nan, dtype="float32")
+    dem[:, :15] = 100 + np.arange(15)[None, :] + np.arange(n)[:, None] * 0.1   # data: left half
+    with tempfile.TemporaryDirectory() as d:
+        tif = Path(d) / "dem.tif"
+        with rasterio.open(tif, "w", driver="GTiff", height=n, width=n, count=1, dtype="float32",
+                           crs=C.TARGET_CRS, transform=from_origin(x0, y0, res, res),
+                           nodata=np.nan) as dst:
+            dst.write(dem, 1)
+        xl = lambda a, b: box(x0 + a * res, y0 - 20 * res, x0 + b * res, y0 - 5 * res)
+        gdf = gpd.GeoDataFrame({"fid_1": [1, 2, 3]}, crs=C.TARGET_CRS, geometry=[
+            xl(2, 10),                                            # 1: over data
+            xl(20, 28),                                           # 2: over nodata (the bug)
+            box(x0 + 1e5, y0 + 1e5, x0 + 1e5 + 50, y0 + 1e5 + 50)])   # 3: outside the DEM
+        r, masked, xll, yll, rx, ry = MS.load_dem_from_tif(tif, gdf_clip=gdf, fid=1)
+        assert MS.count_valid_dem_pixels(masked) > 0 and (rx, ry) == (res, res)
+        assert masked.shape[0] > 0 and masked.shape[1] > 0
+        for bad in (2, 3):
+            try:
+                MS.load_dem_from_tif(tif, gdf_clip=gdf, fid=bad)
+            except ValueError as e:
+                assert "zero-size" not in str(e), f"fid {bad}: unclear error {e}"
+            except Exception as e:                 # noqa: BLE001  (rioxarray NoDataInBounds)
+                assert "zero-size" not in str(e), f"fid {bad}: unclear error {e}"
+            else:
+                raise AssertionError(f"fid {bad}: empty clip must raise")
+        try:
+            MS.load_dem_from_tif(tif, gdf_clip=gdf, fid=2)
+        except ValueError as e:
+            assert "no valid" in str(e) and "fid_1=2" in str(e), e
+    assert MS.count_valid_dem_pixels(np.array([[-9999.0, 1.0], [np.nan, 2.0]])) == 2, "nodata counted"
+
+
 if __name__ == "__main__":
     for name, fn in sorted(globals().items()):
         if name.startswith("test_") and callable(fn):

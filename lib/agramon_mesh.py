@@ -149,6 +149,16 @@ def load_dem_from_tif(
 
     # Crop to valid-data bounding box (trim all-NaN rows/cols)
     valid_mask = ~np.isnan(raster_DEM)
+    if not bool(valid_mask.any()):
+        # Without this guard the crop below dies with "zero-size array to reduction
+        # operation minimum" (REFACTORING.md bug "--dem-plot 2 crashes"), which hides the cause.
+        sel = (f"fid_1={fid}" if fid is not None else
+               f"PlotID={plot_id}" if plot_id is not None else "no polygon")
+        raise ValueError(
+            f"DEM has no valid (non-NaN) pixel after clipping to {sel}: the polygon lies "
+            f"outside the DEM footprint, over nodata cells, or in another CRS "
+            f"(DEM CRS {raster_DEM.rio.crs}, target {target_crs}). Check the plot id, the "
+            f"shapefile and the GeoTIFF extent.")
     valid_x = raster_DEM["x"].where(valid_mask.any(dim="y"), drop=True)
     valid_y = raster_DEM["y"].where(valid_mask.any(dim="x"), drop=True)
     raster_DEM = (
@@ -177,6 +187,13 @@ def load_dem_from_tif(
         plt.tight_layout()
 
     return raster_DEM, raster_DEM_masked, xllcorner, yllcorner, res_x, res_y
+
+
+def count_valid_dem_pixels(raster_DEM_masked, nodata: float = -9999.0) -> int:
+    """Number of real DEM cells in an array that encodes 'outside' as NaN and/or ``nodata``
+    (``load_dem_from_tif`` writes -9999, so ``np.isfinite`` alone counts every cell)."""
+    a = np.asarray(raster_DEM_masked, dtype=float)
+    return int((np.isfinite(a) & (a != nodata)).sum())
 
 
 def initialise_project(path2prj: str, start_year: int, end_year: int,

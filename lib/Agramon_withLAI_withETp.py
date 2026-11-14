@@ -95,6 +95,7 @@ from agramon_config import (
 )
 from agramon_mesh import (  # noqa: F401  (moved, REFACTORING 2.3)
     configure_boundary_conditions,
+    count_valid_dem_pixels,
     initialise_project,
     load_dem_from_tif,
     setup_dem,
@@ -677,6 +678,10 @@ def setup_mesh_and_dem(args: argparse.Namespace, inp: RunInputs) -> MeshSetup:
         resample_resolution=5
     )
 
+
+    if count_valid_dem_pixels(raster_DEM_masked) == 0:
+        raise ValueError(f"--dem-plot {args.dem_plot}: the DEM has no valid pixel inside the "
+                         "selected polygon (empty mesh would follow)")
 
     _check_crs_alignment("DEM",   raster_DEM.rio.crs,  "target", TARGET_CRS)
     _check_crs_alignment("LAI",   ds_LAI.rio.crs,       "target", TARGET_CRS)
