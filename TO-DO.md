@@ -319,3 +319,5 @@ giving "'ic' has length N but the mesh has M points"), and the main script works
 - CATHY / pyCATHY documentation; Feddes root-water-uptake model.
 
 - [ ] **Merge `mesh-vtk-properties` (pycathy_wrapper) into `main`** via PR (review by the author; not merged by Claude). Same for `feat/withIrr-on-main` if the A/B test is kept.
+
+- 2026-11-15 **A/B result (§5.2), run on the `withIrr` build** (`lib/ab_withirr/`, flat 16x16, 60 d, storm every 10 d, ETp 5 mm/d): A = `atmbc = rain - ETp`; B = `atmbc = -ETp` + rain through `irrigation_map` (IRR_SW=1.01, flag 1). Totals over the run: Atmpot-v A -23519.2 / B -23519.8; Atmact-v A 19941.7 / B 19939.9 (rel. diff < 1e-4). **B reproduces A**: the irrigation module adds to ATMPOT, so no separate ETa is reported and the net-of-rain artefact is not removed. Recommendation: drop B for the ETa question, use `--eta-net-neg-mode gross`. Caveat: `hgirrigation` cumulative columns do not match `dtcoupling` (factor ~2 on Cum.ATMPOT, ~1.4 on available IRR vs rain depth x area): basis/units not understood, only needed if irrigation is used for real.
