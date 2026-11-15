@@ -609,6 +609,44 @@ def test_plot_hypotheses():
     plt.close("all")
 
 
+def test_check_monthly_sanity():
+    import datetime as dtm
+    import numpy as np
+    import pandas as pd
+    import agramon_checks as C
+    dt = dtm.datetime(2020, 7, 1)
+    t = [0.0, 86400.0, 2 * 86400.0]; idx = np.array([0, 1, 2])
+    n_surf = 2
+    etp = np.full((3, n_surf), 5e-8); rain = np.full((3, n_surf), 1e-8)
+    sw = pd.DataFrame({"sw": [0.2, 0.5, 1.2]})
+    psi = pd.DataFrame({"psi": [-1.0, -50.0, -2000.0]})
+    et = pd.DataFrame({"time_sec": [0.0, 0.0, 86400.0, 86400.0],
+                       "SURFACE NODE": [1, 2, 1, 2],
+                       "ACT. ETRA": [1e-8, 1e-8, 9e-8, 1e-8]})            # one value > ETp
+    rec = pd.DataFrame({"time_sec": [0.0, 86400.0], "X": [0.0, 0.0], "rech": [1e-9, 1e-9]})
+    st = {}
+    w = C.check_monthly_sanity(dt, st, psi, sw, et, rec, t, idx, etp, rain)
+    assert st["sw_out_of_bounds_n"] == 1 and st["psi_extreme_n"] == 1 and st["eta_exceeds_etp_n"] == 1
+    assert len([x for x in w if "SW value" in x]) == 1 and any("exceed ETp" in x for x in w)
+    # rain 3 d * 1e-8 m/s * 86400 * 1000 = 2.592 mm; ETa mean per output time; residual is rain - ETa - recharge
+    assert np.isclose(st["rain_in_mm"], 3 * 1e-8 * 86400 * 1e3)
+    assert np.isclose(st["eta_out_mm"], (1e-8 + 5e-8) * 86400 * 1e3)
+    assert np.isclose(st["water_balance_residual_mm"],
+                      st["rain_in_mm"] - st["eta_out_mm"] - st["recharge_out_mm"])
+    # clean month: no warnings, no keys for missing inputs, never raises on junk
+    st2 = {}
+    ok = C.check_monthly_sanity(dt, st2, pd.DataFrame({"psi": [-1.0]}), pd.DataFrame({"sw": [0.5]}),
+                                None, None, None, None, None, None)
+    assert ok == [] and st2["sw_out_of_bounds_n"] == 0 and "rain_in_mm" not in st2
+    bad_et = pd.DataFrame({"time_sec": [0.0], "SURFACE NODE": [99], "ACT. ETRA": [1.0]})
+    C.check_monthly_sanity(dt, {}, None, None, bad_et, None, t, idx, etp, rain)   # must not raise
+    # big residual -> water-balance warning
+    st3 = {}
+    w3 = C.check_monthly_sanity(dt, st3, None, None, et.assign(**{"ACT. ETRA": 0.0}), rec, t, idx,
+                                etp, rain * 100, wb_residual_frac=0.5)
+    assert any("water balance residual" in x for x in w3)
+
+
 if __name__ == "__main__":
     for name, fn in sorted(globals().items()):
         if name.startswith("test_") and callable(fn):

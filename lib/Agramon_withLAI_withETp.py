@@ -1489,6 +1489,17 @@ def run_monthly_loop(args: argparse.Namespace, inp: RunInputs, ms: MeshSetup,
         import matplotlib.pyplot as plt_
         plt_.close(fig_)
         log.info(f"run summary figure → {out_dir / 'run_summary.png'}")
+        st_ = pd_.DataFrame(stats_records)
+        if {"month", "rain_in_mm", "eta_out_mm"} <= set(st_.columns):
+            from plot_hypotheses import plot_water_balance
+            wb_ = st_.set_index(pd_.to_datetime(st_["month"].astype(str)))[
+                [c for c in ("rain_in_mm", "eta_out_mm", "recharge_out_mm") if c in st_.columns]
+            ].rename(columns={"rain_in_mm": "precip", "eta_out_mm": "eta",
+                              "recharge_out_mm": "recharge"})
+            plt_.close(plot_water_balance(
+                wb_, out=str(out_dir / "water_balance.png"),
+                title="Monthly flux balance (excludes storage change)"))
+            log.info(f"water balance figure → {out_dir / 'water_balance.png'}")
     except Exception as exc:
         log.warning(f"  Warning: could not draw the run summary figure ({exc})")
     if et_records:

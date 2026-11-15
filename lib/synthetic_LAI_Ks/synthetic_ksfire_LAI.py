@@ -68,7 +68,7 @@ from datetime import date, datetime
 from pathlib import Path
 
 import sys
-sys.path.insert(0, "/home/ben/Nextcloud/BenCSIC/Codes/Tech4agro_org/GRwater_CATmentHYdrology/lib/")
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))   # repo lib/ (was a hard-coded user path)
 
 import numpy as np
 import pandas as pd
