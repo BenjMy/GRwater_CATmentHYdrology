@@ -38,13 +38,14 @@ python Agramon_withLAI_withETp.py --forcing etp --dem-plot 3 --pmin -50 --outlet
 
 Each run writes in `<path2prj>/outputs/<scenario_dir>/`: `*_output.nc`, `monthly_stats.csv`, `run_summary.png`, `water_balance.png`, `simulation_log.md`. One row per run goes to `simulation_log_withETp_withLAI.csv` (`sim_index`).
 
-**A3. Post-process / plot**
+**A3. Post-process / plot** (also available inside the run: add `--post-plots [--post-et-csv <ETA_CSV>]` to `Agramon_withLAI_withETp.py`, or `--extra --post-plots` with `run_paper_scenarios.py`; `run_summary.png` / `water_balance.png` (incl. the applied-Ks panel) are refreshed every month during the run anyway)
 ```bash
-./plot_scenarii_withETp_withLAI.sh                          # every sim_index in the log CSV
-./plot_scenarii_withETp_withLAI.sh --scenario 7 8 --forcing etp --dem-res 5
-./plot_scenarii_withETp_withLAI.sh --scenario 7 --et-csv <ETA_CSV_FROM_HECTOR> --monthly-ts
+python post_process.py                                  # every sim_index in the log CSV
+python post_process.py --scenario 7 8 --forcing etp --dem-res 5
+python post_process.py --scenario 7 --et-csv <ETA_CSV_FROM_HECTOR> --monthly-ts
 ```
-Calls `withLAI_results.py` (maps, hydro, monthly) and `analysis_ET_compare.py` (ETa/ETp, validation panel Fig I) per scenario; figures go to `../Analysis/ET_compare/<scenario_dir>/`.
+(`./plot_scenarii_withETp_withLAI.sh` is now a thin wrapper around `post_process.py`.)
+`post_process.py` calls `withLAI_results.py` (maps, hydro, monthly) and `analysis_ET_compare.py` (ETa/ETp, validation panel Fig I) per scenario; figures go to `../Analysis/ET_compare/<scenario_dir>/`.
 `<ETA_CSV_FROM_HECTOR>` **[MISSING]**: Hector's ETa data, `--et-csv` default is `agramon_treatments_ET.csv`.
 
 Standalone figure script: `python plot_fig8_ETa_ETp_vs_psi.py -h` (Fig. 8, ETa/ETp vs psi). `plot_eta.py`, `plot_maps.py`, `plot_monthly.py` are libraries used by `withLAI_results.py`, not CLIs.

@@ -364,6 +364,11 @@ def _parse_args() -> argparse.Namespace:
     solver.add_argument("--deltat", type=float, default=1e3,  metavar="S")
 
     out = p.add_argument_group("Output")
+    out.add_argument("--post-plots", action="store_true",
+                     help="At the end of the run call post_process.py for this sim_index "
+                          "(maps, hydro, ETa comparison figures) so all plots come out of one call")
+    out.add_argument("--post-et-csv", default=None, metavar="PATH",
+                     help="ETa CSV forwarded to post_process.py (--et-csv)")
     out.add_argument(
         "--path2prj",
         default=str(Path("../SSHydro_withETp_withLAI/").resolve()),
@@ -445,6 +450,7 @@ class RunInputs:
     forcing: ForcingMode    # immutable forcing choice (was module globals, 2.13)
     scenario_dirname: str
     md_log: MarkdownLog
+    sim_index: int = -1     # row of the CSV run registry (-1 if unknown)
 
 
 def setup_inputs(args: argparse.Namespace) -> RunInputs:
@@ -652,6 +658,7 @@ def setup_inputs(args: argparse.Namespace) -> RunInputs:
         forcing=fm,
         scenario_dirname=scenario_dirname,
         md_log=md_log,
+        sim_index=int(sim_index),
     )
 
 
@@ -1636,6 +1643,14 @@ def run_pipeline(args: argparse.Namespace) -> None:
     cfg = configure_model(args, inp, ms, atm)
     run_monthly_loop(args, inp, ms, atm, ks_cfg, cfg.ds_LAI_raster,
                      cfg.first_iteration, cfg.spinup_done)
+    if getattr(args, "post_plots", False):
+        try:
+            from post_process import post_process_scenario
+            post_process_scenario(inp.sim_index, log_csv=Path(".").resolve() / args.log_file,
+                                  path2prj=args.path2prj, dem_res=5,
+                                  et_csv=getattr(args, "post_et_csv", None))
+        except Exception as exc:
+            log.warning(f"  Warning: post-processing plots failed ({exc})")
 
 
 # ── Entry point ───────────────────────────────────────────────────────────────

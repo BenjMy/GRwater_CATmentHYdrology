@@ -504,6 +504,32 @@ def test_agramon_cli_parses():
     assert a.log_file == "my.csv" and a.log_to_file == "/tmp/x.log" and a.log_level == "DEBUG"
 
 
+def test_post_process():
+    import os, tempfile
+    import pandas as pd
+    import post_process as PP
+    d = tempfile.mkdtemp(); f = os.path.join(d, "log.csv")
+    pd.DataFrame({"sim_index": [0, 1, 2, 3], "forcing_mode": [None, "etp_ts", "etp_ts", "etp"]}).to_csv(f, index=False)
+    assert PP.list_logged_scenarios(f) == [0, 1, 2, 3]
+    assert PP.list_logged_scenarios(f, "etp_ts") == [1, 2]
+    assert PP.list_logged_scenarios(f, "etp") == [0, 3]          # legacy row without forcing_mode = etp
+    pd.DataFrame({"sim_index": [5]}).to_csv(f, index=False)      # legacy log without the column
+    assert PP.list_logged_scenarios(f, "etp") == [5] and PP.list_logged_scenarios(f, "era5") == []
+    c = PP.build_commands(7, "l.csv", "prj", 5, monthly_ts=True, et_csv="e.csv", no_csv=True)
+    assert c["results"][-1] == "--monthly-ts" and "--dem-res" in c["results"]
+    assert c["et_compare"][-3:] == ["--et-csv", "e.csv", "--no-csv"] and "7" in c["et_compare"]
+    assert PP.main(["--list", "--scenario", "3", "4"]) == 0
+    # the run script exposes the flag and RunInputs carries the registry index
+    import sys, Agramon_withLAI_withETp as A
+    old = sys.argv; sys.argv = ["x", "--post-plots", "--post-et-csv", "e.csv"]
+    try:
+        a = A._parse_args()
+    finally:
+        sys.argv = old
+    assert a.post_plots and a.post_et_csv == "e.csv"
+    assert A.RunInputs.__dataclass_fields__["sim_index"].default == -1
+
+
 def test_agramon_monthly_readers():
     import types, datetime as dtm
     import pandas as pd
