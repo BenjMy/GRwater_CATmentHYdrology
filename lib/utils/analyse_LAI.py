@@ -23,6 +23,7 @@ Usage
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 from pathlib import Path
 
@@ -38,10 +39,9 @@ import xarray as xr
 # =============================================================================
 
 # LAI NetCDF — location taken from LAI_TSEB.py (lai_monthly.nc input)
-LAI_PATH = Path(
-    "/home/z0272571a@campus.csic.es/Nextcloud/BenCSIC/Training_Supervision"
-    "/Supervision/Xela_Carracedo_Practicas_2026_data/301a-biophysical/agramon/input"
-).resolve()
+# Nextcloud root: AGRAMON_ROOT env var, else the historical default (REFACTORING 2.14)
+_NC = Path(os.environ.get("AGRAMON_ROOT") or "/home/z0272571a@campus.csic.es/Nextcloud").expanduser()
+LAI_PATH = Path(os.environ.get("AGRAMON_LAI_PATH") or (_NC / "BenCSIC/Training_Supervision/Supervision/Xela_Carracedo_Practicas_2026_data/301a-biophysical/agramon/input")).expanduser().resolve()
 
 TARGET_CRS = "EPSG:25830"
 NATIVE_CRS = "EPSG:32630"
@@ -51,10 +51,7 @@ LAI_UNITS = "m² m⁻²"
 LAI_VMAX  = 2.0            # colour-scale ceiling (adjust if needed)
 CMAP_LAI  = "YlGn"
 
-MODULE_PATH = Path(
-    "/home/z0272571a@campus.csic.es/Nextcloud/BenCSIC/Codes"
-    "/Tech4agro_org/GRwater_geophy"
-).resolve()
+MODULE_PATH = Path(os.environ.get("AGRAMON_MODULE_PATH") or (_NC / "BenCSIC/Codes/Tech4agro_org/GRwater_geophy")).expanduser().resolve()
 if str(MODULE_PATH) not in sys.path:
     sys.path.append(str(MODULE_PATH))
 

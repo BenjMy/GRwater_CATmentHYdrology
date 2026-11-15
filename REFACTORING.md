@@ -143,7 +143,7 @@ The main script re-imports these names, so `from Agramon_withLAI_withETp import 
 
 | 2.12 | Unit tests for pure functions (LAI → veg class, Ks recovery, ETa artefact floor, scenario dirname, sanity checks) + regression test for the `--dem-plot 2` empty-mesh crash | ✅ unit tests for the pure helpers are in `lib/test/test_smoke_agramon.py`; regression test added on a synthetic GeoTIFF (polygon over nodata / outside the DEM). `check_monthly_sanity` tested (bounds, ETa>ETp, water-balance arithmetic, never raises). The real `--dem-plot 2` cause is not confirmed (needs the Agramon data) |
 | 2.13 | Global mutable state: `FORCING_MODE`, `USE_ETP_FORCING`, `USE_ETP_TS_FORCING` are module globals set by `apply_forcing_mode`; replace by a field of the run configuration | ✅ frozen `ForcingMode` (`agramon_config.py`: `name`, `label`, `use_etp`, `use_etp_ts`), built in `setup_inputs`, carried in `RunInputs.forcing`; `apply_forcing_mode` and the globals are gone; the `era5` DeprecationWarning is kept. Checked: pyflakes, import + CLI parse under stubs, unit test; not run with CATHY |
-| 2.14 | Hard-coded machine paths (`Nextcloud/...`) → config/env (same as 2.4) | 🟡 `agramon_config` + synthetic_ksfire_LAI done; analysis_ET_compare, withLAI_results, utils/analyse_*.py still hard-code `/home/z0272571a...` |
+| 2.14 | Hard-coded machine paths (`Nextcloud/...`) → config/env (same as 2.4) | ✅ all scripts read `AGRAMON_ROOT` (+ `AGRAMON_PATH_ET`, `AGRAMON_LAI_PATH`, `AGRAMON_CODES`, `AGRAMON_MODULE_PATH`, `AGRAMON_WB_PRJ_ROOT`); analysis scripts keep the z0272571a Nextcloud as default |
 
 ### 3.3 `run_pipeline` split: progress map (static analysis)
 Boundaries follow the `[n/9]` banners and numbered comments.

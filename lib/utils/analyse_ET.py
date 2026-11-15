@@ -22,6 +22,7 @@ Usage
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 from pathlib import Path
 
@@ -37,14 +38,13 @@ import xarray as xr
 # Paths & constants
 # =============================================================================
 
-PathET     = Path("/home/z0272571a@campus.csic.es/Nextcloud/GRwater/data/satellite/Agramon")
+# Nextcloud root: AGRAMON_ROOT env var, else the historical default (REFACTORING 2.14)
+_NC = Path(os.environ.get("AGRAMON_ROOT") or "/home/z0272571a@campus.csic.es/Nextcloud").expanduser()
+PathET     = Path(os.environ.get("AGRAMON_PATH_ET") or (_NC / "GRwater/data/satellite/Agramon")).expanduser()
 TARGET_CRS = "EPSG:25830"
 NATIVE_CRS = "EPSG:32630"
 
-MODULE_PATH = Path(
-    "/home/z0272571a@campus.csic.es/Nextcloud/BenCSIC/Codes"
-    "/Tech4agro_org/GRwater_geophy"
-).resolve()
+MODULE_PATH = Path(os.environ.get("AGRAMON_MODULE_PATH") or (_NC / "BenCSIC/Codes/Tech4agro_org/GRwater_geophy")).expanduser().resolve()
 if str(MODULE_PATH) not in sys.path:
     sys.path.append(str(MODULE_PATH))
 

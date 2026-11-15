@@ -9,6 +9,8 @@ Do **not** use `--forcing era5` for the paper runs (agreed): use `etp` (satellit
 export AGRAMON_ROOT=<NEXTCLOUD_ROOT>              # contains GRwater/, BenCSIC/ ; default = old auto-detection
 export AGRAMON_PATH_ET=<DIR_WITH_ET0_TP_NC>       # optional override (…/GRwater/data/satellite/Agramon)
 export AGRAMON_LAI_PATH=<DIR_WITH_LAI_INPUTS>     # optional override
+export AGRAMON_MODULE_PATH=<PATH>/GRwater_geophy   # optional, analysis scripts
+export AGRAMON_WB_PRJ_ROOT=<PATH>/SSHydro_withETp_withLAI   # optional, analysis_ET_compare.py
 pip install -e <PATH>/pycathy_wrapper             # install pyCATHY from source (not pip)
 python test/test_smoke_agramon.py                 # must end with "smoke test OK"
 ```

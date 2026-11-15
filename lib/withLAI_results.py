@@ -71,6 +71,7 @@ Usage
 import argparse
 import pickle
 import re
+import os
 import sys
 import warnings
 from pathlib import Path
@@ -87,29 +88,19 @@ from Agramon_withLAI_withETp import load_dem_from_tif  # or move it to Agramon_u
 
 # ── Path setup ────────────────────────────────────────────────────────────────
 
-MODULE_PATH = Path(
-    "/home/z0272571a@campus.csic.es/Nextcloud/BenCSIC/Codes"
-    #"/home/ben/Nextcloud/BenCSIC/Codes"
-    "/Tech4agro_org/GRwater_geophy"
-).resolve()
+# Nextcloud root: AGRAMON_ROOT env var, else the historical default (REFACTORING 2.14)
+_NC = Path(os.environ.get("AGRAMON_ROOT") or "/home/z0272571a@campus.csic.es/Nextcloud").expanduser()
 
-EO_PATH = Path(
-    "/home/z0272571a@campus.csic.es/Nextcloud/BenCSIC/Codes"
-    #"/home/ben/Nextcloud/BenCSIC/Codes"
-    "/Tech4agro_org/GRwater_CATmentHYdrology"
-).resolve()
+MODULE_PATH = Path(os.environ.get("AGRAMON_MODULE_PATH") or (_NC / "BenCSIC/Codes/Tech4agro_org/GRwater_geophy")).expanduser().resolve()
 
-LAI_PATH = Path(
-    "/home/z0272571a@campus.csic.es/Nextcloud/BenCSIC/Training_Supervision"
-    #"/home/ben/Nextcloud/BenCSIC/Training_Supervision"
-    "/Supervision/Xela_Carracedo_Practicas_2026_data/301a-biophysical/agramon/input"
-).resolve()
+EO_PATH = Path(os.environ.get("AGRAMON_CODES") or (_NC / "BenCSIC/Codes/Tech4agro_org")).expanduser() .resolve() / "GRwater_CATmentHYdrology"
+
+LAI_PATH = Path(os.environ.get("AGRAMON_LAI_PATH") or (_NC / "BenCSIC/Training_Supervision/Supervision/Xela_Carracedo_Practicas_2026_data/301a-biophysical/agramon/input")).expanduser().resolve()
 
 # Satellite ETp + rain forcing (replaces ERA5 for the Fig 6/7 rain/ETp
 # panel — see Agramon_withLAI_withETp.py, which uses the same files to
 # force the ATMBC boundary).
-PathET    = Path("/home/z0272571a@campus.csic.es/Nextcloud/GRwater/data/satellite/Agramon")
-#PathET    = Path("/home/ben/Nextcloud/GRwater/data/satellite/Agramon")
+PathET    = Path(os.environ.get("AGRAMON_PATH_ET") or (_NC / "GRwater/data/satellite/Agramon")).expanduser()
 etp_path  = PathET / "20161001_20241231_ET0.nc"
 rain_path = PathET / "20161001_20241231_TP.nc"
 
