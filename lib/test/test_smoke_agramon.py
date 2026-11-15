@@ -542,6 +542,46 @@ def test_post_process():
     assert A.RunInputs.__dataclass_fields__["sim_index"].default == -1
 
 
+def test_forcing_providers():
+    import numpy as np, pandas as pd, xarray as xr
+    import agramon_forcing as F
+    T, S = 5, 7
+    t_etp = pd.date_range("2020-01-01", periods=T + 1)          # one extra day on the ETp side
+    t_rain = pd.date_range("2020-01-02", periods=T + 1)         # offset: common axis = 5 days
+    rng = np.random.default_rng(0)
+    etp_mm = rng.uniform(0, 6, (T + 1, S + 3)); rain_mm = rng.uniform(0, 20, (T + 1, S + 3))
+    ds_e = xr.Dataset({"ET_0-gf": (("time", "node"), etp_mm)}, coords={"time": t_etp})
+    ds_r = xr.Dataset({"TP-DD": (("time", "node"), rain_mm)}, coords={"time": t_rain})
+    calls = []
+    def fake_map(ds, ds_mesh, variables):                       # stands in for mesh_tools.map_grid_to_mesh
+        calls.append(variables); return ds
+    prov = F.EtpGridProvider(ds_e, ds_r, fake_map)
+    assert isinstance(prov, F.ForcingProvider) and prov.name == "etp"
+    f = prov.build(None, {"nnod": S})
+    assert isinstance(f, F.Forcing) and f.n_surf == S and f.ETp_nodes.shape == (T, S)
+    assert calls == [["ET_0-gf"], ["TP-DD"]]
+    # equivalence with the original inline formulas
+    common = np.intersect1d(t_rain, t_etp)
+    e = etp_mm[np.isin(t_etp, common)][:, :S] * 1e-3 / 86400
+    r = rain_mm[np.isin(t_rain, common)][:, :S] * 1e-3 / 86400
+    assert np.allclose(f.ETp_nodes, e) and np.allclose(f.rain_nodes, r)
+    assert np.allclose(f.net_flux, (r - e).mean(axis=1))
+    assert list(f.t_atmbc) == [0, 86400, 2 * 86400, 3 * 86400, 4 * 86400] and len(f.valid_times) == T
+    # ERA5 provider
+    times = pd.date_range("2020-01-01", periods=4)
+    daily = xr.Dataset({"pev": ("valid_time", [-1., -2, -3, -4]), "tp": ("valid_time", [0., 1, 0, 2])},
+                       coords={"valid_time": times})
+    e5 = F.Era5Provider("ds", "gdf", lambda ds, g: daily)
+    f5 = e5.build()
+    assert f5.ETp_nodes is None and f5.n_surf is None and not f5.is_etp
+    assert np.allclose(f5.net_flux, [-1, -1, -3, -2]) and list(f5.t_atmbc) == [0, 86400, 172800, 259200]
+    assert e5.daily_ts is daily
+    try:
+        F.ForcingProvider().build(None, None); raise AssertionError("abstract build must raise")
+    except NotImplementedError:
+        pass
+
+
 def test_agramon_monthly_readers():
     import types, datetime as dtm
     import pandas as pd

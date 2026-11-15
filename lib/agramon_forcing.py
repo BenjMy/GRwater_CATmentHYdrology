@@ -361,3 +361,67 @@ class Forcing:
     @property
     def n_steps(self) -> int:
         return len(self.t_atmbc)
+
+
+# ── Forcing providers (REFACTORING.md 3.1) ────────────────────────────────────
+# One object per forcing mode, all exposing ``build(ds_mesh, grid3d) -> Forcing``.
+# The computations are moved verbatim out of ``build_atmbc``; provenance logging
+# and diagnostics stay with the caller.
+
+class ForcingProvider:
+    """Interface: build the run's :class:`Forcing` for a given mesh."""
+    name = "abstract"
+
+    def build(self, ds_mesh, grid3d) -> "Forcing":
+        raise NotImplementedError
+
+
+class EtpGridProvider(ForcingProvider):
+    """
+    Gridded ET0 + rain (``--forcing etp``) or a CSV ETp series broadcast to a grid
+    (``--forcing etp_ts``): both are mapped to the mesh surface nodes and converted
+    mm/day -> m/s.  ``map_fn(ds_src, ds_mesh, variables=[...])`` is injected
+    (``mesh_tools.map_grid_to_mesh``) so this module stays light to import.
+    """
+    name = "etp"
+
+    def __init__(self, ds_etp, ds_rain, map_fn):
+        self.ds_etp, self.ds_rain, self.map_fn = ds_etp, ds_rain, map_fn
+
+    def build(self, ds_mesh, grid3d) -> "Forcing":
+        # `simu.grid3d` can be stale; the freshly read `grid3d` dict matches THIS run's mesh.
+        n_surf = int(grid3d["nnod"])
+        ds_ETp_mapped  = self.map_fn(self.ds_etp,  ds_mesh, variables=["ET_0-gf"])
+        ds_rain_mapped = self.map_fn(self.ds_rain, ds_mesh, variables=["TP-DD"])
+        ds_ETp_surf  = ds_ETp_mapped.isel(node=slice(0, n_surf))
+        ds_rain_surf = ds_rain_mapped.isel(node=slice(0, n_surf))
+        common_time  = np.intersect1d(ds_rain_mapped.time, ds_ETp_mapped.time)
+        ds_ETp_surf  = ds_ETp_surf.sel(time=common_time)
+        ds_rain_surf = ds_rain_surf.sel(time=common_time)
+        # ETp / rain: mm/day -> m/s, shape (time, nodes)
+        ETp_nodes  = ds_ETp_surf["ET_0-gf"].values * 1e-3 / 86400
+        rain_nodes = ds_rain_surf["TP-DD"].values * 1e-3 / 86400
+        net_flux_1d = (rain_nodes - ETp_nodes).mean(axis=1)
+        t_atmbc = (common_time - common_time[0]) / np.timedelta64(1, "s")
+        return Forcing(ETp_nodes=ETp_nodes, rain_nodes=rain_nodes, net_flux=net_flux_1d,
+                       t_atmbc=t_atmbc, valid_times=common_time, n_surf=n_surf)
+
+
+class Era5Provider(ForcingProvider):
+    """ERA5 point series (legacy mode; ``daily_ts`` is kept for plotting)."""
+    name = "era5"
+
+    def __init__(self, ds_era5, gdf_point, extract_fn):
+        self.ds_era5, self.gdf_point, self.extract_fn = ds_era5, gdf_point, extract_fn
+        self.daily_ts = None
+
+    def build(self, ds_mesh=None, grid3d=None) -> "Forcing":
+        self.daily_ts = daily_ts = self.extract_fn(self.ds_era5, self.gdf_point)
+        _t0         = daily_ts["pev"].valid_time[0].values
+        valid_times = daily_ts["pev"].valid_time.values
+        # seconds since the first step (the legacy float(t - _t0) / 1e9 breaks on numpy>=2 timedeltas)
+        t_atmbc     = [float(x) for x in (valid_times - _t0) / np.timedelta64(1, "s")]
+        net_flux    = np.array(daily_ts["tp"]) + np.array(daily_ts["pev"])
+        return Forcing(ETp_nodes=None, rain_nodes=None, net_flux=net_flux,
+                       t_atmbc=t_atmbc, valid_times=valid_times, n_surf=None)
+

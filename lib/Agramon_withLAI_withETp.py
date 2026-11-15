@@ -109,6 +109,8 @@ from agramon_mesh import (  # noqa: F401  (moved, REFACTORING 2.3)
 from agramon_diagnostics import save_forcing_diagnostics  # noqa: F401  (moved, REFACTORING 2.6)
 from agramon_spinup import pick_default_spinup_year, run_spinup  # noqa: F401  (moved, 2.5)
 from agramon_forcing import (
+    EtpGridProvider,
+    Era5Provider,
     Forcing,
     build_etp_ds_from_timeseries,
     load_all,
@@ -843,40 +845,11 @@ def build_atmbc(args: argparse.Namespace, inp: RunInputs,
     })
 
     if fm.use_etp:
-        # ── Map ETp and rain to mesh surface nodes ────────────
-        # FIX: `simu.grid3d` can be stale (only updated as a side effect of
-        # certain internal calls, not by read_outputs()). Use the `grid3d`
-        # dict we just freshly read a few lines above instead, so n_surf
-        # matches the mesh actually built for THIS run.
-        n_surf = int(grid3d["nnod"])
-
-        ds_ETp_mapped  = mt.map_grid_to_mesh(ds_etp,  ds_mesh, variables=["ET_0-gf"])
-        ds_rain_mapped = mt.map_grid_to_mesh(ds_rain, ds_mesh, variables=["TP-DD"])
-
-        # Restrict to surface nodes only
-        ds_ETp_surf  = ds_ETp_mapped.isel( node=slice(0, n_surf))
-        ds_rain_surf = ds_rain_mapped.isel(node=slice(0, n_surf))
-
-        # Align on common time axis
-        common_time  = np.intersect1d(ds_rain_mapped.time, ds_ETp_mapped.time)
-        ds_ETp_surf  = ds_ETp_surf.sel(time=common_time)
-        ds_rain_surf = ds_rain_surf.sel(time=common_time)
-
-        # Unit conversions: ETp mm/day → m/s (negative = loss);  rain mm/day → m/s
-        ETp_nodes  = ds_ETp_surf["ET_0-gf"].values  * 1e-3 / 86400   # (time, nodes)
-        rain_nodes = ds_rain_surf["TP-DD"].values   * 1e-3 / 86400   # (time, nodes)
-
-        # Net flux per node (positive = input to soil)
-        net_flux_2d = rain_nodes - ETp_nodes                          # (time, nodes)
-        # net_flux_2d = - ETp_nodes                          # (time, nodes)
-
-        # Scalar mean over nodes for ATMBC scalar mode
-        net_flux_1d = net_flux_2d.mean(axis=1)                        # (time,)
-
-        # Reference time: first common time step
-        t0          = common_time[0]
-        t_atmbc     = (common_time - t0) / np.timedelta64(1, "s")    # seconds
-        valid_times = common_time
+        # Map ETp / rain to the mesh surface nodes, mm/day -> m/s (EtpGridProvider, 3.1)
+        f = EtpGridProvider(ds_etp, ds_rain, mt.map_grid_to_mesh).build(ds_mesh, grid3d)
+        n_surf, ETp_nodes, rain_nodes = f.n_surf, f.ETp_nodes, f.rain_nodes
+        net_flux_1d, t_atmbc, valid_times = f.net_flux, f.t_atmbc, f.valid_times
+        net_flux_2d = rain_nodes - ETp_nodes                          # (time, nodes), for diagnostics
 
         log.info(f"  ATMBC steps (ETp) : {len(t_atmbc)}  |  flux range : "
               f"[{net_flux_1d.min():.2e}, {net_flux_1d.max():.2e}] m/s")
@@ -947,7 +920,9 @@ def build_atmbc(args: argparse.Namespace, inp: RunInputs,
 
     else:
         # ── ERA5 point time-series ────────────────────────────
-        daily_ts = AgUtils.extract_point_timeseries(ds_era5, gdf_Agramon)
+        prov = Era5Provider(ds_era5, gdf_Agramon, AgUtils.extract_point_timeseries)
+        f = prov.build()
+        daily_ts = prov.daily_ts
         if show_plots:
             pev_series = daily_ts["pev"].to_series()
             tp_series  = daily_ts["tp"].to_series()
@@ -961,10 +936,7 @@ def build_atmbc(args: argparse.Namespace, inp: RunInputs,
             ax.legend()
             plt.tight_layout()
 
-        _t0         = daily_ts["pev"].valid_time[0].values
-        valid_times = daily_ts["pev"].valid_time.values
-        t_atmbc     = [(float(t - _t0) / 1e9) for t in valid_times]  # ns → s
-        net_flux    = np.array(daily_ts["tp"]) + np.array(daily_ts["pev"])
+        valid_times, t_atmbc, net_flux = f.valid_times, f.t_atmbc, f.net_flux
         log.info(f"  ATMBC steps (ERA5) : {len(t_atmbc)}  |  flux range : "
               f"[{net_flux.min():.2e}, {net_flux.max():.2e}] m")
         md_log.meta({
