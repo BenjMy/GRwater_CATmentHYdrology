@@ -108,6 +108,7 @@ from agramon_mesh import (  # noqa: F401  (moved, REFACTORING 2.3)
 )
 from agramon_diagnostics import save_forcing_diagnostics  # noqa: F401  (moved, REFACTORING 2.6)
 from agramon_spinup import pick_default_spinup_year, run_spinup  # noqa: F401  (moved, 2.5)
+from agramon_backend import get_backend, BACKENDS
 from agramon_forcing import (
     EtpGridProvider,
     Era5Provider,
@@ -343,6 +344,8 @@ def _parse_args() -> argparse.Namespace:
                     help="Console/log verbosity (default INFO = same output as before)")
     lg.add_argument("--log-to-file", default=None, metavar="PATH",
                     help="Also write timestamped log records to this file")
+    dem.add_argument("--cathy-backend", choices=BACKENDS, default="scf_lai",
+                     help="CATHY build/run backend (REFACTORING 3.2); only scf_lai exists")
     dem.add_argument("--mesh-props", action="store_true",
                      help="Each month, write soil (PERMX, POROS, ...) and root "
                           "(ZROOT, root_zone, root_beta) node properties onto the "
@@ -750,7 +753,8 @@ def setup_mesh_and_dem(args: argparse.Namespace, inp: RunInputs) -> MeshSetup:
     # ── 6. Initialise CATHY project ───────────────────────────
     log.info("\n[5/9] Initialising CATHY project …")
     simu = initialise_project(args.path2prj, args.start_year, args.end_year,
-                              args.zroot, args.pmin, scenario_dirname)
+                              args.zroot, args.pmin, scenario_dirname,
+                              backend=args.cathy_backend)
 
     # ── 7. DEM → mesh ─────────────────────────────────────────
     log.info("\n[6/9] Feeding DEM into CATHY and building VTK mesh …")
@@ -1373,14 +1377,8 @@ def run_one_month(args, inp, ms, atm, st, ks_cfg, dt, lai_2d,
     # MAXVEG already fixed to N_VEG_CLASSES once before the loop; no
     # need to re-set it (to a mismatched value of 10) every month.
 
-    simu.run_processor(
-        IPRT1=2,
-        DTMIN=args.dtmin,
-        DTMAX=args.dtmax,
-        DELTAT=args.deltat,
-        TRAFLAG=0,
-        verbose=False,
-    )
+    get_backend(getattr(args, "cathy_backend", "scf_lai")).run_month(
+        simu, args.dtmin, args.dtmax, args.deltat)
 
     month_stats = {"month": f"{dt:%Y-%m}"}
     if permx_month is not None:

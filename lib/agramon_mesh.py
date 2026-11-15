@@ -200,11 +200,13 @@ def count_valid_dem_pixels(raster_DEM_masked, nodata: float = -9999.0) -> int:
 
 
 def initialise_project(path2prj: str, start_year: int, end_year: int,
-                       zroot: float, pmin: float, scenario_dirname: str):
+                       zroot: float, pmin: float, scenario_dirname: str,
+                       backend: str = "scf_lai"):
     """Create and return the CATHY project object inside a sim-specific folder."""
+    from agramon_backend import get_backend
     sim_dir = Path(path2prj) / scenario_dirname
     sim_dir.mkdir(parents=True, exist_ok=True)
-    simu = cathy_tools.CATHY(dirName=str(sim_dir))
+    simu = get_backend(backend).create_simu(sim_dir)
     log.info(f"  Working directory  : {sim_dir}")
     return simu
 

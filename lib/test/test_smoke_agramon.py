@@ -499,7 +499,7 @@ def test_run_one_month_split():
     assert b.psi_records == [] and a.active_zones_prev is None   # no shared mutable defaults
     loop = inspect.getsource(A.run_monthly_loop)
     assert "run_one_month(" in loop and "run_processor" not in loop
-    assert "run_processor" in inspect.getsource(A.run_one_month)
+    assert "run_month(" in inspect.getsource(A.run_one_month)      # processor call goes through the backend (3.2)
     assert len(loop.splitlines()) < 150, len(loop.splitlines())
 
 
@@ -580,6 +580,28 @@ def test_forcing_providers():
         F.ForcingProvider().build(None, None); raise AssertionError("abstract build must raise")
     except NotImplementedError:
         pass
+
+
+def test_cathy_backend():
+    import types
+    import agramon_backend as B
+    b = B.get_backend()
+    assert isinstance(b, B.ScfLaiBackend) and b.name == "scf_lai" and B.BACKENDS == ("scf_lai",)
+    seen = {}
+    simu = types.SimpleNamespace(run_processor=lambda **kw: seen.update(kw))
+    b.run_month(simu, 1e-3, 100.0, 5.0)
+    assert seen == {"IPRT1": 2, "DTMIN": 1e-3, "DTMAX": 100.0, "DELTAT": 5.0, "TRAFLAG": 0, "verbose": False}
+    for bad, exc in (("with_irr", NotImplementedError), ("nope", ValueError)):
+        try:
+            B.get_backend(bad); raise AssertionError(bad)
+        except exc:
+            pass
+    import sys, Agramon_withLAI_withETp as A
+    old = sys.argv; sys.argv = ["x", "--cathy-backend", "scf_lai"]
+    try:
+        assert A._parse_args().cathy_backend == "scf_lai"
+    finally:
+        sys.argv = old
 
 
 def test_agramon_monthly_readers():
