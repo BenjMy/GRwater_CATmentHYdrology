@@ -1133,6 +1133,106 @@ def ks_cfg_fire_date(args):
     return getattr(args, "ks_fire_date", None) or FIRE_DATE_DEFAULT
 
 
+def write_etp_forcing(fm, ETp_nodes, valid_times, out_dir) -> None:
+    """Persist the per-node ETp forcing driving ATMBC (moved verbatim from run_monthly_loop)."""
+    if fm.use_etp and ETp_nodes is not None:
+        etp_out_path = out_dir / "etp_output.nc"
+        xr.DataArray(
+            ETp_nodes,
+            dims=["datetime", "node"],
+            coords={"datetime": valid_times, "node": np.arange(ETp_nodes.shape[1])},
+            name="ETp",
+            attrs={
+                "units": "m/s",
+                "description": (
+                    "Potential ET forcing per surface node, as mapped from "
+                    + ("the uniform CSV ETp time series" if fm.use_etp_ts
+                       else "the satellite ET0 raster")
+                    + " onto the mesh (node index "
+                    "matches the first n_surf rows of grid3d['mesh3d_nodes'])."
+                ),
+            },
+        ).to_netcdf(etp_out_path)
+        log.info(f"  ETp forcing saved -> {etp_out_path}")
+
+
+def refresh_mesh_mapping(simu, fm, ds_etp, ds_rain, raster_DEM_masked,
+                         n_surf, ds_mesh, ETp_nodes, rain_nodes):
+    """
+    Rebuild the mesh and the per-node ETp/rain mapping against the grid the
+    preprocessor really finalized (moved verbatim from run_monthly_loop, 12.6).
+    Returns (grid3d, n_surf, ds_mesh, ETp_nodes, rain_nodes).
+    """
+    simu.create_mesh_vtk(verbose=True)
+    grid3d = simu.read_outputs("grid3d")
+    n_surf_real = int(grid3d["nnod"])
+
+    if fm.use_etp and n_surf_real != n_surf:
+        log.info(f"  Refreshing ETp/rain node mapping: n_surf "
+              f"{n_surf} → {n_surf_real} (grid finalized by "
+              f"preprocessor)")
+        n_surf = n_surf_real
+
+        ds_mesh = mt.build_mesh_dataset(
+            simu, raster_DEM_masked=raster_DEM_masked
+        )
+        ds_ETp_mapped  = mt.map_grid_to_mesh(
+            ds_etp,  ds_mesh, variables=["ET_0-gf"]
+        )
+        ds_rain_mapped = mt.map_grid_to_mesh(
+            ds_rain, ds_mesh, variables=["TP-DD"]
+        )
+
+        ds_ETp_surf  = ds_ETp_mapped.isel( node=slice(0, n_surf))
+        ds_rain_surf = ds_rain_mapped.isel(node=slice(0, n_surf))
+
+        common_time_refresh = np.intersect1d(
+            ds_rain_mapped.time, ds_ETp_mapped.time
+        )
+        ds_ETp_surf  = ds_ETp_surf.sel(time=common_time_refresh)
+        ds_rain_surf = ds_rain_surf.sel(time=common_time_refresh)
+
+        ETp_nodes  = ds_ETp_surf["ET_0-gf"].values * 1e-3 / 86400
+        rain_nodes = ds_rain_surf["TP-DD"].values  * 1e-3 / 86400
+
+        # NOTE: t_atmbc / net_flux (the scalar, spatially-averaged
+        # forcing already applied via update_atmbc for THIS month,
+        # a few lines above) are not retroactively corrected here —
+        # HSPATM=1 means CATHY only ever saw their spatial mean, so
+        # this refresh mainly fixes the per-node ETp_nodes/
+        # rain_nodes arrays used by the ETa/recharge sanity checks
+        # from this month onward, plus (critically) the mesh used
+        # by update_ic below.
+    return grid3d, n_surf, ds_mesh, ETp_nodes, rain_nodes
+
+
+def save_run_figures(stats_records, args, scenario_dirname, out_dir) -> None:
+    """Run-summary and water-balance figures, never fatal (moved verbatim from run_monthly_loop)."""
+    # Run-summary figure (ETa, SW, psi, recharge, solver flags) — never fatal
+    try:
+        import pandas as pd_
+        from plot_hypotheses import plot_run_summary
+        fig_ = plot_run_summary(pd_.DataFrame(stats_records), ks_cfg_fire_date(args),
+                                title=f"Run summary — {scenario_dirname}",
+                                out=str(out_dir / "run_summary.png"))
+        import matplotlib.pyplot as plt_
+        plt_.close(fig_)
+        log.info(f"run summary figure → {out_dir / 'run_summary.png'}")
+        st_ = pd_.DataFrame(stats_records)
+        if {"month", "rain_in_mm", "eta_out_mm"} <= set(st_.columns):
+            from plot_hypotheses import plot_water_balance
+            wb_ = st_.set_index(pd_.to_datetime(st_["month"].astype(str)))[
+                [c for c in ("rain_in_mm", "eta_out_mm", "recharge_out_mm") if c in st_.columns]
+            ].rename(columns={"rain_in_mm": "precip", "eta_out_mm": "eta",
+                              "recharge_out_mm": "recharge"})
+            plt_.close(plot_water_balance(
+                wb_, out=str(out_dir / "water_balance.png"),
+                title="Monthly flux balance (excludes storage change)"))
+            log.info(f"water balance figure → {out_dir / 'water_balance.png'}")
+    except Exception as exc:
+        log.warning(f"  Warning: could not draw the run summary figure ({exc})")
+
+
 def run_monthly_loop(args: argparse.Namespace, inp: RunInputs, ms: MeshSetup,
                      atm: AtmbcSetup, ks_cfg, ds_LAI_raster,
                      first_iteration: bool, spinup_done: bool) -> None:
@@ -1189,25 +1289,7 @@ def run_monthly_loop(args: argparse.Namespace, inp: RunInputs, ms: MeshSetup,
     # re-running the satellite-to-mesh mapping (mt.map_grid_to_mesh).
     # Only meaningful in the ETp-forcing branch — ERA5-forced runs never
     # build a per-node ETp array.
-    if fm.use_etp and ETp_nodes is not None:
-        etp_out_path = out_dir / "etp_output.nc"
-        xr.DataArray(
-            ETp_nodes,
-            dims=["datetime", "node"],
-            coords={"datetime": valid_times, "node": np.arange(ETp_nodes.shape[1])},
-            name="ETp",
-            attrs={
-                "units": "m/s",
-                "description": (
-                    "Potential ET forcing per surface node, as mapped from "
-                    + ("the uniform CSV ETp time series" if fm.use_etp_ts
-                       else "the satellite ET0 raster")
-                    + " onto the mesh (node index "
-                    "matches the first n_surf rows of grid3d['mesh3d_nodes'])."
-                ),
-            },
-        ).to_netcdf(etp_out_path)
-        log.info(f"  ETp forcing saved -> {etp_out_path}")
+    write_etp_forcing(fm, ETp_nodes, valid_times, out_dir)
 
     # Per-month outputs are written here as soon as each month finishes,
     # so a crash mid-run still leaves usable files on disk instead of
@@ -1315,46 +1397,9 @@ def run_monthly_loop(args: argparse.Namespace, inp: RunInputs, ms: MeshSetup,
             #      bounds" warnings later when reading real ETa/recharge
             #      output (which is indexed on the true, larger grid).
             # Refresh both against the grid this run is actually using.
-            simu.create_mesh_vtk(verbose=True)
-            grid3d = simu.read_outputs("grid3d")
-            n_surf_real = int(grid3d["nnod"])
-
-            if fm.use_etp and n_surf_real != n_surf:
-                log.info(f"  Refreshing ETp/rain node mapping: n_surf "
-                      f"{n_surf} → {n_surf_real} (grid finalized by "
-                      f"preprocessor)")
-                n_surf = n_surf_real
-
-                ds_mesh = mt.build_mesh_dataset(
-                    simu, raster_DEM_masked=raster_DEM_masked
-                )
-                ds_ETp_mapped  = mt.map_grid_to_mesh(
-                    ds_etp,  ds_mesh, variables=["ET_0-gf"]
-                )
-                ds_rain_mapped = mt.map_grid_to_mesh(
-                    ds_rain, ds_mesh, variables=["TP-DD"]
-                )
-
-                ds_ETp_surf  = ds_ETp_mapped.isel( node=slice(0, n_surf))
-                ds_rain_surf = ds_rain_mapped.isel(node=slice(0, n_surf))
-
-                common_time_refresh = np.intersect1d(
-                    ds_rain_mapped.time, ds_ETp_mapped.time
-                )
-                ds_ETp_surf  = ds_ETp_surf.sel(time=common_time_refresh)
-                ds_rain_surf = ds_rain_surf.sel(time=common_time_refresh)
-
-                ETp_nodes  = ds_ETp_surf["ET_0-gf"].values * 1e-3 / 86400
-                rain_nodes = ds_rain_surf["TP-DD"].values  * 1e-3 / 86400
-
-                # NOTE: t_atmbc / net_flux (the scalar, spatially-averaged
-                # forcing already applied via update_atmbc for THIS month,
-                # a few lines above) are not retroactively corrected here —
-                # HSPATM=1 means CATHY only ever saw their spatial mean, so
-                # this refresh mainly fixes the per-node ETp_nodes/
-                # rain_nodes arrays used by the ETa/recharge sanity checks
-                # from this month onward, plus (critically) the mesh used
-                # by update_ic below.
+            grid3d, n_surf, ds_mesh, ETp_nodes, rain_nodes = refresh_mesh_mapping(
+                simu, fm, ds_etp, ds_rain, raster_DEM_masked,
+                n_surf, ds_mesh, ETp_nodes, rain_nodes)
 
 
 
@@ -1479,29 +1524,7 @@ def run_monthly_loop(args: argparse.Namespace, inp: RunInputs, ms: MeshSetup,
     )
     log.info(f"veg_map_history saved → {out_dir / 'veg_map_history.pkl'}")
 
-    # Run-summary figure (ETa, SW, psi, recharge, solver flags) — never fatal
-    try:
-        import pandas as pd_
-        from plot_hypotheses import plot_run_summary
-        fig_ = plot_run_summary(pd_.DataFrame(stats_records), ks_cfg_fire_date(args),
-                                title=f"Run summary — {scenario_dirname}",
-                                out=str(out_dir / "run_summary.png"))
-        import matplotlib.pyplot as plt_
-        plt_.close(fig_)
-        log.info(f"run summary figure → {out_dir / 'run_summary.png'}")
-        st_ = pd_.DataFrame(stats_records)
-        if {"month", "rain_in_mm", "eta_out_mm"} <= set(st_.columns):
-            from plot_hypotheses import plot_water_balance
-            wb_ = st_.set_index(pd_.to_datetime(st_["month"].astype(str)))[
-                [c for c in ("rain_in_mm", "eta_out_mm", "recharge_out_mm") if c in st_.columns]
-            ].rename(columns={"rain_in_mm": "precip", "eta_out_mm": "eta",
-                              "recharge_out_mm": "recharge"})
-            plt_.close(plot_water_balance(
-                wb_, out=str(out_dir / "water_balance.png"),
-                title="Monthly flux balance (excludes storage change)"))
-            log.info(f"water balance figure → {out_dir / 'water_balance.png'}")
-    except Exception as exc:
-        log.warning(f"  Warning: could not draw the run summary figure ({exc})")
+    save_run_figures(stats_records, args, scenario_dirname, out_dir)
     if et_records:
         log.info(f"ET saved → {out_dir / 'et_output.nc'}")
     if psi_records:

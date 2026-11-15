@@ -420,6 +420,36 @@ def test_run_pipeline_split():
     assert "for dt, lai_2d in iter_monthly_lai" in inspect.getsource(A.run_monthly_loop)
 
 
+def test_monthly_loop_helpers():
+    import inspect, tempfile, types
+    import numpy as np, pandas as pd
+    from pathlib import Path
+    import Agramon_withLAI_withETp as A
+    assert list(inspect.signature(A.refresh_mesh_mapping).parameters) == [
+        "simu", "fm", "ds_etp", "ds_rain", "raster_DEM_masked",
+        "n_surf", "ds_mesh", "ETp_nodes", "rain_nodes"]
+    src = inspect.getsource(A.run_monthly_loop)
+    for call in ("write_etp_forcing(", "refresh_mesh_mapping(", "save_run_figures("):
+        assert call in src, call
+    assert "simu.create_mesh_vtk(" not in src and "plot_run_summary(" not in src
+    # write_etp_forcing: no-op without ETp, writes a (datetime, node) file otherwise
+    with tempfile.TemporaryDirectory() as d:
+        fm = types.SimpleNamespace(use_etp=True, use_etp_ts=True)
+        A.write_etp_forcing(types.SimpleNamespace(use_etp=False, use_etp_ts=False), None, None, Path(d))
+        assert not (Path(d) / "etp_output.nc").exists()
+        times = pd.date_range("2020-01-01", periods=3)
+        A.write_etp_forcing(fm, np.ones((3, 4)) * 1e-8, times, Path(d))
+        assert (Path(d) / "etp_output.nc").exists()
+        # save_run_figures must never raise, even with empty stats
+        A.save_run_figures([], types.SimpleNamespace(), "x", Path(d))
+        # refresh_mesh_mapping: when n_surf already matches, inputs are returned untouched
+        simu = types.SimpleNamespace(create_mesh_vtk=lambda verbose=True: None,
+                                     read_outputs=lambda k: {"nnod": 4})
+        e, r = np.zeros((3, 4)), np.ones((3, 4))
+        g, n, dm, e2, r2 = A.refresh_mesh_mapping(simu, fm, None, None, None, 4, "dsm", e, r)
+        assert n == 4 and dm == "dsm" and e2 is e and r2 is r and g["nnod"] == 4
+
+
 def test_agramon_monthly_readers():
     import types, datetime as dtm
     import pandas as pd
