@@ -165,6 +165,8 @@ Note: some variables lack units/names (`TP-DD`, `LW-IN`, `VZA`, `SZA`); the dms 
 
 **Idea.** Use the **`withIrr` pyCATHY wrapper**: rain through the **irrigation map file** (surface water source), ATMBC carrying **ETp only**. Rain is no longer netted against ETp, so CATHY computes ETa against the full ETp daily and the artefact (and the patch) should disappear.
 
+**Finding (2026-11-15, read from `CATHY_src_WithIrrigation/code/atmone.f` + `IRR_CBLOCK.H`).** In that build irrigation is **not** a separate surface source: at each step `ATMPOT(I) = ATMPOT(I) + IRR_NNOD(I)*ARENOD(I)` is applied (only where `SW(I) < IRR_SW`) to the *same* nodal atmospheric array that carries the BC input, before the rainfall/ET partitioning and BC switching. So `ATMBC = -ETp` plus rain via the irrigation file gives the same net `ATMPOT` as `rain - ETp` today, and the reported `ACT. ETRA` should collapse in the same way. Consequences: (1) the trick probably does **not** remove the artefact; (2) irrigation input is a raster map with piecewise-constant rates in L/T read from unit IINDEM12 (`IRR_FLAG`, `IRR_SW`, `IRR_HT`, `IRR_HS`) and only works in DEM-input mode; pyCATHY currently only knows `withIrr` as a file-format version (no irrigation writer). Not yet confirmed by a run (only `atmone.f` read; `atmnxt.f` / `atmbak.f` and the ETRA bookkeeping not checked). **Decision for the author:** run the A/B anyway (needs an irrigation-file writer in pyCATHY), or drop §5.2 and keep the floor, documenting it in the methods.
+
 **To verify:**
 - units and time-stepping of the irrigation map file vs the ATMBC time axis (rain is daily, m/s per surface node);
 - that irrigation-type rain behaves like rainfall (infiltration, ponding, runoff, ψmin/Feddes switching) and is treated the same in water-balance outputs (recharge, hydrograph stay comparable);
@@ -224,7 +226,7 @@ giving "'ic' has length N but the mesh has M points"), and the main script works
 - [x] ✅ Outlet/bottom flux BCs, IC modes, spin-up cycles
 - [x] ✅ Three forcing modes (`era5` deprecated, `etp`, `etp_ts` wet/dry)
 - [x] ✅ ETa net-forcing artefact floor (temporary patch)
-- [ ] ⬜ Rain via irrigation file with `withIrr` + A/B test (§5.2)
+- [ ] 🟡 Rain via irrigation file with `withIrr` + A/B test (§5.2): source reading suggests it will NOT separate rain from ETp (irrigation is added to the same `ATMPOT`); see the finding in §5.2, decision needed
 - [x] ✅ Self-describing scenario folders, skip-if-done, markdown + CSV run logs, batch runner
 - [x] ✅ Comparison against EO-EB ETa and treatments CSV; `etp_output.nc` + Camporese Fig. 8
 - [x] ✅ Post-fire Ks equations and presets in `ks_fire_utils.py`
@@ -305,6 +307,7 @@ giving "'ic' has length N but the mesh has M points"), and the main script works
 - 2026-11-14: §5.4: `map_soil_root_to_mesh` got an explicit `origin` (map row order; default 'upper' = CATHY files) because the Agramon rasters use 'lower' in `build_mesh_dataset`; to check against a real run. Found that the `~isinstance` and stale-cache bugs are already fixed in pyCATHY (tracker updated).
 - 2026-11-14: §4 first step: `lib/recovery_metrics.py` (burned/control ratio, recovery time, deficit, table) + test. Thresholds are placeholders for the author to choose.
 - 2026-11-15: figures: new `lib/plot_hypotheses.py` (`plot_run_summary` written automatically as `run_summary.png` at the end of each run; `plot_validation_panel` with bias/RMSE/r/NSE/KGE; `plot_water_balance`; `plot_recovery_panels` burned vs control + recovery time). Tested with synthetic data only; the author asked not to run the pipeline with ERA5 forcing, so nothing was run with real data. `agramon_runlog` now falls back to a local CSV logger when the private `geoutils` is missing.
+- 2026-11-15: §5.2 withIrr: read the CATHY withIrrigation Fortran; irrigation is added to ATMPOT (the same net array), so the trick likely does not remove the ETa artefact; nothing implemented, decision requested. Also `analysis_ET_compare` got Fig I (validation panel).
 - 2026-11-13: §3.1 implemented (see ticks); only "new study: different DEM slopes" remains. Checked: py_compile, `--smoke-test`, comparison rebuilt on committed dry runs. Not checked: full CATHY runs (`--quick`, `--wet`).
 
 ## 10. References to cite
