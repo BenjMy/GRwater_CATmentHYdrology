@@ -49,7 +49,9 @@ Calls `withLAI_results.py` (maps, hydro, monthly) and `analysis_ET_compare.py` (
 
 Standalone figure script: `python plot_fig8_ETa_ETp_vs_psi.py -h` (Fig. 8, ETa/ETp vs psi). `plot_eta.py`, `plot_maps.py`, `plot_monthly.py` are libraries used by `withLAI_results.py`, not CLIs.
 
-## B. Post-fire Ks scenarios, real data
+## B. Post-fire Ks curves (theory, no run needed)
+
+`plot_ks_scenarios.py` reads **no simulation output**: it only draws the Ks(t) equations (`ks_fire_utils`) for the dates you give, so it is not part of A3 (which post-processes finished runs). Use it to choose/justify the scenarios before running them.
 
 ```bash
 python plot_ks_scenarios.py --fire-date <YYYY-MM-DD> --start <YYYY-MM-DD> --end <YYYY-MM-DD> --out ks_scenarios.png
