@@ -556,6 +556,59 @@ def test_recovery_metrics():
             raise AssertionError("bad input accepted")
 
 
+def test_plot_hypotheses():
+    import os, tempfile
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    import numpy as np
+    import pandas as pd
+    import plot_hypotheses as H
+    d = tempfile.mkdtemp()
+    # skill: perfect, biased, degenerate
+    s = pd.Series(np.arange(10.0)); sk = H.skill_metrics(s, s)
+    assert sk["rmse"] == 0 and all(np.isclose(sk[k], 1) for k in ("r", "nse", "kge")), sk
+    sk = H.skill_metrics(s + 1, s)
+    assert np.isclose(sk["bias"], 1) and np.isclose(sk["rmse"], 1) and sk["r"] > 0.999
+    assert np.isnan(H.skill_metrics(pd.Series([1.0]), pd.Series([1.0]))["rmse"])
+    assert np.isnan(H.skill_metrics(pd.Series([1.0, 1.0, 1.0]), pd.Series([1.0, 2.0, 3.0]))["r"])
+    # run summary (+ missing columns tolerated, solver flag marker)
+    st = pd.DataFrame({"month": ["2020-01", "2020-02", "2020-03"], "eta_mean": [1.0, 2.0, 1.5],
+                       "psi_mean": [-3, -4, -5], "solver_status": ["✓ OK", "⚠ not converged (1 < 2)", "✓ OK"]})
+    f = H.plot_run_summary(st, "2020-02-01", out=os.path.join(d, "rs.png"))
+    assert os.path.getsize(os.path.join(d, "rs.png")) > 1000 and len(f.axes) == 2
+    for bad in (pd.DataFrame({"x": [1]}), pd.DataFrame({"month": ["2020-01"]})):
+        try:
+            H.plot_run_summary(bad)
+        except ValueError:
+            pass
+        else:
+            raise AssertionError("bad stats accepted")
+    # validation panel
+    idx = pd.date_range("2020-01-01", periods=60, freq="D")
+    obs = pd.Series(np.sin(np.arange(60) / 8) + 2, index=idx)
+    f = H.plot_validation_panel(obs * 1.1 + 0.2, obs, out=os.path.join(d, "val.png"))
+    assert len(f.axes) == 3
+    try:
+        H.plot_validation_panel(obs, obs.shift(1000).dropna())
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("empty overlap accepted")
+    # water balance
+    mi = pd.date_range("2020-01-31", periods=6, freq="ME")
+    wb = pd.DataFrame({"precip": [50, 40, 30, 10, 5, 0.0], "eta": [20, 25, 30, 20, 10, 5.0],
+                       "recharge": [5, 5, 2, 0, 0, 0.0]}, index=mi)
+    f = H.plot_water_balance(wb, out=os.path.join(d, "wb.png")); assert len(f.axes) == 1
+    # recovery panels
+    ic = pd.date_range("2020-01-31", periods=12, freq="ME")
+    ctrl = pd.DataFrame({"LAI": 1.0, "ETa": 2.0}, index=ic)
+    burn = ctrl * pd.Series([1.0] * 6 + [0.4, 0.5, 0.7, 0.92, 0.95, 1.0], index=ic).to_numpy()[:, None]
+    f = H.plot_recovery_panels(burn, ctrl, "2020-07-01", out=os.path.join(d, "rec.png"))
+    assert len(f.axes) == 4 and "recovered after 3 months" in f.axes[1].get_title()
+    plt.close("all")
+
+
 if __name__ == "__main__":
     for name, fn in sorted(globals().items()):
         if name.startswith("test_") and callable(fn):

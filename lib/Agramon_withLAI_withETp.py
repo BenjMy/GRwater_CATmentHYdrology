@@ -1128,6 +1128,11 @@ def configure_model(args: argparse.Namespace, inp: RunInputs, ms: MeshSetup,
                       first_iteration=first_iteration, spinup_done=spinup_done)
 
 
+def ks_cfg_fire_date(args):
+    """Fire date used for the figures (``--ks-fire-date``, default 2020-07-01)."""
+    return getattr(args, "ks_fire_date", None) or FIRE_DATE_DEFAULT
+
+
 def run_monthly_loop(args: argparse.Namespace, inp: RunInputs, ms: MeshSetup,
                      atm: AtmbcSetup, ks_cfg, ds_LAI_raster,
                      first_iteration: bool, spinup_done: bool) -> None:
@@ -1473,6 +1478,19 @@ def run_monthly_loop(args: argparse.Namespace, inp: RunInputs, ms: MeshSetup,
         all_hgraph_recs, M, N,
     )
     log.info(f"veg_map_history saved → {out_dir / 'veg_map_history.pkl'}")
+
+    # Run-summary figure (ETa, SW, psi, recharge, solver flags) — never fatal
+    try:
+        import pandas as pd_
+        from plot_hypotheses import plot_run_summary
+        fig_ = plot_run_summary(pd_.DataFrame(stats_records), ks_cfg_fire_date(args),
+                                title=f"Run summary — {scenario_dirname}",
+                                out=str(out_dir / "run_summary.png"))
+        import matplotlib.pyplot as plt_
+        plt_.close(fig_)
+        log.info(f"run summary figure → {out_dir / 'run_summary.png'}")
+    except Exception as exc:
+        log.warning(f"  Warning: could not draw the run summary figure ({exc})")
     if et_records:
         log.info(f"ET saved → {out_dir / 'et_output.nc'}")
     if psi_records:

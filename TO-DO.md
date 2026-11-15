@@ -304,6 +304,7 @@ giving "'ic' has length N but the mesh has M points"), and the main script works
 - 2026-11-14: REFACTORING 2.10 done: `agramon_log.py`; prints in agramon_* + main script converted to `log.*` (stdout output unchanged by default, warnings/errors now real levels); new `--log-level` / `--log-file`.
 - 2026-11-14: §5.4: `map_soil_root_to_mesh` got an explicit `origin` (map row order; default 'upper' = CATHY files) because the Agramon rasters use 'lower' in `build_mesh_dataset`; to check against a real run. Found that the `~isinstance` and stale-cache bugs are already fixed in pyCATHY (tracker updated).
 - 2026-11-14: §4 first step: `lib/recovery_metrics.py` (burned/control ratio, recovery time, deficit, table) + test. Thresholds are placeholders for the author to choose.
+- 2026-11-15: figures: new `lib/plot_hypotheses.py` (`plot_run_summary` written automatically as `run_summary.png` at the end of each run; `plot_validation_panel` with bias/RMSE/r/NSE/KGE; `plot_water_balance`; `plot_recovery_panels` burned vs control + recovery time). Tested with synthetic data only; the author asked not to run the pipeline with ERA5 forcing, so nothing was run with real data. `agramon_runlog` now falls back to a local CSV logger when the private `geoutils` is missing.
 - 2026-11-13: §3.1 implemented (see ticks); only "new study: different DEM slopes" remains. Checked: py_compile, `--smoke-test`, comparison rebuilt on committed dry runs. Not checked: full CATHY runs (`--quick`, `--wet`).
 
 ## 10. References to cite

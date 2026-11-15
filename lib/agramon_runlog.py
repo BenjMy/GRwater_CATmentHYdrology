@@ -16,10 +16,33 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from geoutils import uCATHY
 from agramon_log import get_logger
 
 log = get_logger(__name__)
+
+try:
+    from geoutils import uCATHY      # private package (author's machine)
+except ImportError:                  # fallback so the pipeline also runs elsewhere
+    uCATHY = None
+
+
+def _fallback_log_simulation(log_path, params) -> int:
+    """
+    Minimal stand-in for ``geoutils.uCATHY.log_simulation``: append one row
+    (``sim_index`` first) to the CSV at ``log_path`` and return the new
+    sim_index (previous max + 1, starting at 0). The CSV keeps the union of
+    old and new columns.
+    """
+    path = Path(log_path)
+    if path.exists() and path.stat().st_size > 0:
+        df = pd.read_csv(path)
+        idx = int(df["sim_index"].max()) + 1 if "sim_index" in df.columns and len(df) else len(df)
+    else:
+        df, idx = pd.DataFrame(), 0
+    row = pd.DataFrame([{"sim_index": idx, **params}])
+    path.parent.mkdir(parents=True, exist_ok=True)
+    pd.concat([df, row], ignore_index=True).to_csv(path, index=False)
+    return idx
 
 
 class MarkdownLog:
@@ -193,7 +216,10 @@ def log_simulation(log_path: Path, start_year: int, end_year: int,
         # existed were all static-Ks runs, i.e. an empty value means "off"
         "ks_fire":           ks_fire,
     }
-    sim_index = uCATHY.log_simulation(log_path, params)
+    if uCATHY is not None:
+        sim_index = uCATHY.log_simulation(log_path, params)
+    else:
+        sim_index = _fallback_log_simulation(log_path, params)
     log.info(f"  sim_index = {sim_index}  (withLAI={with_lai})")
     return sim_index
 
