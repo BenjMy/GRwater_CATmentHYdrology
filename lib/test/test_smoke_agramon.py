@@ -675,6 +675,30 @@ def test_plot_ks_scenarios():
     plt.close("all")
 
 
+def test_cmp_eta_variants():
+    import sys, tempfile
+    from pathlib import Path
+    import matplotlib
+    matplotlib.use("Agg")
+    import pandas as pd
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "synthetic_LAI_Ks"))
+    import synthetic_ksfire_analysis as SA
+    idx = pd.date_range("2020-01-01", periods=6, freq="MS")
+    mon = pd.DataFrame({"etp_mm": 100.0, "eta_mm": 100.0, "eta_gross_mm": [60, 50, 40, 30, 30, 40.0],
+                        "eta_raw_mm": [10.0] * 6}, index=idx)
+    runs = {"a": {"mon": mon}, "b": {"mon": mon.drop(columns="eta_gross_mm")}}
+    out = Path(tempfile.mkdtemp())
+    SA.cmp_eta_variants(runs, {"a": {}, "b": {}}, "2020-03-01", out, 80)
+    assert (out / "fig_cmp_eta_variants.png").stat().st_size > 1000
+    try:
+        SA.cmp_eta_variants({"b": runs["b"]}, {"b": {}}, None, out, 80)
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("runs without eta_gross_mm accepted")
+    assert SA.diagnose_eta_vs_etp({"a": {"mon": mon}}) == ["a"]
+
+
 if __name__ == "__main__":
     for name, fn in sorted(globals().items()):
         if name.startswith("test_") and callable(fn):

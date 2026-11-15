@@ -112,6 +112,11 @@ def build_timeseries(psi_xr, sw_xr, et_xr, rech_xr, grid3d, *, et_var, et_scale,
     """Daily full-area-mean table + info dict (depths really used, recharge var)."""
     cols, info = {}, {}
     cols["eta_mm_d"] = _area_mean_surface(et_xr, et_var, et_scale)
+    # unpatched / soil-limited variants (present in runs made after 2026-11-15):
+    # raw = ACT. ETRA as CATHY reports it (net of rain), gross = min(ETp, raw + rain)
+    for name, var in (("eta_raw_mm_d", "ACT. ETRA"), ("eta_gross_mm_d", "ACT. ETRA_gross")):
+        if var in et_xr.data_vars:
+            cols[name] = _area_mean_surface(et_xr, var, et_scale)
     if rech_xr is not None:
         rv = pick_recharge_var(rech_xr, rech_var)
         info["rech_var"] = rv
@@ -144,7 +149,7 @@ def monthly_table(ts: pd.DataFrame) -> pd.DataFrame:
     """Monthly means (mm/d) and totals (mm) of the daily full-area means."""
     m = ts.resample("MS").mean()
     dim = m.index.days_in_month.to_numpy()
-    for c in ("eta_mm_d", "recharge_mm_d", "rain_mm_d", "etp_mm_d"):
+    for c in ("eta_mm_d", "eta_raw_mm_d", "eta_gross_mm_d", "recharge_mm_d", "rain_mm_d", "etp_mm_d"):
         if c in m:
             m[c.replace("_mm_d", "_mm")] = m[c] * dim
     return m
@@ -418,6 +423,37 @@ def diagnose_eta_vs_etp(runs, tol=1e-3) -> list:
             if len(ratio) and (ratio.sub(1).abs() < tol).all():
                 flagged.append(lab)
     return flagged
+
+
+def cmp_eta_variants(runs, st, fire, out, dpi):
+    """
+    ETa as ``ETp-patched`` (the default output), ``gross`` (= min(ETp, raw + rain):
+    keeps soil-limited cells below ETp) and ``raw`` (ACT. ETRA as CATHY reports it,
+    i.e. net of rain), per scenario. The patched curve equals ETp by construction
+    wherever rain < ETp, so a gap between it and ``gross`` is water limitation
+    that the patch hides — and the only place where Ks/LAI can show an effect.
+    """
+    plt = _plt()
+    labs = [lab for lab, r in runs.items() if "eta_gross_mm" in r["mon"]]
+    if not labs:
+        raise ValueError("no run has eta_gross_mm (made before 2026-11-15): re-run to get it")
+    fig, axes = plt.subplots(len(labs), 1, figsize=(11, 3.2 * len(labs)), sharex=True,
+                             squeeze=False, constrained_layout=True)
+    for ax, lab in zip(axes[:, 0], labs):
+        m = runs[lab]["mon"]
+        if "etp_mm" in m:
+            ax.plot(m.index, m["etp_mm"], ":", color="grey", label="ETp")
+        ax.plot(m.index, m["eta_mm"], "-o", ms=3, color="#d94801", label="ETa patched (default)")
+        ax.plot(m.index, m["eta_gross_mm"], "-o", ms=3, color="#1a9850", label="ETa gross (soil-limited)")
+        if "eta_raw_mm" in m:
+            ax.plot(m.index, m["eta_raw_mm"], "-", color="#4575b4", lw=1, label="ACT. ETRA raw (net of rain)")
+        _fire_line(ax, fire)
+        ax.set_ylabel("mm month⁻¹"); ax.set_title(lab, fontsize=9, loc="left")
+        ax.grid(True, ls="--", alpha=0.3); ax.legend(fontsize=7, ncol=4, loc="upper left")
+    axes[0, 0].set_title("ETa variants (patched vs soil-limited vs raw) — " + labs[0],
+                         fontsize=10, fontweight="bold", loc="left")
+    fig.savefig(out / "fig_cmp_eta_variants.png", dpi=dpi)
+    plt.close(fig)
 
 
 def cmp_atmospheric(runs, fire, out, dpi):
@@ -784,9 +820,11 @@ def compare_scenarios(root, out=None, exclude=(), fire_date=None, dpi=150) -> Pa
     flat = diagnose_eta_vs_etp(runs)
     if flat:
         print("  NOTE: ETa == ETp in every month for: " + ", ".join(flat) + "\n"
-              "        -> the soil never limits evaporation (too dry / ETa floor), so Ks cannot\n"
-              "           change ETa and scenario curves overlap. Try --wet or a larger --rain-scale.")
+              "        -> the PATCHED ETa equals ETp on every net<0 cell (--eta-net-neg-mode etp), so it\n"
+              "           cannot show water limitation, whatever the soil does. Check fig_cmp_eta_variants\n"
+              "           (gross = soil-limited ETa); use --eta-net-neg-mode gross for ETa-based conclusions.")
     for fn in (lambda: cmp_atmospheric(runs, fire, out, dpi),
+               lambda: cmp_eta_variants(runs, st, fire, out, dpi),
                lambda: cmp_monthly(runs, st, fire, out, dpi),
                lambda: cmp_cumulative(runs, ctrl, st, fire, out, dpi),
                lambda: cmp_delta(runs, ctrl, st, fire, out, dpi),

@@ -1370,9 +1370,13 @@ def run_pipeline(args: argparse.Namespace) -> None:
 
             def _et():
                 df = AG.add_datetime_col(simu.read_outputs("ET").copy(), dt)
+                df_g, _, _ = AG.apply_eta_artefact_floor(
+                    df, t_month, ETp_nodes, rain_nodes, idx_month, net_neg_mode="gross")
                 df, _, _ = AG.apply_eta_artefact_floor(
                     df, t_month, ETp_nodes, rain_nodes, idx_month,
                     net_neg_mode=args.eta_net_neg_mode)
+                # soil-limited variant, kept for interpretation: min(ETp, raw + rain)
+                df["ACT. ETRA_gross"] = df_g["ACT. ETRA_patched"].to_numpy()
                 x = df.set_index(["X", "Y", "datetime"]).to_xarray()
                 x = x.rio.set_spatial_dims(x_dim="X", y_dim="Y").rio.write_crs(SYN_CRS)
                 et_rec.append(x)
