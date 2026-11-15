@@ -345,12 +345,27 @@ def load_runs(root, exclude=()) -> dict:
 
 
 def matching_control(runs: dict) -> dict:
-    """label -> label of the mode-off run with the same number of layers (or None)."""
-    ctrl = {}
+    """
+    label -> label of its matching control (or None): the mode-off run with the same
+    number of layers AND the same unburned Ks (run_meta 'ks_unburned_mm_hr', 1 % tolerance),
+    so a preset's pre-fire baseline is not mistaken for a fire effect. Runs whose meta lacks
+    the unburned Ks (older runs) fall back to the first control with the same layers.
+    """
+    controls = {lab: r["meta"] for lab, r in runs.items() if r["meta"]["mode"] == "off"}
+    out = {}
     for lab, r in runs.items():
-        if r["meta"]["mode"] == "off":
-            ctrl.setdefault(bool(r["meta"]["two_layers"]), lab)
-    return {lab: ctrl.get(bool(r["meta"]["two_layers"])) for lab, r in runs.items()}
+        m = r["meta"]
+        same = [c for c, cm in controls.items() if bool(cm["two_layers"]) == bool(m["two_layers"])]
+        ks = m.get("ks_unburned_mm_hr")
+        pick = None
+        if ks:
+            pick = next((c for c in same if controls[c].get("ks_unburned_mm_hr")
+                         and abs(controls[c]["ks_unburned_mm_hr"] - ks) <= 0.01 * ks), None)
+            if pick is None and same:
+                print(f"  WARNING: no control with unburned Ks {ks:.3g} mm/hr for {lab}; "
+                      f"falling back to {same[0]} (baseline Ks differs: deltas include it)")
+        out[lab] = pick or (same[0] if same else None)
+    return out
 
 
 def _style(runs):

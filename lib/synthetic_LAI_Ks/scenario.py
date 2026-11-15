@@ -105,6 +105,19 @@ BUILTIN = [
     _s("control_2L", ["--ks-fire-mode", "off", *L2], {"default", "control", "layers2", "ks"},
        "constant Ks, 2 layers"),
 
+    # matched controls for the time presets: constant Ks = the preset's unburned Ks_UL
+    # (the analysis pairs a run with the control of the same layers and unburned Ks)
+    _s("control_ks_avg_1L", ["--ks-fire-mode", "off", "--permx", "1.0417e-5", *L1],
+       {"default", "control", "matched", "layers1", "ks"}, "control, Ks = overall_average Ks_UL (37.5 mm/hr), 1 layer"),
+    _s("control_ks_avg_2L", ["--ks-fire-mode", "off", "--permx", "1.0417e-5", *L2],
+       {"default", "control", "matched", "layers2", "ks"}, "control, Ks = overall_average Ks_UL (37.5 mm/hr), 2 layers"),
+    _s("control_ks_median_2L", ["--ks-fire-mode", "off", "--permx", "5.4167e-6", *L2],
+       {"control", "matched", "layers2", "ks"}, "control, Ks = median Ks_UL (19.5 mm/hr), 2 layers"),
+    _s("control_ks_lower_2L", ["--ks-fire-mode", "off", "--permx", "1.3889e-6", *L2],
+       {"control", "matched", "layers2", "ks"}, "control, Ks = lower_bound Ks_UL (5.0 mm/hr), 2 layers"),
+    _s("control_ks_upper_2L", ["--ks-fire-mode", "off", "--permx", "2.4306e-5", *L2],
+       {"control", "matched", "layers2", "ks"}, "control, Ks = upper_bound Ks_UL (87.5 mm/hr), 2 layers"),
+
     # LAI-driven Ks (Thomas et al. 2021, Eq. 11)
     _s("lai_1L", ["--ks-fire-mode", "lai", *L1], {"default", "lai", "layers1", "ks"},
        "Ks from LAI recovery ratio, 1 layer"),

@@ -800,6 +800,29 @@ def test_plot_ks_scenarios():
     plt.close("all")
 
 
+def test_matching_control_by_unburned_ks():
+    import sys, io, os, contextlib
+    sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "synthetic_LAI_Ks"))
+    import synthetic_ksfire_analysis as SA
+    def run(mode, two, ks=None):
+        meta = {"mode": mode, "two_layers": two}
+        if ks is not None:
+            meta["ks_unburned_mm_hr"] = ks
+        return {"meta": meta}
+    runs = {"control_2L": run("off", True, 43.8), "control_ks_lower_2L": run("off", True, 5.0),
+            "control_1L": run("off", False, 43.8),
+            "lai_2L": run("lai", True, 43.8), "time_lower_2L": run("time", True, 5.0),
+            "time_old_2L": run("time", True), "lai_1L": run("lai", False, 43.8),
+            "time_noctl_2L": run("time", True, 19.5)}
+    buf = io.StringIO()
+    with contextlib.redirect_stdout(buf):
+        c = SA.matching_control(runs)
+    assert c["lai_2L"] == "control_2L" and c["time_lower_2L"] == "control_ks_lower_2L"
+    assert c["lai_1L"] == "control_1L" and c["control_ks_lower_2L"] == "control_ks_lower_2L"
+    assert c["time_old_2L"] == "control_2L"                      # old meta: layers-only fallback
+    assert c["time_noctl_2L"] == "control_2L" and "WARNING" in buf.getvalue()
+
+
 def test_cmp_eta_variants():
     import sys, tempfile
     from pathlib import Path

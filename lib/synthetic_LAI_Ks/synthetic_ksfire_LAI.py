@@ -1160,6 +1160,14 @@ def run_pipeline(args: argparse.Namespace) -> None:
         meta = {"scenario": scenario, "mode": cfg.mode, "two_layers": bool(args.two_layers), "slope": args.slope,
                 "failed_months": failed_months, "complete": complete,
                 "months_simulated": len(psi_rec), "months_planned": len(months)}
+        # Ks of the unburned soil of this run (used to pair it with its matching control)
+        try:
+            if cfg.mode == "off":
+                meta["ks_unburned_mm_hr"] = float(ks_rows[0]["permx_mm_hr"])
+            elif cfg.ks_ul is not None:
+                meta["ks_unburned_mm_hr"] = float(KsFire.m_s_to_mm_hr(cfg.ks_ul))
+        except Exception:
+            pass
         SA.save_run_analysis(out_dir, fig_dir, ts, info, meta, pd.Timestamp(fire_date),
                              plots=plots, dpi=args.dpi)
 
