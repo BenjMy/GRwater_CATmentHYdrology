@@ -647,6 +647,34 @@ def test_check_monthly_sanity():
     assert any("water balance residual" in x for x in w3)
 
 
+def test_plot_ks_scenarios():
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    import numpy as np
+    import pandas as pd
+    import plot_ks_scenarios as K
+    months = pd.date_range("2019-07-01", "2022-07-01", freq="MS")
+    df = K.ks_trajectories(months, "2020-07-01", presets=["median", "lower_bound"])
+    assert set(df["mode"]) == set(K.MODES) and set(df["preset"]) == {"median", "lower_bound"}
+    pre = df[df["date"] < "2020-07-01"]
+    assert np.allclose(pre["ratio"], 1.0)                              # unburned before the fire
+    med = df[(df["preset"] == "median")]
+    t0 = med[(med["date"] == "2020-07-01")].set_index("mode")["ks_mm_hr"]
+    assert np.isclose(t0["time"], 12.9) and np.isclose(t0["burn_severity"], 19.5 * (1 - 0.5 * 0.8))
+    late = med[(med["date"] == "2022-07-01")].set_index("mode")["ratio"]
+    assert late["time"] > 0.99 and late["lai"] > 0.99 and np.isclose(late["burn_severity"], 0.6)
+    try:
+        K.ks_trajectories(months, "2020-07-01", severity=2)
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("bad severity accepted")
+    fig = K.plot_ks_scenarios(df, "2020-07-01")
+    assert len(fig.axes) == 2
+    plt.close("all")
+
+
 if __name__ == "__main__":
     for name, fn in sorted(globals().items()):
         if name.startswith("test_") and callable(fn):
