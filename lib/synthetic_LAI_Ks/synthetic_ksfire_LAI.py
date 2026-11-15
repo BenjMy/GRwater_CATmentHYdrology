@@ -82,7 +82,7 @@ XLL, YLL = 450000.0, 4120000.0    # arbitrary UTM-like origin of the synthetic D
 # results live outside lib/: <repo>/results/synthetic_LAI_Ks (override: $SYNTH_KS_ROOT)
 DEFAULT_ROOT = Path(os.environ.get("SYNTH_KS_ROOT") or
                     Path(__file__).resolve().parents[2] / "results" / "synthetic_LAI_Ks")
-PATH_ET = Path.home() / "Nextcloud" / "GRwater" / "data" / "satellite" / "Agramon"
+PATH_ET = Path(os.environ.get("AGRAMON_PATH_ET") or Path.home() / "Nextcloud" / "GRwater" / "data" / "satellite" / "Agramon")
 
 # ── Pure helpers (no pyCATHY needed -> usable in the smoke test) ─────────────
 

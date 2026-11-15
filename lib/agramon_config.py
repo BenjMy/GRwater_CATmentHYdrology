@@ -23,29 +23,39 @@ ETP_TS_COLUMN_DEFAULT = "ET_0_wet"
 
 
 # ── Data paths ────────────────────────────────────────────────────────────────
-# TODO (REFACTORING.md, step 2.4): replace the machine auto-detection below
-# with environment variables / a config file.
+# Paths come from environment variables; if unset, the previous machine
+# auto-detection is the fallback (REFACTORING.md 2.4 — backward compatible):
+#   AGRAMON_ROOT      Nextcloud root (default: auto-detected as before)
+#   AGRAMON_CODES     folder holding the repo      (default: ROOT/BenCSIC/Codes/Tech4agro_org)
+#   AGRAMON_LAI_PATH  LAI inputs folder            (default: see below)
+#   AGRAMON_PATH_ET   folder with ET0 / TP netCDF  (default: ROOT/GRwater/data/satellite/Agramon)
+import os
 
-# ── Path setup ────────────────────────────────────────────────────────────────
 
-# Auto-detect the machine from the home directory (no commenting/uncommenting).
+def _env_path(name, default):
+    """Path from environment variable ``name`` (``~`` expanded), else ``default``."""
+    val = os.environ.get(name, "").strip()
+    return Path(val).expanduser() if val else Path(default)
+
+
 HOME = Path.home()
 if HOME.name == "z0272571a@campus.csic.es":
-    ROOT = HOME / "Nextcloud"
+    _DEFAULT_ROOT = HOME / "Nextcloud"
 else:
-    ROOT = Path("/home/ben/Nextcloud")
+    _DEFAULT_ROOT = Path("/home/ben/Nextcloud")
+ROOT = _env_path("AGRAMON_ROOT", _DEFAULT_ROOT)
 
-CODES = ROOT / "BenCSIC" / "Codes" / "Tech4agro_org"
+CODES = _env_path("AGRAMON_CODES", ROOT / "BenCSIC" / "Codes" / "Tech4agro_org")
 
 # MODULE_PATH = (CODES / "GRwater_geophy").resolve()
 EO_PATH     = (CODES / "GRwater_CATmentHYdrology").resolve()
 
-LAI_PATH = (
+LAI_PATH = _env_path("AGRAMON_LAI_PATH", (
     ROOT / "BenCSIC" / "Training_Supervision" / "Supervision"
     / "Xela_Carracedo_Practicas_2026_data" / "301a-biophysical" / "agramon" / "input"
-).resolve()
+)).resolve()
 
-PathET    = ROOT / "GRwater" / "data" / "satellite" / "Agramon"
+PathET    = _env_path("AGRAMON_PATH_ET", ROOT / "GRwater" / "data" / "satellite" / "Agramon")
 etp_path  = PathET / "20161001_20241231_ET0.nc"
 rain_path = PathET / "20161001_20241231_TP.nc"
 

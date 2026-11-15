@@ -450,6 +450,30 @@ def test_monthly_loop_helpers():
         assert n == 4 and dm == "dsm" and e2 is e and r2 is r and g["nnod"] == 4
 
 
+def test_config_env_paths():
+    import importlib, os
+    import agramon_config as C
+    keys = ("AGRAMON_ROOT", "AGRAMON_PATH_ET", "AGRAMON_LAI_PATH", "AGRAMON_CODES")
+    saved = {k: os.environ.pop(k, None) for k in keys}
+    try:
+        importlib.reload(C)
+        default_et = C.PathET
+        os.environ["AGRAMON_ROOT"] = "/data/nc"
+        importlib.reload(C)
+        assert str(C.PathET) == "/data/nc/GRwater/data/satellite/Agramon", C.PathET
+        os.environ["AGRAMON_PATH_ET"] = "/data/et"
+        importlib.reload(C)
+        assert str(C.etp_path) == "/data/et/20161001_20241231_ET0.nc"
+        assert str(C.rain_path).endswith("_TP.nc")
+    finally:
+        for k in keys:
+            os.environ.pop(k, None)
+            if saved[k] is not None:
+                os.environ[k] = saved[k]
+        importlib.reload(C)
+    assert C.PathET == default_et
+
+
 def test_agramon_monthly_readers():
     import types, datetime as dtm
     import pandas as pd
