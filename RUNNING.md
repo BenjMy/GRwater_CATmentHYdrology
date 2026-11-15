@@ -68,7 +68,7 @@ python synthetic_ksfire_LAI.py --smoke-test                 # one tiny run
 python scenario.py --list
 python scenario.py --dry-run
 python scenario.py --root <OUT_ROOT> --jobs 3                       # default set + comparison
-python scenario.py --root <OUT_ROOT> --only control_2L time_median_2L time_lower_2L lai_2L --wet
+python scenario.py --root <OUT_ROOT> --only control_2L control_ks_median_2L time_median_2L control_ks_lower_2L time_lower_2L lai_2L --wet   # each time_* preset needs its control_ks_* (same unburned Ks)
 python scenario.py --root <OUT_ROOT> --quick --wet                  # 5x5 grid sanity run
 python scenario.py --root <OUT_ROOT> --config <MY_SCENARIOS.toml>   # custom, see scenario.py docstring
 ```
