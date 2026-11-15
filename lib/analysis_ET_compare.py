@@ -1551,6 +1551,17 @@ def run_comparison(
     print("\n── Fig D : scatter EO-EB vs WB ──────────────────────────────────")
     plot_compare_scatter(s_eo, s_wb, fig_path, label=label, dpi=dpi, show=show)
 
+    print("\n── Fig I : validation panel (skill, 1:1, monthly bias) ──────────")
+    try:
+        from plot_hypotheses import plot_validation_panel
+        fig_i = plot_validation_panel(
+            s_wb, s_eo, label=f"ETa {EO_LABEL} vs WB", units="mm/day",
+            out=str(fig_path / f"fig_I_validation{'_' + label if label else ''}.png"))
+        import matplotlib.pyplot as _plt
+        _plt.close(fig_i)
+    except Exception as exc:                      # never block the other figures
+        print(f"  Fig I skipped ({exc})")
+
     print("\n── Fig E : spatial maps ─────────────────────────────────────────")
     plot_compare_spatial_maps(
         ds_eo, var_eo, ds_wb, selected_year,
