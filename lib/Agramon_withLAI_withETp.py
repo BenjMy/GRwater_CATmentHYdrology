@@ -48,7 +48,7 @@ Forcing switch (``--forcing``, default FORCING_MODE_DEFAULT in agramon_config)
 import argparse
 import shutil
 import warnings
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -1233,6 +1233,265 @@ def save_run_figures(stats_records, args, scenario_dirname, out_dir) -> None:
         log.warning(f"  Warning: could not draw the run summary figure ({exc})")
 
 
+@dataclass
+class LoopState:
+    """Mutable state carried from one monthly CATHY run to the next."""
+    first_iteration: bool
+    n_surf: int
+    ds_mesh: object
+    grid3d: object
+    ETp_nodes: object
+    rain_nodes: object
+    active_zones_prev: object = None
+    psi_records: list = field(default_factory=list)
+    sw_records: list = field(default_factory=list)
+    et_records: list = field(default_factory=list)
+    all_recharge_recs: list = field(default_factory=list)
+    all_hgraph_recs: list = field(default_factory=list)
+    veg_map_history: dict = field(default_factory=dict)
+    lai_history: dict = field(default_factory=dict)
+    stats_records: list = field(default_factory=list)
+
+
+def run_one_month(args, inp, ms, atm, st, ks_cfg, dt, lai_2d,
+                  spinup_done, out_dir, monthly_dir) -> bool:
+    """
+    One calendar month of the loop in ``run_monthly_loop`` (moved verbatim,
+    REFACTORING.md 12.6): LAI -> vegetation map -> soil -> ATMBC -> CATHY run
+    -> readers/sanity/stats. Mutates ``st``; returns False if the month was
+    skipped for lack of forcing, True if it ran.
+    """
+    fm               = inp.forcing
+    feddes           = inp.feddes
+    ds_rain          = inp.ds_rain
+    ds_etp           = inp.ds_etp
+    md_log           = inp.md_log
+    simu              = ms.simu
+    raster_DEM_masked = ms.raster_DEM_masked
+    N                 = ms.N
+    M                 = ms.M
+    t_atmbc     = atm.t_atmbc
+    net_flux    = atm.net_flux
+    valid_times = atm.valid_times
+    psi_records       = st.psi_records
+    sw_records        = st.sw_records
+    et_records        = st.et_records
+    all_recharge_recs = st.all_recharge_recs
+    all_hgraph_recs   = st.all_hgraph_recs
+    veg_map_history   = st.veg_map_history
+    lai_history       = st.lai_history
+    stats_records     = st.stats_records
+    first_iteration   = st.first_iteration
+    n_surf, ds_mesh, grid3d = st.n_surf, st.ds_mesh, st.grid3d
+    ETp_nodes, rain_nodes   = st.ETp_nodes, st.rain_nodes
+    active_zones_prev       = st.active_zones_prev
+    df_psi = None
+
+    # 12.1  LAI → consecutive vegetation map + remap dict
+    (veg_map, remap, veg_valid,
+     veg_map_semantic, inv_remap) = prepare_month_vegetation(simu, lai_2d, dt)
+    lai_history[dt]       = lai_2d.copy()
+    veg_map_history[dt]   = veg_map_semantic
+
+    # 12.3  Update soil only when active zones change
+    active_zones = set(int(z) for z in veg_valid)
+    lai_updated  = (active_zones != active_zones_prev)
+    # if lai_updated:
+    update_soil_for_active_zones(simu,
+                                 active_zones,
+                                 remap=remap,
+                                 base_zroot=args.zroot,
+                                 pmin=args.pmin,
+                                 scf=args.scf,
+                                 zroot_factors=zroot_factors_from_args(args),
+                                 permx=ks_for_month(ks_cfg, dt, lai_2d, args.permx),
+                                 permy_ratio=args.permy_ratio,
+                                 permz_ratio=args.permz_ratio,
+                                 pcana=feddes["pcana"], pcref=feddes["pcref"],
+                                 pcwlt=feddes["pcwlt"], pz=feddes["pz"],
+                                 omgc=feddes["omgc"],
+                                 feddes_crop=feddes["feddes_crop"],
+                                 )
+    active_zones_prev = active_zones
+    if getattr(args, "mesh_props", False):
+        export_mesh_props(simu, dt)
+
+    # 12.4  Subset ATMBC to current month
+    t_month, nv_month = subset_atmbc_for_month(
+        t_atmbc, net_flux, valid_times, dt.year, dt.month
+    )
+    if t_month is None:
+        log.info(f"  {dt:%Y-%m-%d} | No forcing data — skipping")
+        md_log.table_row([f"{dt:%Y-%m}", "—", "—", "—", "—", "—", "—",
+                           "skipped (no forcing)"])
+        st.active_zones_prev = active_zones_prev
+        return False
+
+    simu.update_atmbc(HSPATM=1,
+                      IETO=1,
+                      time=t_month,
+                      netValue=nv_month
+                      )
+
+    # Indices into ETp_nodes/rain_nodes' time axis for this month —
+    # needed by both the ETa artefact floor (12.10) and the sanity
+    # checks (12.9b). Computed once here so both reuse the same mask.
+    idx_month = None
+    if fm.use_etp:
+        idx_month = month_forcing_indices(valid_times, dt)
+
+
+    # Optional: plot the monthly forcing
+    plot_month_forcing(nv_month, dt, fm.use_etp)
+
+    # 12.5  Update PARM print list
+    df_atmbc_month = simu.read_inputs("atmbc")
+    simu.update_parm(TIMPRTi=list(df_atmbc_month.time),
+                     IPRT=4,
+                     VTKF=2
+                     )
+
+    # 12.6  Preprocessor (first iteration only)
+    # FIX: mirror the working withLAI logic exactly — run preprocessor
+    # once on first iteration; BCs were already configured above from
+    # the full time axis, not re-built here.
+    if first_iteration:
+        #simu.run_preprocessor(verbose=True)
+        first_iteration = False
+
+        # FIX: this preprocessor call can finalize a DIFFERENT (larger)
+        # mesh than the one built earlier (setup_dem's create_mesh_vtk
+        # + the very first run_preprocessor() before this loop). Two
+        # things upstream were computed against that earlier, smaller
+        # mesh and go stale the moment the grid actually changes size:
+        #   1. `update_ic`'s internal map_prop2mesh() reuses the mesh
+        #      cached by create_mesh_vtk() — never rebuilt afterwards,
+        #      causing "'ic' has length N but the mesh has M points".
+        #   2. `n_surf` / ETp_nodes / rain_nodes were sliced using the
+        #      old grid3d["nnod"], causing the "SURFACE NODE out of
+        #      bounds" warnings later when reading real ETa/recharge
+        #      output (which is indexed on the true, larger grid).
+        # Refresh both against the grid this run is actually using.
+        grid3d, n_surf, ds_mesh, ETp_nodes, rain_nodes = refresh_mesh_mapping(
+            simu, fm, ds_etp, ds_rain, raster_DEM_masked,
+            n_surf, ds_mesh, ETp_nodes, rain_nodes)
+
+
+
+    if len(psi_records) > 0 or spinup_done:
+        df_psi = simu.read_outputs("psi").copy()
+        psi_ini = df_psi.iloc[-1].values
+        simu.update_ic(INDP=1,
+                       pressure_head_ini=psi_ini
+                       )
+
+
+    # 12.7  Run processor
+    log.info(f"\n  Running processor for {dt:%Y-%m} "
+          f"(LAI updated: {lai_updated}) …")
+
+    # MAXVEG already fixed to N_VEG_CLASSES once before the loop; no
+    # need to re-set it (to a mismatched value of 10) every month.
+
+    simu.run_processor(
+        IPRT1=2,
+        DTMIN=args.dtmin,
+        DTMAX=args.dtmax,
+        DELTAT=args.deltat,
+        TRAFLAG=0,
+        verbose=False,
+    )
+
+    month_stats = {"month": f"{dt:%Y-%m}"}
+    monthly_out = monthly_dir if args.save_monthly else None
+
+    # 12.8  PSI — check solver actually progressed; keep last known state if not
+    psi_month_df, solver_status = read_psi_month(simu, dt, psi_records, month_stats,
+                                                 monthly_out, md_log, t_month)
+    # 12.9  SW
+    sw_month_df = read_sw_month(simu, dt, sw_records, month_stats, monthly_out)
+
+    # 12.10  ET
+    df_et = read_et_month(simu, dt, et_records, month_stats, monthly_out, md_log,
+                          use_etp=fm.use_etp, t_month=t_month, ETp_nodes=ETp_nodes,
+                          rain_nodes=rain_nodes, idx_month=idx_month,
+                          eta_net_neg_mode=args.eta_net_neg_mode)
+
+    # 12.11  Recharge
+    df_rec = read_recharge_month(simu, dt, all_recharge_recs, month_stats, monthly_out)
+
+    # 12.11a  Surface runoff hydrograph (hgraph)
+    read_hgraph_month(simu, dt, all_hgraph_recs, monthly_out)
+
+    # 12.11b  Monthly LAI raster backup (already kept in lai_history
+    # for the combined lai_output.nc written by save_combined_outputs;
+    # also dropped per-month here when --save-monthly is passed).
+    if args.save_monthly:
+        try:
+            xr.DataArray(
+                lai_2d,
+                dims=["row", "col"],
+                coords={"row": np.arange(M), "col": np.arange(N)},
+                name="LAI",
+                attrs={"crs": TARGET_CRS},
+            ).to_netcdf(monthly_dir / f"lai_{dt:%Y%m}.nc")
+        except Exception as exc:
+            log.warning(f"  Warning: could not save monthly LAI for {dt:%Y-%m} ({exc})")
+
+    # 12.11c  Sanity checks (physical bounds + approximate water balance)
+    try:
+        sanity_warnings = check_monthly_sanity(
+            dt, month_stats,
+            psi_month_df=psi_month_df,
+            sw_month_df=sw_month_df,
+            df_et=df_et,
+            df_rec=df_rec,
+            t_month=t_month,
+            idx_month=idx_month,
+            ETp_nodes=ETp_nodes if fm.use_etp else None,
+            rain_nodes=rain_nodes if fm.use_etp else None,
+        )
+    except Exception as exc:
+        sanity_warnings = []
+        log.warning(f"  Warning: sanity checks failed for {dt:%Y-%m} ({exc})")
+
+    for w in sanity_warnings:
+        log.warning(f"  ⚠ sanity: {w}")
+        md_log.warn(w)
+
+    # 12.12  Progress summary
+    semantic_zones = sorted(inv_remap.get(z, z) for z in active_zones)
+    n_veg = int((veg_map > 1).sum())
+    log.info(f"  {dt:%Y-%m-%d} | zones (semantic): {semantic_zones} | "
+          f"vegetated px: {n_veg}/{N*M} ({100*n_veg/(N*M):.1f} %) | "
+          f"LAI updated: {lai_updated}")
+
+    # 12.12b  Monthly info stats (printed, logged, running monthly_stats.csv)
+    report_month_stats(dt, month_stats, solver_status, md_log, stats_records, out_dir)
+
+    # FIX: this counter was declared but never incremented before —
+    # completed months now register in the run summary written by
+    # md_log.close().
+
+    # 12.13  Refresh the single running combined-output files with
+    # everything completed so far (in addition to this month's
+    # standalone files already saved above).
+    try:
+        save_combined_outputs(
+            out_dir, veg_map_history, lai_history, et_records,
+            psi_records, sw_records, all_recharge_recs,
+            all_hgraph_recs, M, N,
+        )
+    except Exception as exc:
+        log.warning(f"  Warning: could not refresh combined outputs after {dt:%Y-%m} ({exc})")
+    st.first_iteration = first_iteration
+    st.n_surf, st.ds_mesh, st.grid3d = n_surf, ds_mesh, grid3d
+    st.ETp_nodes, st.rain_nodes = ETp_nodes, rain_nodes
+    st.active_zones_prev = active_zones_prev
+    return True
+
+
+
 def run_monthly_loop(args: argparse.Namespace, inp: RunInputs, ms: MeshSetup,
                      atm: AtmbcSetup, ks_cfg, ds_LAI_raster,
                      first_iteration: bool, spinup_done: bool) -> None:
@@ -1246,13 +1505,9 @@ def run_monthly_loop(args: argparse.Namespace, inp: RunInputs, ms: MeshSetup,
     and ``ds_LAI_raster`` is the LAI interpolated on the DEM grid.
     """
     fm               = inp.forcing
-    feddes           = inp.feddes
-    ds_rain          = inp.ds_rain
-    ds_etp           = inp.ds_etp
     scenario_dirname = inp.scenario_dirname
     md_log           = inp.md_log
     simu              = ms.simu
-    raster_DEM_masked = ms.raster_DEM_masked
     grid3d            = ms.grid3d
     N                 = ms.N
     M                 = ms.M
@@ -1260,22 +1515,11 @@ def run_monthly_loop(args: argparse.Namespace, inp: RunInputs, ms: MeshSetup,
     n_surf      = atm.n_surf
     ETp_nodes   = atm.ETp_nodes
     rain_nodes  = atm.rain_nodes
-    net_flux    = atm.net_flux
-    t_atmbc     = atm.t_atmbc
     valid_times = atm.valid_times
 
-    # ── 11. Storage containers ────────────────────────────────
-    df_psi = None
-    psi_records       = []
-    sw_records        = []
-    et_records        = []
-    all_recharge_recs = []
-    all_hgraph_recs   = []
-    veg_map_history   = {}
-    lai_history       = {}
-    stats_records     = []
-
-    active_zones_prev = None
+    # ── 11. Storage containers (mutable state shared across months) ──
+    st = LoopState(first_iteration=first_iteration, n_surf=n_surf, ds_mesh=ds_mesh,
+                   grid3d=grid3d, ETp_nodes=ETp_nodes, rain_nodes=rain_nodes)
 
     out_dir = Path(args.path2prj) / "outputs" / scenario_dirname
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -1312,204 +1556,17 @@ def run_monthly_loop(args: argparse.Namespace, inp: RunInputs, ms: MeshSetup,
     n_months_skipped = 0
 
     for dt, lai_2d in iter_monthly_lai(ds_LAI_raster.isel(time=slice(1, None))):
-        # 12.1  LAI → consecutive vegetation map + remap dict
-        (veg_map, remap, veg_valid,
-         veg_map_semantic, inv_remap) = prepare_month_vegetation(simu, lai_2d, dt)
-        lai_history[dt]       = lai_2d.copy()
-        veg_map_history[dt]   = veg_map_semantic
-
-        # 12.3  Update soil only when active zones change
-        active_zones = set(int(z) for z in veg_valid)
-        lai_updated  = (active_zones != active_zones_prev)
-        # if lai_updated:
-        update_soil_for_active_zones(simu,
-                                     active_zones,
-                                     remap=remap,
-                                     base_zroot=args.zroot,
-                                     pmin=args.pmin,
-                                     scf=args.scf,
-                                     zroot_factors=zroot_factors_from_args(args),
-                                     permx=ks_for_month(ks_cfg, dt, lai_2d, args.permx),
-                                     permy_ratio=args.permy_ratio,
-                                     permz_ratio=args.permz_ratio,
-                                     pcana=feddes["pcana"], pcref=feddes["pcref"],
-                                     pcwlt=feddes["pcwlt"], pz=feddes["pz"],
-                                     omgc=feddes["omgc"],
-                                     feddes_crop=feddes["feddes_crop"],
-                                     )
-        active_zones_prev = active_zones
-        if getattr(args, "mesh_props", False):
-            export_mesh_props(simu, dt)
-
-        # 12.4  Subset ATMBC to current month
-        t_month, nv_month = subset_atmbc_for_month(
-            t_atmbc, net_flux, valid_times, dt.year, dt.month
-        )
-        if t_month is None:
-            log.info(f"  {dt:%Y-%m-%d} | No forcing data — skipping")
+        if run_one_month(args, inp, ms, atm, st, ks_cfg, dt, lai_2d,
+                         spinup_done, out_dir, monthly_dir):
+            n_months_run += 1
+        else:
             n_months_skipped += 1
-            md_log.table_row([f"{dt:%Y-%m}", "—", "—", "—", "—", "—", "—",
-                               "skipped (no forcing)"])
-            continue
-
-        simu.update_atmbc(HSPATM=1,
-                          IETO=1,
-                          time=t_month,
-                          netValue=nv_month
-                          )
-
-        # Indices into ETp_nodes/rain_nodes' time axis for this month —
-        # needed by both the ETa artefact floor (12.10) and the sanity
-        # checks (12.9b). Computed once here so both reuse the same mask.
-        idx_month = None
-        if fm.use_etp:
-            idx_month = month_forcing_indices(valid_times, dt)
 
 
-        # Optional: plot the monthly forcing
-        plot_month_forcing(nv_month, dt, fm.use_etp)
-
-        # 12.5  Update PARM print list
-        df_atmbc_month = simu.read_inputs("atmbc")
-        simu.update_parm(TIMPRTi=list(df_atmbc_month.time),
-                         IPRT=4,
-                         VTKF=2
-                         )
-
-        # 12.6  Preprocessor (first iteration only)
-        # FIX: mirror the working withLAI logic exactly — run preprocessor
-        # once on first iteration; BCs were already configured above from
-        # the full time axis, not re-built here.
-        if first_iteration:
-            #simu.run_preprocessor(verbose=True)
-            first_iteration = False
-
-            # FIX: this preprocessor call can finalize a DIFFERENT (larger)
-            # mesh than the one built earlier (setup_dem's create_mesh_vtk
-            # + the very first run_preprocessor() before this loop). Two
-            # things upstream were computed against that earlier, smaller
-            # mesh and go stale the moment the grid actually changes size:
-            #   1. `update_ic`'s internal map_prop2mesh() reuses the mesh
-            #      cached by create_mesh_vtk() — never rebuilt afterwards,
-            #      causing "'ic' has length N but the mesh has M points".
-            #   2. `n_surf` / ETp_nodes / rain_nodes were sliced using the
-            #      old grid3d["nnod"], causing the "SURFACE NODE out of
-            #      bounds" warnings later when reading real ETa/recharge
-            #      output (which is indexed on the true, larger grid).
-            # Refresh both against the grid this run is actually using.
-            grid3d, n_surf, ds_mesh, ETp_nodes, rain_nodes = refresh_mesh_mapping(
-                simu, fm, ds_etp, ds_rain, raster_DEM_masked,
-                n_surf, ds_mesh, ETp_nodes, rain_nodes)
-
-
-
-        if len(psi_records) > 0 or spinup_done:
-            df_psi = simu.read_outputs("psi").copy()
-            psi_ini = df_psi.iloc[-1].values
-            simu.update_ic(INDP=1,
-                           pressure_head_ini=psi_ini
-                           )
-
-
-        # 12.7  Run processor
-        log.info(f"\n  Running processor for {dt:%Y-%m} "
-              f"(LAI updated: {lai_updated}) …")
-
-        # MAXVEG already fixed to N_VEG_CLASSES once before the loop; no
-        # need to re-set it (to a mismatched value of 10) every month.
-
-        simu.run_processor(
-            IPRT1=2,
-            DTMIN=args.dtmin,
-            DTMAX=args.dtmax,
-            DELTAT=args.deltat,
-            TRAFLAG=0,
-            verbose=False,
-        )
-
-        month_stats = {"month": f"{dt:%Y-%m}"}
-        monthly_out = monthly_dir if args.save_monthly else None
-
-        # 12.8  PSI — check solver actually progressed; keep last known state if not
-        psi_month_df, solver_status = read_psi_month(simu, dt, psi_records, month_stats,
-                                                     monthly_out, md_log, t_month)
-        # 12.9  SW
-        sw_month_df = read_sw_month(simu, dt, sw_records, month_stats, monthly_out)
-
-        # 12.10  ET
-        df_et = read_et_month(simu, dt, et_records, month_stats, monthly_out, md_log,
-                              use_etp=fm.use_etp, t_month=t_month, ETp_nodes=ETp_nodes,
-                              rain_nodes=rain_nodes, idx_month=idx_month,
-                              eta_net_neg_mode=args.eta_net_neg_mode)
-
-        # 12.11  Recharge
-        df_rec = read_recharge_month(simu, dt, all_recharge_recs, month_stats, monthly_out)
-
-        # 12.11a  Surface runoff hydrograph (hgraph)
-        read_hgraph_month(simu, dt, all_hgraph_recs, monthly_out)
-
-        # 12.11b  Monthly LAI raster backup (already kept in lai_history
-        # for the combined lai_output.nc written by save_combined_outputs;
-        # also dropped per-month here when --save-monthly is passed).
-        if args.save_monthly:
-            try:
-                xr.DataArray(
-                    lai_2d,
-                    dims=["row", "col"],
-                    coords={"row": np.arange(M), "col": np.arange(N)},
-                    name="LAI",
-                    attrs={"crs": TARGET_CRS},
-                ).to_netcdf(monthly_dir / f"lai_{dt:%Y%m}.nc")
-            except Exception as exc:
-                log.warning(f"  Warning: could not save monthly LAI for {dt:%Y-%m} ({exc})")
-
-        # 12.11c  Sanity checks (physical bounds + approximate water balance)
-        try:
-            sanity_warnings = check_monthly_sanity(
-                dt, month_stats,
-                psi_month_df=psi_month_df,
-                sw_month_df=sw_month_df,
-                df_et=df_et,
-                df_rec=df_rec,
-                t_month=t_month,
-                idx_month=idx_month,
-                ETp_nodes=ETp_nodes if fm.use_etp else None,
-                rain_nodes=rain_nodes if fm.use_etp else None,
-            )
-        except Exception as exc:
-            sanity_warnings = []
-            log.warning(f"  Warning: sanity checks failed for {dt:%Y-%m} ({exc})")
-
-        for w in sanity_warnings:
-            log.warning(f"  ⚠ sanity: {w}")
-            md_log.warn(w)
-
-        # 12.12  Progress summary
-        semantic_zones = sorted(inv_remap.get(z, z) for z in active_zones)
-        n_veg = int((veg_map > 1).sum())
-        log.info(f"  {dt:%Y-%m-%d} | zones (semantic): {semantic_zones} | "
-              f"vegetated px: {n_veg}/{N*M} ({100*n_veg/(N*M):.1f} %) | "
-              f"LAI updated: {lai_updated}")
-
-        # 12.12b  Monthly info stats (printed, logged, running monthly_stats.csv)
-        report_month_stats(dt, month_stats, solver_status, md_log, stats_records, out_dir)
-
-        # FIX: this counter was declared but never incremented before —
-        # completed months now register in the run summary written by
-        # md_log.close().
-        n_months_run += 1
-
-        # 12.13  Refresh the single running combined-output files with
-        # everything completed so far (in addition to this month's
-        # standalone files already saved above).
-        try:
-            save_combined_outputs(
-                out_dir, veg_map_history, lai_history, et_records,
-                psi_records, sw_records, all_recharge_recs,
-                all_hgraph_recs, M, N,
-            )
-        except Exception as exc:
-            log.warning(f"  Warning: could not refresh combined outputs after {dt:%Y-%m} ({exc})")
+    veg_map_history, lai_history = st.veg_map_history, st.lai_history
+    et_records, psi_records, sw_records = st.et_records, st.psi_records, st.sw_records
+    all_recharge_recs, all_hgraph_recs = st.all_recharge_recs, st.all_hgraph_recs
+    stats_records = st.stats_records
 
     log.info("\n── Loop complete (partial runs saved if any months were skipped) ────────")
 

@@ -429,8 +429,9 @@ def test_monthly_loop_helpers():
         "simu", "fm", "ds_etp", "ds_rain", "raster_DEM_masked",
         "n_surf", "ds_mesh", "ETp_nodes", "rain_nodes"]
     src = inspect.getsource(A.run_monthly_loop)
-    for call in ("write_etp_forcing(", "refresh_mesh_mapping(", "save_run_figures("):
+    for call in ("write_etp_forcing(", "save_run_figures("):
         assert call in src, call
+    assert "refresh_mesh_mapping(" in inspect.getsource(A.run_one_month)
     assert "simu.create_mesh_vtk(" not in src and "plot_run_summary(" not in src
     # write_etp_forcing: no-op without ETp, writes a (datetime, node) file otherwise
     with tempfile.TemporaryDirectory() as d:
@@ -472,6 +473,22 @@ def test_config_env_paths():
                 os.environ[k] = saved[k]
         importlib.reload(C)
     assert C.PathET == default_et
+
+
+def test_run_one_month_split():
+    import inspect
+    import Agramon_withLAI_withETp as A
+    assert list(inspect.signature(A.run_one_month).parameters) == [
+        "args", "inp", "ms", "atm", "st", "ks_cfg", "dt", "lai_2d",
+        "spinup_done", "out_dir", "monthly_dir"]
+    a = A.LoopState(True, 4, None, None, None, None)
+    b = A.LoopState(False, 5, None, None, None, None)
+    a.psi_records.append(1)
+    assert b.psi_records == [] and a.active_zones_prev is None   # no shared mutable defaults
+    loop = inspect.getsource(A.run_monthly_loop)
+    assert "run_one_month(" in loop and "run_processor" not in loop
+    assert "run_processor" in inspect.getsource(A.run_one_month)
+    assert len(loop.splitlines()) < 150, len(loop.splitlines())
 
 
 def test_agramon_monthly_readers():
