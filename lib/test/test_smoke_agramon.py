@@ -179,6 +179,18 @@ def _ks_args(argv):
     return p.parse_args(argv)
 
 
+def test_ks_time_mode_prefire_is_unburned():
+    """Regression: compute_permx_for_month(time) used ks_ll before the fire (synthetic runs
+    were treating pre-fire months as burned)."""
+    from datetime import datetime as dt_
+    cfg = K.KsFireConfig(mode="time", fire_date=dt_(2020, 7, 1), ks_ll=1.0, ks_ul=4.0, r_ks=3.0)
+    assert K.compute_permx_for_month(cfg, dt_(2020, 1, 1)) == 4.0      # before: unburned
+    assert K.compute_permx_for_month(cfg, dt_(2020, 6, 30)) == 4.0
+    assert K.compute_permx_for_month(cfg, dt_(2020, 7, 1)) == 1.0      # fire day: burned minimum
+    a, b = (K.compute_permx_for_month(cfg, dt_(2020, m, 1)) for m in (9, 12))
+    assert 1.0 < a < b < 4.0                                           # recovering
+
+
 def test_agramon_ks():
     mm = K.mm_hr_to_m_s
     lai = np.array([[1.0, 2.0], [np.nan, 3.0]])

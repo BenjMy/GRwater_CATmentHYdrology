@@ -321,6 +321,10 @@ def compute_permx_for_month(
                 "mode='time' requires fire_date, ks_ll, ks_ul, and r_ks to be set."
             )
         t_years = years_since_fire(current_date, cfg.fire_date)
+        if t_years < 0:
+            # before the fire the soil is unburned (ks_recovery_time_based alone would
+            # return ks_ll for t <= 0, i.e. treat pre-fire months as burned)
+            return cfg.ks_ul
         return ks_recovery_time_based(t_years, cfg.ks_ll, cfg.ks_ul, cfg.r_ks)
 
     if cfg.mode == "lai":
