@@ -67,7 +67,7 @@ def plot_run_summary(stats: pd.DataFrame, fire_date=None, title: str = "",
                      out: Optional[str] = None):
     """
     Four stacked panels from ``monthly_stats.csv`` (columns: month, eta_mean,
-    eta_patched_mean, sw_mean, psi_mean/min/max, recharge_mean, solver_status;
+    eta_patched_mean, permx_mm_hr, sw_mean, psi_mean/min/max, recharge_mean, solver_status;
     missing columns are skipped). Months whose solver status is not OK are marked.
     """
     if "month" not in stats.columns:
@@ -78,6 +78,7 @@ def plot_run_summary(stats: pd.DataFrame, fire_date=None, title: str = "",
     bad = (~d["solver_status"].astype(str).str.contains("OK")) if "solver_status" in d else \
         pd.Series(False, index=d.index)
     panels = [
+        ("Ks (mm/hr)", [("permx_mm_hr", "PERMX applied", C_BURN)]),
         ("ETa (mm/day)", [("eta_mean", "ETa", C_SIM), ("eta_patched_mean", "ETa patched", C_BURN)]),
         ("Saturation (-)", [("sw_mean", "SW mean", C_CTRL)]),
         ("Pressure head (m)", [("psi_mean", "mean", C_OBS), ("psi_min", "min", C_BURN),
@@ -98,6 +99,8 @@ def plot_run_summary(stats: pd.DataFrame, fire_date=None, title: str = "",
             ax.plot(d.loc[bad, "t"], d.loc[bad, first], "x", color=C_WARN, ms=9, mew=2,
                     label="solver not OK")
         _fire_line(ax, fire_date)
+        if ylab.startswith("Ks"):
+            ax.set_yscale("log")
         ax.set_ylabel(ylab); ax.grid(alpha=0.3); ax.legend(fontsize=7, ncol=4, loc="best")
     axes[0, 0].set_title(title or "Run summary (monthly)")
     fig.autofmt_xdate()

@@ -4,7 +4,7 @@ agramon_log.py — logging for the Agramon pipeline (REFACTORING.md 2.10)
 Console output is unchanged by default: records go to stdout with a bare
 ``%(message)s`` format, so what used to be ``print`` looks identical. What
 is new: levels (warnings/errors are real ``WARNING``/``ERROR`` records),
-``--log-level`` and an optional ``--log-file`` mirror.
+``--log-level`` and an optional ``--log-to-file`` mirror.
 
 Usage in a module::
 

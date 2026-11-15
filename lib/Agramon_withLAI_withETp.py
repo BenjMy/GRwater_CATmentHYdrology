@@ -339,7 +339,7 @@ def _parse_args() -> argparse.Namespace:
     lg.add_argument("--log-level", default="INFO",
                     choices=["DEBUG", "INFO", "WARNING", "ERROR"],
                     help="Console/log verbosity (default INFO = same output as before)")
-    lg.add_argument("--log-file", default=None, metavar="PATH",
+    lg.add_argument("--log-to-file", default=None, metavar="PATH",
                     help="Also write timestamped log records to this file")
     dem.add_argument("--mesh-props", action="store_true",
                      help="Each month, write soil (PERMX, POROS, ...) and root "
@@ -1206,7 +1206,7 @@ def refresh_mesh_mapping(simu, fm, ds_etp, ds_rain, raster_DEM_masked,
     return grid3d, n_surf, ds_mesh, ETp_nodes, rain_nodes
 
 
-def save_run_figures(stats_records, args, scenario_dirname, out_dir) -> None:
+def save_run_figures(stats_records, args, scenario_dirname, out_dir, quiet=False) -> None:
     """Run-summary and water-balance figures, never fatal (moved verbatim from run_monthly_loop)."""
     # Run-summary figure (ETa, SW, psi, recharge, solver flags) — never fatal
     try:
@@ -1217,7 +1217,7 @@ def save_run_figures(stats_records, args, scenario_dirname, out_dir) -> None:
                                 out=str(out_dir / "run_summary.png"))
         import matplotlib.pyplot as plt_
         plt_.close(fig_)
-        log.info(f"run summary figure → {out_dir / 'run_summary.png'}")
+        (log.debug if quiet else log.info)(f"run summary figure → {out_dir / 'run_summary.png'}")
         st_ = pd_.DataFrame(stats_records)
         if {"month", "rain_in_mm", "eta_out_mm"} <= set(st_.columns):
             from plot_hypotheses import plot_water_balance
@@ -1228,7 +1228,7 @@ def save_run_figures(stats_records, args, scenario_dirname, out_dir) -> None:
             plt_.close(plot_water_balance(
                 wb_, out=str(out_dir / "water_balance.png"),
                 title="Monthly flux balance (excludes storage change)"))
-            log.info(f"water balance figure → {out_dir / 'water_balance.png'}")
+            (log.debug if quiet else log.info)(f"water balance figure → {out_dir / 'water_balance.png'}")
     except Exception as exc:
         log.warning(f"  Warning: could not draw the run summary figure ({exc})")
 
@@ -1297,6 +1297,7 @@ def run_one_month(args, inp, ms, atm, st, ks_cfg, dt, lai_2d,
     active_zones = set(int(z) for z in veg_valid)
     lai_updated  = (active_zones != active_zones_prev)
     # if lai_updated:
+    permx_month = ks_for_month(ks_cfg, dt, lai_2d, args.permx)   # m/s, recorded in monthly_stats.csv
     update_soil_for_active_zones(simu,
                                  active_zones,
                                  remap=remap,
@@ -1304,7 +1305,7 @@ def run_one_month(args, inp, ms, atm, st, ks_cfg, dt, lai_2d,
                                  pmin=args.pmin,
                                  scf=args.scf,
                                  zroot_factors=zroot_factors_from_args(args),
-                                 permx=ks_for_month(ks_cfg, dt, lai_2d, args.permx),
+                                 permx=permx_month,
                                  permy_ratio=args.permy_ratio,
                                  permz_ratio=args.permz_ratio,
                                  pcana=feddes["pcana"], pcref=feddes["pcref"],
@@ -1403,6 +1404,8 @@ def run_one_month(args, inp, ms, atm, st, ks_cfg, dt, lai_2d,
     )
 
     month_stats = {"month": f"{dt:%Y-%m}"}
+    if permx_month is not None:
+        month_stats["permx_mm_hr"] = float(permx_month) * 3.6e6
     monthly_out = monthly_dir if args.save_monthly else None
 
     # 12.8  PSI — check solver actually progressed; keep last known state if not
@@ -1559,6 +1562,8 @@ def run_monthly_loop(args: argparse.Namespace, inp: RunInputs, ms: MeshSetup,
         if run_one_month(args, inp, ms, atm, st, ks_cfg, dt, lai_2d,
                          spinup_done, out_dir, monthly_dir):
             n_months_run += 1
+            # figures are refreshed every month so a partial/crashed run still has them
+            save_run_figures(st.stats_records, args, scenario_dirname, out_dir, quiet=True)
         else:
             n_months_skipped += 1
 
@@ -1616,7 +1621,7 @@ def run_monthly_loop(args: argparse.Namespace, inp: RunInputs, ms: MeshSetup,
 
 def run_pipeline(args: argparse.Namespace) -> None:
     """Execute the full pyCATHY + LAI + ETp simulation pipeline."""
-    setup_logging(getattr(args, "log_level", "INFO"), getattr(args, "log_file", None))
+    setup_logging(getattr(args, "log_level", "INFO"), getattr(args, "log_to_file", None))
 
     inp = setup_inputs(args)
 

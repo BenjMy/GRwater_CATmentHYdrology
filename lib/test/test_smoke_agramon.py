@@ -491,6 +491,19 @@ def test_run_one_month_split():
     assert len(loop.splitlines()) < 150, len(loop.splitlines())
 
 
+def test_agramon_cli_parses():
+    """The CLI must build (guards against duplicate option strings, which only fail at parse time)."""
+    import sys
+    import Agramon_withLAI_withETp as A
+    old = sys.argv
+    sys.argv = ["x", "--log-level", "DEBUG", "--log-to-file", "/tmp/x.log", "--log-file", "my.csv"]
+    try:
+        a = A._parse_args()
+    finally:
+        sys.argv = old
+    assert a.log_file == "my.csv" and a.log_to_file == "/tmp/x.log" and a.log_level == "DEBUG"
+
+
 def test_agramon_monthly_readers():
     import types, datetime as dtm
     import pandas as pd
@@ -648,6 +661,9 @@ def test_plot_hypotheses():
                        "psi_mean": [-3, -4, -5], "solver_status": ["✓ OK", "⚠ not converged (1 < 2)", "✓ OK"]})
     f = H.plot_run_summary(st, "2020-02-01", out=os.path.join(d, "rs.png"))
     assert os.path.getsize(os.path.join(d, "rs.png")) > 1000 and len(f.axes) == 2
+    st["permx_mm_hr"] = [36.0, 20.0, 30.0]       # applied Ks -> extra log-scale panel on top
+    f = H.plot_run_summary(st, "2020-02-01")
+    assert len(f.axes) == 3 and f.axes[0].get_yscale() == "log" and f.axes[0].get_ylabel().startswith("Ks")
     for bad in (pd.DataFrame({"x": [1]}), pd.DataFrame({"month": ["2020-01"]})):
         try:
             H.plot_run_summary(bad)
