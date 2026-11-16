@@ -1284,7 +1284,15 @@ def load_artefacts(out_dir: Path, path2prj: Path | None = None, sim_index: int |
     # Recharge NetCDF (preferred over simu.read_outputs for Fig 10)
     recharge_nc = out_dir / "recharge_output.nc"
     if recharge_nc.exists():
-        xr_recharge = xr.open_dataset(recharge_nc)
+        try:
+            xr_recharge = xr.open_dataset(recharge_nc)
+        except ValueError as e:
+            if "overwriting existing key dtype" not in str(e):
+                raise
+            print(f"  ⚠ {recharge_nc.name}: bad 'dtype' attr on time, "
+                  "reopening with decode_timedelta=False")
+            xr_recharge = xr.open_dataset(recharge_nc, decode_timedelta=False)
+            xr_recharge["time"].attrs.pop("dtype", None)
         print(f"  Recharge NC: {recharge_nc}  |  variables: {list(xr_recharge.data_vars)}")
     else:
         xr_recharge = None

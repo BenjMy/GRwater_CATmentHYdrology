@@ -102,8 +102,11 @@ def save_combined_outputs(
         )
 
     if all_recharge_recs:
-        xr.concat(all_recharge_recs, dim="datetime").to_netcdf(
-            out_dir / "recharge_output.nc")
+        rech_all = xr.concat(all_recharge_recs, dim="datetime")
+        for _v in rech_all.variables:
+            # a stray 'dtype' attr breaks xarray's timedelta decoding on reopen
+            rech_all[_v].attrs.pop("dtype", None)
+        rech_all.to_netcdf(out_dir / "recharge_output.nc")
 
     if all_hgraph_recs:
         pd.concat(all_hgraph_recs, ignore_index=True).to_csv(
