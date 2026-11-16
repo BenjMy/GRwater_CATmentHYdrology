@@ -91,7 +91,7 @@ from Agramon_withLAI_withETp import load_dem_from_tif  # or move it to Agramon_u
 # Nextcloud root: AGRAMON_ROOT env var, else the historical default (REFACTORING 2.14)
 _NC = Path(os.environ.get("AGRAMON_ROOT") or "/home/z0272571a@campus.csic.es/Nextcloud").expanduser()
 
-MODULE_PATH = Path(os.environ.get("AGRAMON_MODULE_PATH") or (_NC / "BenCSIC/Codes/Tech4agro_org/GRwater_geophy")).expanduser().resolve()
+MODULE_PATH = (Path(__file__).resolve().parent / "utils")
 
 EO_PATH = Path(os.environ.get("AGRAMON_CODES") or (_NC / "BenCSIC/Codes/Tech4agro_org")).expanduser() .resolve() / "GRwater_CATmentHYdrology"
 
