@@ -1030,7 +1030,7 @@ def _parse_args() -> argparse.Namespace:
         help="DTM plot index (1-8) used to load the DEM raster.",
     )
     p.add_argument(
-        "--dem-tif", default=str(MODULE_PATH / "DTMplots/20250618_AGRAMON100m_micasense_dtm.tif"),
+        "--dem-tif", default=str("../DTMplots/20250618_AGRAMON100m_micasense_dtm.tif"),
         metavar="PATH",
         help=(
             "Full path to the GeoTIFF DEM used to build the mesh "
@@ -1619,7 +1619,7 @@ def run_pipeline(args: argparse.Namespace) -> None:
     # -- DEM -------------------------------------------------------------------
     adf_folder = f"{MODULE_PATH}/DTMplots/dtmplot{log_row['watershed_nb']}/"
 
-    gdf_Agramon = AgUtils.load_plot_shapefiles(['microcuencas_13'], MODULE_PATH / "shapefiles")
+    gdf_Agramon = AgUtils.load_plot_shapefiles(['microcuencas_13'], "../data/microcuencas_13/")
     dem_tif_path = Path(args.dem_tif)  # same CLI default/value used at generation time
 
     raster_DEM, raster_DEM_masked, xllcorner, yllcorner, res_x, res_y = load_dem_from_tif(

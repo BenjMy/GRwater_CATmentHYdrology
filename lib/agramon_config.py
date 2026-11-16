@@ -19,7 +19,7 @@ from typing import Optional
 
 # Column of the Agramon CSVs used as ETp (mm/day) in "etp_ts" mode: either
 # "ET_0_wet" or "ET_0_dry" (selectable with --etp-ts-column).
-ETP_TS_COLUMN_DEFAULT = "ET_0_wet"
+ETP_TS_COLUMN_DEFAULT = "ET_0_dry"
 
 
 # ── Data paths ────────────────────────────────────────────────────────────────
