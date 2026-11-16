@@ -11,7 +11,7 @@ call of run_scenarii_withETp_withLAI_ALL.sh per combination and runs them.
     python run_paper_scenarios.py --only all --skip experimental --stop-on-error
     python run_paper_scenarios.py --extra --start-year 2018  # appended to every call
 
-Exit code 0 if every call returned 0, 1 otherwise. Stdlib only (tomllib: Python >= 3.11).
+Exit code 0 if every call returned 0, 1 otherwise. Stdlib only on Python >= 3.11 (tomllib); older Pythons need `pip install tomli`.
 """
 from __future__ import annotations
 
@@ -38,7 +38,14 @@ class Scenario:
 
 
 def load_config(path: Path) -> dict[str, Scenario]:
-    import tomllib
+    try:
+        import tomllib                                    # Python >= 3.11
+    except ModuleNotFoundError:
+        try:
+            import tomli as tomllib                       # type: ignore  (pip install tomli)
+        except ModuleNotFoundError:
+            raise SystemExit("Python < 3.11 needs the 'tomli' package to read the TOML config: "
+                             "pip install tomli")
     data = tomllib.loads(Path(path).read_text())
     out = {}
     for name, spec in data.items():

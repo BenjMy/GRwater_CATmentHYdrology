@@ -12,6 +12,7 @@ export AGRAMON_LAI_PATH=<DIR_WITH_LAI_INPUTS>     # optional override
 export AGRAMON_MODULE_PATH=<PATH>/GRwater_geophy   # optional, analysis scripts
 export AGRAMON_WB_PRJ_ROOT=<PATH>/SSHydro_withETp_withLAI   # optional, analysis_ET_compare.py
 pip install -e <PATH>/pycathy_wrapper             # install pyCATHY from source (not pip)
+pip install tomli                                 # only if Python < 3.11 (run_paper_scenarios.py, scenario.py --config)
 python test/test_smoke_agramon.py                 # must end with "smoke test OK"
 ```
 
