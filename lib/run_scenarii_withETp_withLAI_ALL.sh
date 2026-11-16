@@ -39,7 +39,7 @@ SPINUP_CYCLES=3
 IC_MODE="both"                # wt | pressure | both
 IC_WTPOSITION="1"             # m, used when ic_label=wt
 IC_PRESSURE_HEAD="-10"        # m, used when ic_label=pressure
-FORCING="etp"                # era5 | etp | etp_ts (Agramon script file 1)
+FORCING="etp_ts"             # era5 | etp | etp_ts (Agramon script file 1)
 ETP_TS_COLUMN="ET_0_wet"     # ET_0_wet | ET_0_dry, only for etp_ts
 ETP_TS_FEATURE_ID=""         # optional; defaults to dem-plot - 1 in Python
 DEM_SMOOTH_SIGMA="0.0"      # Gaussian smoothing sigma in DEM pixels

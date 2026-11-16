@@ -1,7 +1,7 @@
 # Running the scenarios and plotting them (GRwater / Agramon)
 
 All commands run from `lib/` unless stated. Placeholders: `<LIKE_THIS>` = fill in; items marked **[MISSING]** do not exist yet in the repo.
-Do **not** use `--forcing era5` for the paper runs (agreed): use `etp` (satellite ET0 + TP rasters) or `etp_ts` (CSV ETp series).
+Do **not** use `--forcing era5` for the paper runs (agreed). **Default is now `--forcing etp_ts`** (CSV ETp series, uniform over pixels, + rain raster; options `--etp-ts-column ET_0_wet|ET_0_dry`, `--etp-ts-feature-id <ID>`); `--forcing etp` (satellite ET0 + TP rasters) stays available.
 
 ## 0. Setup (once per machine)
 
@@ -31,7 +31,7 @@ python run_paper_scenarios.py --only paper_good --extra --forcing etp_ts --etp-t
 ```
 Single run, directly:
 ```bash
-python Agramon_withLAI_withETp.py --forcing etp --dem-plot 3 --pmin -50 --outlet-flux 0 --permx 1e-4 \
+python Agramon_withLAI_withETp.py --forcing etp_ts --etp-ts-feature-id <FEATURE_ID> --dem-plot 3 --pmin -50 --outlet-flux 0 --permx 1e-4 \
     --eta-net-neg-mode etp|gross|off --save-monthly --mesh-props --log-level INFO
 ```
 `--eta-net-neg-mode gross` is the recommended mode to expose water limitation (see TO-DO §5.2; decision pending).
@@ -41,7 +41,7 @@ Each run writes in `<path2prj>/outputs/<scenario_dir>/`: `*_output.nc`, `monthly
 **A3. Post-process / plot** (also available inside the run: add `--post-plots [--post-et-csv <ETA_CSV>]` to `Agramon_withLAI_withETp.py`, or `--extra --post-plots` with `run_paper_scenarios.py`; `run_summary.png` / `water_balance.png` (incl. the applied-Ks panel) are refreshed every month during the run anyway)
 ```bash
 python post_process.py                                  # every sim_index in the log CSV
-python post_process.py --scenario 7 8 --forcing etp --dem-res 5
+python post_process.py --scenario 7 8 --forcing etp_ts --dem-res 5
 python post_process.py --scenario 7 --et-csv <ETA_CSV_FROM_HECTOR> --monthly-ts
 ```
 (`./plot_scenarii_withETp_withLAI.sh` is now a thin wrapper around `post_process.py`.)

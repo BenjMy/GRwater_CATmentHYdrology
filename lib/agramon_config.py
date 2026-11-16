@@ -198,7 +198,7 @@ def feddes_params_from_args(args: argparse.Namespace) -> dict[str, float | None]
 #   "etp"    -> satellite ETp raster + satellite rain raster (PathET files)
 #   "etp_ts" -> ETp from the Agramon ET CSV time series (uniform over all pixels,
 #               treatment selected by --dem-plot) + satellite rain raster
-FORCING_MODE_DEFAULT = "etp"
+FORCING_MODE_DEFAULT = "etp_ts"
 FORCING_LABELS = {
     "era5": "ERA5",
     "etp": "satellite ETp + rain",
