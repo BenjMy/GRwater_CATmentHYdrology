@@ -75,7 +75,7 @@ from analyse_ET import (
     selection_label,
     parse_args,
 )
-from results_plotter import save_fig, maybe_show
+from plot_results_shared import save_fig, maybe_show
 
 RNG = np.random.default_rng(0)
 
@@ -457,7 +457,7 @@ def _parse_csv_args() -> tuple[Path, int | None]:
     """--et-csv / --csv-fid / --fire-date. Unknown flags (--plots, ...) are left alone."""
     global FIRE_DATE
     ap = argparse.ArgumentParser(add_help=False, allow_abbrev=False)
-    ap.add_argument("--et-csv", default=str(PathET / "agramon_treatments_ET.csv"))
+    ap.add_argument("--et-csv", default=str(__import__("agramon_config").ETP_CSV_PATH))
     ap.add_argument("--csv-fid", type=int, default=None)
     ap.add_argument("--fire-date", default=None, metavar="YYYY-MM-DD")
     ns, _ = ap.parse_known_args(sys.argv[1:])

@@ -23,6 +23,9 @@ from utils import Agramon_utils as AgUtils
 from agramon_config import (
     EO_PATH,
     ETP_TS_COLUMN_DEFAULT,
+    ET_CSV_NAME,
+    ETP_CSV_NAME,
+    LAI_FILE,
     NATIVE_CRS,
     TARGET_CRS,
     etp_path,
@@ -35,7 +38,7 @@ def load_monthly_lai(lai_input_dir: Path) -> xr.Dataset:
     Load monthly LAI dataset, assign its native CRS (EPSG:32630),
     and reproject to TARGET_CRS.
     """
-    ds_lai = xr.open_dataset(lai_input_dir / "lai_monthly.nc")
+    ds_lai = xr.open_dataset(Path(lai_input_dir) / LAI_FILE.name)
 
     if ds_lai.rio.crs is None:
         ds_lai = ds_lai.rio.write_crs("EPSG:32630")
@@ -96,7 +99,7 @@ def load_spatial_etp(path: Path = etp_path) -> xr.Dataset:
 VALUE_COLS = ["ET", "T", "ET_0_dry", "T_0_dry", "ET_0_wet", "T_0_wet"]
 
 
-def load_agramon_et(filename: Path = "agramon_ET.csv") -> pd.DataFrame:
+def load_agramon_et(filename: Path = ET_CSV_NAME) -> pd.DataFrame:
     """Load the single-series Agramon ET file.
 
     Returns
@@ -113,7 +116,7 @@ def load_agramon_et(filename: Path = "agramon_ET.csv") -> pd.DataFrame:
 
 
 def load_treatments_et(
-    filename: Path = "agramon_treatments_ET.csv",
+    filename: Path = ETP_CSV_NAME,
     drop_empty: bool = True,
     add_ratios: bool = True,
 ) -> pd.DataFrame:
@@ -181,10 +184,10 @@ def load_all(folder: Path = Path("."), **treatment_kwargs) -> pd.DataFrame:
     together (they are not the same series).
     """
     folder = Path(folder)
-    single = load_agramon_et(folder / "agramon_ET.csv").reset_index()
+    single = load_agramon_et(folder / ET_CSV_NAME).reset_index()
     single["source"] = "agramon_ET"
     treat = load_treatments_et(
-        folder / "agramon_treatments_ET.csv", **treatment_kwargs
+        folder / ETP_CSV_NAME, **treatment_kwargs
     ).reset_index()
     treat["source"] = "treatments"
 

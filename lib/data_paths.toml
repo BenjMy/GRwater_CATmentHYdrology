@@ -1,0 +1,43 @@
+# data_paths.toml - every INPUT path of the pipeline, in one place
+# ================================================================
+# Read by agramon_config.py (imported by the driver, the post-processing and the hypothesis
+# runners). To run another site / catchment, copy this file, edit it and point to it:
+#
+#     export AGRAMON_DATA_CONFIG=/path/to/my_site.toml
+#
+# Precedence (highest first):  AGRAMON_* environment variables  >  this file  >  built-in defaults.
+# Env overrides still honoured: AGRAMON_ROOT, AGRAMON_CODES, AGRAMON_LAI_PATH, AGRAMON_PATH_ET,
+# AGRAMON_WB_PRJ_ROOT, AGRAMON_MODULE_PATH.
+#
+# Path rules: "~" is expanded; an absolute path is used as is; a relative path is resolved against
+# the base written in its comment. File-name keys are relative to the folder key above them.
+# Empty string = use the built-in default.
+
+[general]
+root  = ""                                 # data root (Nextcloud). "" = machine auto-detection
+codes = "BenCSIC/Codes/Tech4agro_org"      # relative to root; holds the GRwater_* repos
+
+[crs]
+target = "EPSG:25830"      # everything is reprojected to this CRS before any operation
+native = "EPSG:32630"      # CRS of the LAI / ETp / rain rasters as delivered
+
+[forcing]                                   # satellite ETp / rain, EO ETa, ETp time series
+dir         = "GRwater/data/satellite/Agramon"   # relative to root
+etp_raster  = "20161001_20241231_ET0.nc"    # --forcing etp      (gridded ETp)
+rain_raster = "20161001_20241231_TP.nc"     # --forcing etp / etp_ts (gridded rain)
+eo_et       = "20161001_20241231_ET.nc"     # EO energy-balance ETa (validation reference)
+etp_csv     = "agramon_treatments_ET.csv"   # --forcing etp_ts : ETp (ET_0_wet / ET_0_dry) per treatment
+et_csv      = "agramon_ET.csv"              # single-series ET csv (same folder)
+
+[vegetation]
+dir  = "BenCSIC/Training_Supervision/Supervision/Xela_Carracedo_Practicas_2026_data/301a-biophysical/agramon/input"   # relative to root
+file = "lai_monthly.nc"                     # monthly LAI
+
+[terrain]                                   # relative to the repo root unless absolute
+dem_tif         = "DTMplots/20250618_AGRAMON100m_micasense_dtm.tif"
+shapefile_dir   = "data/microcuencas_13"
+shapefile_names = ["microcuencas_13"]
+
+[outputs]
+# CATHY project tree read by the post-processing (analysis_ET_compare, hypothesis validation)
+wb_prj_root = "BenCSIC/Training_Supervision/Supervision/Xela_Carracedo_Practicas_2026_data/SSHydro_withETp_withLAI"   # relative to root

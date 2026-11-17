@@ -49,8 +49,8 @@ if str(MODULE_PATH) not in sys.path:
     sys.path.append(str(MODULE_PATH))
 
 import Agramon_utils as AgUtils
-import results_plotter
-from results_plotter import save_fig, maybe_show
+import plot_results_shared
+from plot_results_shared import save_fig, maybe_show
 
 fig_path = Path().cwd() / "../Analysis"
 et_path  = PathET / "20161001_20241231_ET.nc"
@@ -250,18 +250,18 @@ def clip_dataset(
 # Plotting — thin wrappers that inject the label into filenames
 #
 # Root cause of the blank-figure bug:
-#   results_plotter functions call maybe_show(fig, show) internally, which
+#   plot_results_shared functions call maybe_show(fig, show) internally, which
 #   calls plt.close(fig) even when show=False.  plt.gcf() after that returns
 #   a NEW blank figure.
 #
-# Fix: pass show=False so the figure is saved inside results_plotter with its
+# Fix: pass show=False so the figure is saved inside plot_results_shared with its
 #   default hardcoded name, then immediately rename / re-save it with our
 #   label-aware name using the still-open figure object retrieved via
 #   plt.get_fignums() before the close happens.
 #
-# Cleanest approach: create the figure, let results_plotter draw into it (it
+# Cleanest approach: create the figure, let plot_results_shared draw into it (it
 #   always calls plt.tight_layout() before save_fig), capture it before close.
-#   Since results_plotter always creates its own fig internally we instead
+#   Since plot_results_shared always creates its own fig internally we instead
 #   patch around the close by saving plt.gcf() *before* calling the plotter,
 #   then retrieving the last figure number after the call.
 # =============================================================================
@@ -287,7 +287,7 @@ def run_plots(
     out_path.mkdir(parents=True, exist_ok=True)
 
     # Monthly mean by year
-    results_plotter.plot_eta_monthly_by_year(
+    plot_results_shared.plot_eta_monthly_by_year(
         ds_crop,
         et_var=et_var,
         fig_path=out_path,
@@ -297,7 +297,7 @@ def run_plots(
     )
 
     # Spatial maps
-    _orig_save = results_plotter.save_fig
+    _orig_save = plot_results_shared.save_fig
 
     def _labelled_save(fig, fp, name, dpi=150):
         return _orig_save(
@@ -307,10 +307,10 @@ def run_plots(
             dpi,
         )
 
-    results_plotter.save_fig = _labelled_save
+    plot_results_shared.save_fig = _labelled_save
 
     try:
-        results_plotter.plot_eta_spatial_maps_year(
+        plot_results_shared.plot_eta_spatial_maps_year(
             ds_crop,
             et_var=et_var,
             selected_year=selected_year,
@@ -319,10 +319,10 @@ def run_plots(
             product_name=product_name,
         )
     finally:
-        results_plotter.save_fig = _orig_save
+        plot_results_shared.save_fig = _orig_save
 
     # Annual histogram
-    results_plotter.plot_eta_annual_hist(
+    plot_results_shared.plot_eta_annual_hist(
         ds_crop,
         et_var=et_var,
         fig_path=out_path,
@@ -332,7 +332,7 @@ def run_plots(
     )
 
     # Monthly + annual totals
-    results_plotter.plot_eta_total(
+    plot_results_shared.plot_eta_total(
         ds_crop,
         fig_path=out_path,
         label=label,
@@ -356,10 +356,10 @@ def plot_eta_etp_timeseries(
     Top panel    : spatial-mean ETa and ETp per time step [mm]
     Bottom panel : ETa / ETp ratio per time step (dashed line at 1.0 for reference)
 
-    NOTE: this is a standalone plot (not routed through results_plotter.py,
+    NOTE: this is a standalone plot (not routed through plot_results_shared.py,
     which wasn't available when this was added) — it reuses the same
     save_fig / maybe_show helpers so behaviour and output layout stay
-    consistent with the other diagnostics. If results_plotter.py already has
+    consistent with the other diagnostics. If plot_results_shared.py already has
     a house style (colors, fonts, dpi) this doesn't pick it up automatically —
     happy to align it once that file's shared.
     """

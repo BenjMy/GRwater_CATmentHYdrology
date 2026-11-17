@@ -23,13 +23,22 @@ ETP_TS_COLUMN_DEFAULT = "ET_0_dry"
 
 
 # ── Data paths ────────────────────────────────────────────────────────────────
-# Paths come from environment variables; if unset, the previous machine
-# auto-detection is the fallback (REFACTORING.md 2.4 — backward compatible):
-#   AGRAMON_ROOT      Nextcloud root (default: auto-detected as before)
-#   AGRAMON_CODES     folder holding the repo      (default: ROOT/BenCSIC/Codes/Tech4agro_org)
-#   AGRAMON_LAI_PATH  LAI inputs folder            (default: see below)
-#   AGRAMON_PATH_ET   folder with ET0 / TP netCDF  (default: ROOT/GRwater/data/satellite/Agramon)
+# ALL input paths are declared in lib/data_paths.toml (or the file named by the
+# AGRAMON_DATA_CONFIG environment variable) so another catchment only needs its own
+# TOML. Precedence, highest first:  AGRAMON_* env vars  >  TOML  >  built-in defaults:
+#   AGRAMON_DATA_CONFIG  alternative TOML file          (default: lib/data_paths.toml)
+#   AGRAMON_ROOT         data root, e.g. Nextcloud       (default: machine auto-detection)
+#   AGRAMON_CODES        folder holding the repo         (default: ROOT/<general.codes>)
+#   AGRAMON_LAI_PATH     LAI folder                      (default: ROOT/<vegetation.dir>)
+#   AGRAMON_PATH_ET      folder with ETp/rain/ET/csv     (default: ROOT/<forcing.dir>)
+#   AGRAMON_WB_PRJ_ROOT  CATHY project tree (post-proc)  (default: ROOT/<outputs.wb_prj_root>)
 import os
+
+HERE = Path(__file__).resolve().parent
+REPO_ROOT = HERE.parent
+
+DATA_CONFIG_ENV = "AGRAMON_DATA_CONFIG"
+DEFAULT_DATA_CONFIG = HERE / "data_paths.toml"
 
 
 def _env_path(name, default):
@@ -38,26 +47,95 @@ def _env_path(name, default):
     return Path(val).expanduser() if val else Path(default)
 
 
+def _read_toml(path: Path) -> dict:
+    try:
+        import tomllib                                    # Python >= 3.11
+    except ModuleNotFoundError:
+        try:
+            import tomli as tomllib                       # type: ignore  (pip install tomli)
+        except ModuleNotFoundError:
+            raise SystemExit(f"Python < 3.11 needs the 'tomli' package to read {path}: "
+                             "pip install tomli")
+    return tomllib.loads(Path(path).read_text())
+
+
+def _resolve(value, base: Path) -> Path:
+    """'~' expanded; absolute kept; relative resolved against ``base``."""
+    p = Path(str(value)).expanduser()
+    return p if p.is_absolute() else Path(base) / p
+
+
+# Built-in defaults == the previous hard-coded values (used when the TOML omits a key).
+_DEFAULTS = {
+    "general": {"root": "", "codes": "BenCSIC/Codes/Tech4agro_org"},
+    "crs": {"target": "EPSG:25830", "native": "EPSG:32630"},
+    "forcing": {"dir": "GRwater/data/satellite/Agramon",
+                "etp_raster": "20161001_20241231_ET0.nc",
+                "rain_raster": "20161001_20241231_TP.nc",
+                "eo_et": "20161001_20241231_ET.nc",
+                "etp_csv": "agramon_treatments_ET.csv",
+                "et_csv": "agramon_ET.csv"},
+    "vegetation": {"dir": ("BenCSIC/Training_Supervision/Supervision/"
+                           "Xela_Carracedo_Practicas_2026_data/301a-biophysical/agramon/input"),
+                   "file": "lai_monthly.nc"},
+    "terrain": {"dem_tif": "DTMplots/20250618_AGRAMON100m_micasense_dtm.tif",
+                "shapefile_dir": "data/microcuencas_13",
+                "shapefile_names": ["microcuencas_13"]},
+    "outputs": {"wb_prj_root": ("BenCSIC/Training_Supervision/Supervision/"
+                                "Xela_Carracedo_Practicas_2026_data/SSHydro_withETp_withLAI")},
+}
+
+
+def load_data_config(path=None) -> dict:
+    """The data-paths TOML merged over the built-in defaults (``path`` > $AGRAMON_DATA_CONFIG >
+    lib/data_paths.toml > defaults only). Returns ``{section: {key: value}}``."""
+    cfg = {sec: dict(vals) for sec, vals in _DEFAULTS.items()}
+    chosen = Path(path).expanduser() if path else _env_path(DATA_CONFIG_ENV, DEFAULT_DATA_CONFIG)
+    if chosen.exists():
+        for sec, vals in _read_toml(chosen).items():
+            if sec in cfg and isinstance(vals, dict):
+                cfg[sec].update({k: v for k, v in vals.items() if v not in ("", None)})
+    elif path or os.environ.get(DATA_CONFIG_ENV, "").strip():
+        raise FileNotFoundError(f"data config not found: {chosen}")
+    cfg["_source"] = {"file": str(chosen) if chosen.exists() else "built-in defaults"}
+    return cfg
+
+
+DATA_CFG = load_data_config()
+
 HOME = Path.home()
 if HOME.name == "z0272571a@campus.csic.es":
     _DEFAULT_ROOT = HOME / "Nextcloud"
 else:
     _DEFAULT_ROOT = Path("/home/ben/Nextcloud")
-ROOT = _env_path("AGRAMON_ROOT", _DEFAULT_ROOT)
+ROOT = _env_path("AGRAMON_ROOT", _resolve(DATA_CFG["general"]["root"], Path.cwd())
+                 if DATA_CFG["general"]["root"] else _DEFAULT_ROOT)
 
-CODES = _env_path("AGRAMON_CODES", ROOT / "BenCSIC" / "Codes" / "Tech4agro_org")
+CODES = _env_path("AGRAMON_CODES", _resolve(DATA_CFG["general"]["codes"], ROOT))
 
-# MODULE_PATH = (CODES / "GRwater_geophy").resolve()
-EO_PATH     = (CODES / "GRwater_CATmentHYdrology").resolve()
+# Repo root: CODES/GRwater_CATmentHYdrology when the repo lives there (historical layout),
+# otherwise the checkout this file sits in, so a fresh clone works anywhere.
+_repo_in_codes = (CODES / "GRwater_CATmentHYdrology")
+EO_PATH = (_repo_in_codes if _repo_in_codes.exists() else REPO_ROOT).resolve()
 
-LAI_PATH = _env_path("AGRAMON_LAI_PATH", (
-    ROOT / "BenCSIC" / "Training_Supervision" / "Supervision"
-    / "Xela_Carracedo_Practicas_2026_data" / "301a-biophysical" / "agramon" / "input"
-)).resolve()
+LAI_PATH = _env_path("AGRAMON_LAI_PATH",
+                     _resolve(DATA_CFG["vegetation"]["dir"], ROOT)).resolve()
+LAI_FILE = LAI_PATH / DATA_CFG["vegetation"]["file"]
 
-PathET    = _env_path("AGRAMON_PATH_ET", ROOT / "GRwater" / "data" / "satellite" / "Agramon")
-etp_path  = PathET / "20161001_20241231_ET0.nc"
-rain_path = PathET / "20161001_20241231_TP.nc"
+PathET        = _env_path("AGRAMON_PATH_ET", _resolve(DATA_CFG["forcing"]["dir"], ROOT))
+etp_path      = PathET / DATA_CFG["forcing"]["etp_raster"]
+rain_path     = PathET / DATA_CFG["forcing"]["rain_raster"]
+EO_ET_PATH    = PathET / DATA_CFG["forcing"]["eo_et"]          # EO-EB ETa (validation reference)
+ETP_CSV_NAME  = DATA_CFG["forcing"]["etp_csv"]                 # ETp time series (etp_ts forcing)
+ET_CSV_NAME   = DATA_CFG["forcing"]["et_csv"]
+ETP_CSV_PATH  = PathET / ETP_CSV_NAME
+
+DEM_TIF         = _resolve(DATA_CFG["terrain"]["dem_tif"], EO_PATH)
+SHAPEFILE_DIR   = _resolve(DATA_CFG["terrain"]["shapefile_dir"], EO_PATH)
+SHAPEFILE_NAMES = list(DATA_CFG["terrain"]["shapefile_names"])
+
+WB_PRJ_ROOT = _env_path("AGRAMON_WB_PRJ_ROOT",
+                        _resolve(DATA_CFG["outputs"]["wb_prj_root"], ROOT)).expanduser()
 
 
 # ── Constants ─────────────────────────────────────────────────────────────────
@@ -65,8 +143,8 @@ rain_path = PathET / "20161001_20241231_TP.nc"
 # All spatial datasets are reprojected to this CRS before any operation.
 # DEM / shapefiles : EPSG:25830 (UTM zone 30N, ETRS89)
 # LAI / ETp / rain : EPSG:32630 (UTM zone 30N, WGS84) — same zone, different datum
-TARGET_CRS = "EPSG:25830"
-NATIVE_CRS = "EPSG:32630"
+TARGET_CRS = DATA_CFG["crs"]["target"]
+NATIVE_CRS = DATA_CFG["crs"]["native"]
 
 # LAI class boundaries  [very low | low | moderate | high | very high]
 # Calibrated to the observed LAI range (~1 – 3 m² m⁻²), spaced evenly so each

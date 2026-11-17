@@ -56,8 +56,8 @@ if str(MODULE_PATH) not in sys.path:
     sys.path.append(str(MODULE_PATH))
 
 import Agramon_utils as AgUtils
-import results_plotter
-from results_plotter import save_fig, maybe_show
+import plot_results_shared
+from plot_results_shared import save_fig, maybe_show
 
 fig_path = Path().cwd() / "../Analysis/LAI"
 lai_file = LAI_PATH / "lai_monthly.nc"
@@ -258,7 +258,7 @@ def plot_lai_monthly_by_year(
 ) -> None:
     """
     Spatial-mean LAI per calendar month, one line per year.
-    Mirrors results_plotter.plot_eta_monthly_by_year in style.
+    Mirrors plot_results_shared.plot_eta_monthly_by_year in style.
     """
     da = ds[lai_var]
 
@@ -304,7 +304,7 @@ def plot_lai_spatial_maps_year(
 ) -> None:
     """
     Monthly spatial maps (mosaic) for *selected_year*.
-    Mirrors results_plotter.plot_eta_spatial_maps_year in style.
+    Mirrors plot_results_shared.plot_eta_spatial_maps_year in style.
     """
     da = ds[lai_var]
     da_year = da.sel(time=da["time"].dt.year == selected_year)
@@ -362,7 +362,7 @@ def plot_lai_annual_hist(
 ) -> None:
     """
     Histogram of per-pixel annual mean LAI (all years combined).
-    Mirrors results_plotter.plot_eta_annual_hist in style.
+    Mirrors plot_results_shared.plot_eta_annual_hist in style.
     """
     da = ds[lai_var]
 
@@ -401,7 +401,7 @@ def plot_lai_annual_mean(
 ) -> None:
     """
     Bar chart of domain-mean annual LAI with an overlaid trend line.
-    Mirrors results_plotter.plot_eta_total in style.
+    Mirrors plot_results_shared.plot_eta_total in style.
     """
     da = ds[lai_var]
 

@@ -128,6 +128,8 @@ def run_spinup(
         scf=args.scf,
         zroot_factors=zroot_factors_from_args(args),
         permx=args.permx,
+        permx_bottom=getattr(args, "permx_bottom", None),
+        ks_layer_depth=getattr(args, "ks_layer_depth", None),
         permy_ratio=args.permy_ratio,
         permz_ratio=args.permz_ratio,
         pcana=_feddes["pcana"], pcref=_feddes["pcref"], pcwlt=_feddes["pcwlt"],

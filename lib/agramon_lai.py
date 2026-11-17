@@ -94,6 +94,26 @@ def smooth_veg_map(
     return out
 
 
+def _apply_two_layer_ks(simu, df_spp, ks_top, ks_bottom, top_depth, permy_ratio, permz_ratio):
+    """df_spp with PERMX/Y/Z set per CATHY layer (ks_top above top_depth, ks_bottom below)."""
+    from agramon_ks import layer_permx_profile, layers_from_simu
+    zratio, base = layers_from_simu(simu)
+    nstr = len(zratio)
+    profile = layer_permx_profile(zratio, base, top_depth, ks_top, ks_bottom)
+    if len(df_spp) == 1:
+        df_spp = pd.concat([df_spp] * nstr, ignore_index=True)
+        df_spp.index = pd.RangeIndex(1, nstr + 1)
+    elif len(df_spp) != nstr:
+        raise ValueError(f"two-layer Ks: SPP_map has {len(df_spp)} rows, expected 1 or "
+                         f"NSTR={nstr} (one per CATHY layer)")
+    for col, ratio in (("PERMX", 1.0), ("PERMY", permy_ratio), ("PERMZ", permz_ratio)):
+        df_spp[col] = profile * ratio
+    n_top = int((profile == ks_top).sum()) if ks_top != ks_bottom else 0
+    label = (f"2 layers: PERMX={ks_top:.3e} (top {top_depth:g} m, {n_top}/{nstr} CATHY layers) / "
+             f"{ks_bottom:.3e} m/s below; PERMY/PERMZ ratios {permy_ratio:g}/{permz_ratio:g}")
+    return df_spp, label
+
+
 def update_soil_for_active_zones(
     simu,
     active_zones: set[int],
@@ -114,6 +134,8 @@ def update_soil_for_active_zones(
     pz: float | None = None,
     omgc: float | None = None,
     feddes_crop: str | None = None,
+    permx_bottom: float | None = None,
+    ks_layer_depth: float | None = None,
 ) -> None:
     """
     ``zroot_factors`` overrides the module-level ZROOT_FACTORS mapping
@@ -209,6 +231,13 @@ def update_soil_for_active_zones(
                       f"--permx/--permy-ratio/--permz-ratio ignored for it.")
         permx_label = (f"PERMX={permx:.3e}, PERMY={overrides['PERMY']:.3e}, "
                        f"PERMZ={overrides['PERMZ']:.3e} m/s")
+
+        # Two-layer Ks (--permx-bottom / --ks-layer-depth): one SPP row per CATHY layer, the
+        # top layer keeps the values set above, deeper layers get permx_bottom (same
+        # anisotropy ratios). Rows are per layer, as in pyCATHY's SPP_map (NSTR rows, 1 zone).
+        if permx_bottom is not None:
+            df_spp, permx_label = _apply_two_layer_ks(
+                simu, df_spp, permx, permx_bottom, ks_layer_depth, permy_ratio, permz_ratio)
 
     # Retention curve (van Genuchten) overrides — VGNCELL/VGRMCCELL/
     # VGPSATCELL — same broadcast-to-every-row pattern as permx above.

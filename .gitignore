@@ -16,3 +16,6 @@ lib/synthetic_LAI_Ks_wet/
 
 # Synthetic Ks study results (outside lib/)
 results/
+
+# Batch / run logs (no longer written by the runner, never tracked)
+*.log

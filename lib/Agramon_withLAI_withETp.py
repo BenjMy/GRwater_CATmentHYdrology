@@ -65,7 +65,7 @@ from pyCATHY import meshtools as mt
 from utils import Agramon_utils as AgUtils
 from utils import ks_fire_utils as KsFire
 from agramon_ks import (FIRE_DATE_DEFAULT, ks_banner_label, ks_config_from_args,
-                        ks_for_month, ks_key, ks_tag)
+                        ks_for_month, ks_key, ks_tag, validate_two_layer_args)
 from pyCATHY import cathy_tools, cathy_utils
 from pyCATHY.petro import Feddes_litterature  # literature-based Feddes lookup
 
@@ -83,8 +83,12 @@ from agramon_config import (
     FORCING_LABELS,
     FORCING_MODE_DEFAULT,
     ForcingMode,
+    DEM_TIF,
     EO_PATH,
+    ETP_CSV_PATH,
     LAI_PATH,
+    SHAPEFILE_DIR,
+    SHAPEFILE_NAMES,
     N_VEG_CLASSES,
     NATIVE_CRS,
     PathET,
@@ -237,6 +241,17 @@ def _parse_args() -> argparse.Namespace:
              "pyCATHY's own SPP default untouched."
     )
     soil.add_argument(
+        "--permx-bottom", type=float, default=None, metavar="M/S",
+        help="Two-layer Ks: PERMX (m/s) of the soil BELOW --ks-layer-depth; the top layer "
+             "keeps --permx (or the post-fire Ks of the month). Default: off (one Ks for the "
+             "whole column). PERMY/PERMZ follow --permy-ratio / --permz-ratio."
+    )
+    soil.add_argument(
+        "--ks-layer-depth", type=float, default=None, metavar="M",
+        help="Two-layer Ks: thickness (m) of the top layer; a CATHY layer is 'top' when its "
+             "centre is shallower than this. Required with --permx-bottom."
+    )
+    soil.add_argument(
         "--permy-ratio", type=float, default=1.0, metavar="RATIO",
         help="Anisotropy ratio: PERMY = --permx * this value. Only takes "
              "effect when --permx is set."
@@ -331,10 +346,10 @@ def _parse_args() -> argparse.Namespace:
                             "--dem-plot as feature_id = dem_plot - 1")
 
     dem = p.add_argument_group("DEM selection")
-    dem.add_argument("--dem-tif", default=str(EO_PATH / "DTMplots/20250618_AGRAMON100m_micasense_dtm.tif"),
+    dem.add_argument("--dem-tif", default=str(DEM_TIF),
                      metavar="PATH",
                      help="Full path to the GeoTIFF DEM used to build the mesh "
-                          "(default: 20250618_AGRAMON100m_micasense_dtm.tif)")
+                          "(default: terrain.dem_tif of data_paths.toml)")
     dem.add_argument("--dem-plot",   type=int, default=3, choices=range(1, 14), metavar="N",
                      help="Plot index (1-13, matches gdf_Agramon's fid_1 column) used to "
                           "clip the DEM (loaded from --dem-tif) to that plot's footprint")
@@ -413,8 +428,7 @@ def _check_crs_alignment(label_a: str, crs_a, label_b: str, crs_b) -> None:
 def load_shapefiles():
     """Load Agramon plot shapefiles, ensuring TARGET_CRS."""
     #gdf = AgUtils.load_plot_shapefiles(MODULE_PATH / "shapefiles")
-    gdf = AgUtils.load_plot_shapefiles(['microcuencas_13'],
-                                               EO_PATH / "data/microcuencas_13")
+    gdf = AgUtils.load_plot_shapefiles(SHAPEFILE_NAMES, SHAPEFILE_DIR)
 
     if gdf.crs is None:
         raise ValueError("Shapefile has no CRS — assign one before proceeding.")
@@ -506,6 +520,7 @@ def setup_inputs(args: argparse.Namespace) -> RunInputs:
             f"  |  PERMZ ratio {args.permz_ratio}"
         )
     ks_cfg = ks_config_from_args(args)      # validates --ks-fire-* now, not at month 1
+    validate_two_layer_args(args)           # --permx-bottom / --ks-layer-depth consistency
     spinup_banner_label = (
         "disabled" if args.no_spinup else f"{args.spinup_cycles} cycle(s)"
     )
@@ -521,6 +536,9 @@ def setup_inputs(args: argparse.Namespace) -> RunInputs:
     log.info(f"  Feddes (FP)    : {feddes_label}")
     log.info(f"  PERMX (Ks)     : {banner_permx_label}")
     log.info(f"  Post-fire Ks   : {ks_banner_label(ks_cfg)}")
+    if args.permx_bottom is not None:
+        log.info(f"  Two-layer Ks   : top {args.ks_layer_depth:g} m = PERMX above, "
+                 f"{args.permx_bottom:.3e} m/s below")
     log.info(f"  DEM source     : {dem_tif_path}")
     log.info(f"  Log file       : {args.log_file}")
     log.info(f"  Spin-up        : {spinup_banner_label}")
@@ -591,7 +609,7 @@ def setup_inputs(args: argparse.Namespace) -> RunInputs:
     )
 
     # Single source of truth for this run's folder name (project dir,
-    # outputs dir, markdown log, and — via withLAI_results.py — the
+    # outputs dir, markdown log, and — via plot_run_results.py — the
     # figures dir all reuse it), so the same run always lands in the
     # same, comparably-named place. See build_scenario_dirname() above.
     scenario_dirname = build_scenario_dirname(
@@ -871,7 +889,7 @@ def build_atmbc(args: argparse.Namespace, inp: RunInputs,
         md_log.section("Atmospheric forcing — provenance & units")
         md_log.meta({
             "ETp source": (
-                f"{PathET / 'agramon_treatments_ET.csv'} "
+                f"{ETP_CSV_PATH} "
                 f"(feature_id={etp_ts_fid}, "
                 f"column={args.etp_ts_column}; same value for every pixel)"
                 if fm.use_etp_ts else str(etp_path)),
@@ -1289,6 +1307,8 @@ def run_one_month(args, inp, ms, atm, st, ks_cfg, dt, lai_2d,
                                  scf=args.scf,
                                  zroot_factors=zroot_factors_from_args(args),
                                  permx=permx_month,
+                                 permx_bottom=args.permx_bottom,
+                                 ks_layer_depth=args.ks_layer_depth,
                                  permy_ratio=args.permy_ratio,
                                  permz_ratio=args.permz_ratio,
                                  pcana=feddes["pcana"], pcref=feddes["pcref"],

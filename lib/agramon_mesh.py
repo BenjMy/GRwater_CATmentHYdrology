@@ -2,7 +2,7 @@
 agramon_mesh.py - DEM loading, mesh set-up and boundary conditions for the Agramon pipeline
 =========================================================================================
 Moved unchanged from Agramon_withLAI_withETp.py (REFACTORING.md 2.3); the main script
-re-exports the names, so withLAI_results.py and the synthetic Ks study keep working.
+re-exports the names, so plot_run_results.py and the synthetic Ks study keep working.
 
 Planned (TO-DO.md 5.4): systematic soil / root properties in the mesh .vtk will be built on
 top of this module.

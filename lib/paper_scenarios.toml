@@ -1,4 +1,4 @@
-# paper_scenarios.toml - Agramon paper runs (replaces the copy-paste blocks of to_run_paper.md)
+# paper_scenarios.toml - Agramon paper runs (replaced the copy-paste blocks of the former to_run_paper.md, now removed)
 # =========================================================================================
 # One table per scenario. [name.args]: CLI options of run_scenarii_withETp_withLAI_ALL.sh
 #   scalar -> "--key value" | list -> "--key v1 v2 ..." (multi-value flags) | true -> "--key"
@@ -10,7 +10,7 @@
 # Root-depth sets: baseline 0.1 0.3 1.0 1.5 2.5 | deeper 0.3 0.6 2.0 3.0 5.0 | uniform 2.5 (x5)
 
 [baseline_zroot_dem3]
-description = "dem 3, PMIN -1e34/-15, baseline vs uniform 2.5 root depth, Ks 1e-4 (first block of to_run_paper.md)"
+description = "dem 3, PMIN -1e34/-15, baseline vs uniform 2.5 root depth, Ks 1e-4"
 tags = ["baseline", "zroot"]
 [baseline_zroot_dem3.args]
 dem-plot = ["3"]
@@ -97,7 +97,7 @@ ic = "pressure"
 permx = "6e-4"
 zroot-factors = ["0.3", "0.6", "2.0", "3.0", "5.0"]
 
-# "Good one" of to_run_paper.md. The old shell recipe passed "${KS_VALUES}", which expands
+# The former "Good one" recipe. The old shell recipe passed "${KS_VALUES}", which expands
 # to the FIRST element only (1e-4); the loop below really runs the three Ks values.
 [paper_good]
 description = "dem 3, PMIN -50/-1e35, outlet+bottom both, IC both (-100 m), Ks 1e-4/6e-4/1e-3, deeper rooting"

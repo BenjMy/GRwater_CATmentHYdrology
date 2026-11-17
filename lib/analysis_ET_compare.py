@@ -16,7 +16,7 @@ Figures produced
 Saved under ``<fig_path>/<scenario_dirname>/``, where scenario_dirname is
 the resolved (possibly tagged) scenario_<sim_index>[_tag] folder name for
 --scenario (e.g. scenario_7_plot2_outlet-free_bottom-closed_spinup-on3c) —
-same naming convention as withLAI_results.py's figures/ tree, so each
+same naming convention as plot_run_results.py's figures/ tree, so each
 scenario's ET-compare plots land in their own folder instead of
 overwriting one another in a flat directory.
 
@@ -82,7 +82,7 @@ Usage
                                   --log-file simulation_log_withETp_withLAI.csv
         # point --scenario's resolution at a specific project tree/log —
         # same values plot_scenarii_withETp_withLAI.sh passes to
-        # withLAI_results.py for that experiment. Without these, --scenario
+        # plot_run_results.py for that experiment. Without these, --scenario
         # is resolved against the WB_PRJ_ROOT/LOG_FILE module defaults.
 """
 
@@ -108,26 +108,19 @@ import xarray as xr
 # Paths & constants
 # =============================================================================
 
-# Nextcloud root: AGRAMON_ROOT env var, else the historical default (REFACTORING 2.14)
-_NC = Path(os.environ.get("AGRAMON_ROOT") or "/home/z0272571a@campus.csic.es/Nextcloud").expanduser()
+# All input paths come from agramon_config (lib/data_paths.toml, AGRAMON_* env overrides).
+from agramon_config import CODES, EO_ET_PATH, ETP_CSV_PATH, LAI_FILE, WB_PRJ_ROOT   # noqa: E402
 
-EO_ET_PATH = Path(os.environ.get("AGRAMON_PATH_ET") or (_NC / "GRwater/data/satellite/Agramon")).expanduser() / "20161001_20241231_ET.nc"
-
-# Root of CATHY project — simulation artefacts live under <WB_PRJ_ROOT>/sim<N>/outputs/
-# WB_PRJ_ROOT = Path(
-#     "/home/z0272571a@campus.csic.es/Nextcloud/BenCSIC/Codes"
-#     "/Tech4agro_org/GRwater_CATmentHYdrology"
-# )
-WB_PRJ_ROOT = Path(os.environ.get("AGRAMON_WB_PRJ_ROOT") or (_NC / "BenCSIC/Training_Supervision/Supervision/Xela_Carracedo_Practicas_2026_data/SSHydro_withETp_withLAI")).expanduser()
+# Root of CATHY project - simulation artefacts live under <WB_PRJ_ROOT>/outputs/scenario_*/
 
 # Shared CSV log produced by LT_SShydro_run_withLAI.py — same file used by
-# withLAI_results.py to resolve a --scenario index into the actual (possibly
+# plot_run_results.py to resolve a --scenario index into the actual (possibly
 # tagged) scenario_<N>[_tag] output folder. Resolved under
 # <WB_PRJ_ROOT>/../Codigos_HydroModel/<LOG_FILE> via _resolve_log().
 LOG_FILE = "simulation_log_withETp_withLAI.csv"
 
 
-MODULE_PATH = Path(os.environ.get("AGRAMON_MODULE_PATH") or (_NC / "BenCSIC/Codes/Tech4agro_org/GRwater_geophy")).expanduser().resolve()
+MODULE_PATH = Path(os.environ.get("AGRAMON_MODULE_PATH") or (CODES / "GRwater_geophy")).expanduser().resolve()
 if str(MODULE_PATH) not in sys.path:
     sys.path.append(str(MODULE_PATH))
 
@@ -142,7 +135,7 @@ WB_ET_SCALE = 1e3 * 86400        # m/s  → mm/day
 
 # Agramon ET CSV (per-treatment, long format) — same folder as the EO NetCDF.
 # Columns used: ET (real ET), ET_0_dry, ET_0_wet (mm/day), feature_id, t.
-ET_CSV_PATH = EO_ET_PATH.parent / "agramon_treatments_ET.csv"
+ET_CSV_PATH = ETP_CSV_PATH
 COLOR_CSV_ET  = "black"
 COLOR_CSV_DRY = "#e08214"
 COLOR_CSV_WET = "#2c7fb8"
@@ -157,11 +150,11 @@ fig_path = Path().cwd() / "../Analysis/ET_compare"
 # -----------------------------------------------------------------------------
 # LAI-zone comparison (per-zone ETa, not just domain-mean)
 # -----------------------------------------------------------------------------
-# Same monthly LAI product used by withLAI_results.py / Agramon_withLAI_
+# Same monthly LAI product used by plot_run_results.py / Agramon_withLAI_
 # withETp.py (LAI_PATH / "lai_monthly.nc") — NOT alongside EO_ET_PATH.
 # (Previously guessed as EO_ET_PATH.parent / "20161001_20241231_LAI.nc",
 # which doesn't exist, silently disabling Fig F/G every run.)
-LAI_PATH = Path(os.environ.get("AGRAMON_LAI_PATH") or (_NC / "BenCSIC/Training_Supervision/Supervision/Xela_Carracedo_Practicas_2026_data/301a-biophysical/agramon/input")).expanduser() / "lai_monthly.nc"
+LAI_PATH = LAI_FILE
 
 # Zones are tercile-split (by default) on the PRE-FIRE time-mean LAI, so
 # zone boundaries are fixed at the pre-disturbance vegetation structure —
@@ -172,7 +165,7 @@ N_LAI_ZONES  = 3
 ZONE_LABELS  = ("Bare", "Moderate veg.", "Dense veg.")
 CMAP_ZONES   = mcolors.ListedColormap(["#d4b483", "#78c679", "#006837"])
 
-# Duplicated locally (rather than imported from results_plotter, which
+# Duplicated locally (rather than imported from plot_results_shared, which
 # pulls in pyCATHY) so this script keeps its own lighter dependency set.
 FIRE_DATE = pd.Timestamp("2020-07-01")
 
@@ -436,7 +429,7 @@ def _find_sim_dir(scenario: int, log_file: str | None = None) -> Path:
     """
     Locate the WB simulation output folder for *scenario*.
 
-    Mirrors withLAI_results.py's scenario-selection pattern instead of
+    Mirrors plot_run_results.py's scenario-selection pattern instead of
     assuming a flat <WB_PRJ_ROOT>/sim<N>/outputs/ layout (which is not how
     LT_SShydro_run_withLAI.py actually writes its outputs):
       1. Resolve *scenario* to a sim_index via the shared log
@@ -526,6 +519,12 @@ def load_wb_et(scenario: int = 0) -> tuple[xr.Dataset, Path]:
                   subfolder name (see __main__).
     """
     sim_dir = _find_sim_dir(scenario)
+    return load_wb_et_from_dir(sim_dir), sim_dir
+
+
+def load_wb_et_from_dir(sim_dir: Path) -> xr.Dataset:
+    """Same as load_wb_et but for an explicit scenario folder (no log lookup): mm/day, (x, y, time)."""
+    sim_dir = Path(sim_dir)
     nc_path = sim_dir / "et_output.nc"
     if not nc_path.exists():
         raise FileNotFoundError(f"et_output.nc not found in {sim_dir}")
@@ -563,7 +562,7 @@ def load_wb_et(scenario: int = 0) -> tuple[xr.Dataset, Path]:
     ds = ds.rio.write_crs(TARGET_CRS, inplace=False)
     ds = ds.rio.set_spatial_dims(x_dim="x", y_dim="y", inplace=False)
     print(f"  WB-ET final dims : {dict(ds.dims)}   CRS: {ds.rio.crs}")
-    return ds, sim_dir
+    return ds
 
 
 # =============================================================================
@@ -1589,6 +1588,62 @@ def run_comparison(
 
 
 # =============================================================================
+# Validation of one run against the EO energy-balance ETa (used by the hyp*.py runners)
+# =============================================================================
+
+def validate_against_eb(
+    sim_dir: Path,
+    *,
+    gdf_proj: gpd.GeoDataFrame | None = None,
+    ds_eo: xr.Dataset | None = None,
+    fig_dir: Path | None = None,
+    full_figures: bool = False,
+    selected_year: int = 2020,
+    n_zones: int = N_LAI_ZONES,
+) -> dict:
+    """
+    Compare the WB ETa of one scenario folder with the EO-EB ETa NetCDF (EO_ET_PATH).
+
+    Steps (same as ``main``): load et_output.nc, clip WB and EO to the dem-plot footprint,
+    pick the EO variable matching the run's wet/dry ETp condition, build the coincident
+    monthly spatial-mean series and score them (bias, RMSE, r, NSE, KGE; see plot_hypotheses).
+    ``full_figures`` also writes Figs A-I under ``fig_dir`` (as the CLI does).
+
+    Returns {"s_eo", "s_wb" (monthly mm/day), "metrics" (dict), "condition", "eo_var", "label"}.
+    Pass ``gdf_proj`` / ``ds_eo`` to reuse them across many runs (the EO file is slow to open).
+    """
+    from plot_hypotheses import skill_metrics
+
+    sim_dir = Path(sim_dir)
+    ds_wb = load_wb_et_from_dir(sim_dir)
+    gdf_proj = load_shapefiles() if gdf_proj is None else gdf_proj
+    gdf_clip = resolve_plot_for_dataset(gdf_proj, ds_wb)
+    ds_eo = load_eo_et() if ds_eo is None else ds_eo
+    ds_eo_c, ds_wb_c = _clip_ds(ds_eo, gdf_clip), _clip_ds(ds_wb, gdf_clip)
+    cond = forcing_condition(sim_dir)
+    var_eo = pick_eo_var(ds_eo_c, cond)
+    s_eo, s_wb = build_common_series(ds_eo_c, var_eo, ds_wb_c)
+    out = {"s_eo": s_eo, "s_wb": s_wb, "metrics": skill_metrics(s_wb, s_eo),
+           "condition": cond, "eo_var": var_eo, "label": sim_dir.name}
+
+    if full_figures and fig_dir is not None:
+        df_csv, csv_forcing = None, None
+        parsed = parse_etpts_forcing(sim_dir)
+        if parsed is not None:
+            df_csv = load_csv_et(ET_CSV_PATH, parsed[1])
+            csv_forcing = parsed if df_csv is not None else None
+        da_lai_ref = None
+        ds_lai = load_lai_ref()
+        if ds_lai is not None:
+            ds_lai_c = _clip_ds(ds_lai, gdf_clip)
+            da_lai_ref = compute_lai_zone_reference(ds_lai_c[next(iter(ds_lai_c.data_vars))])
+        run_comparison(ds_eo_c, var_eo, ds_wb_c, label=sim_dir.name, selected_year=selected_year,
+                       show=False, fig_path=Path(fig_dir), da_lai_ref=da_lai_ref,
+                       n_zones=n_zones, df_csv=df_csv, csv_forcing=csv_forcing)
+    return out
+
+
+# =============================================================================
 # CLI argument parsing
 # =============================================================================
 
@@ -1628,7 +1683,7 @@ def parse_args() -> tuple[list[str], int, int, str, int, bool, str, str, Path, i
     parser.add_argument(
         "--path2prj", default=str(WB_PRJ_ROOT),
         help=(
-            "Root of the CATHY project outputs — mirrors withLAI_results.py's "
+            "Root of the CATHY project outputs — mirrors plot_run_results.py's "
             "--path2prj. scenario_<N>[_tag] folders are resolved under "
             f"<path2prj>/outputs/, and the log CSV under "
             f"<path2prj>/../Codigos_HydroModel/. Default: {WB_PRJ_ROOT}"
@@ -1637,7 +1692,7 @@ def parse_args() -> tuple[list[str], int, int, str, int, bool, str, str, Path, i
     parser.add_argument(
         "--log-file", default=LOG_FILE,
         help=(
-            "Simulation log CSV — mirrors withLAI_results.py's --log-file. "
+            "Simulation log CSV — mirrors plot_run_results.py's --log-file. "
             f"Default: {LOG_FILE}"
         ),
     )
@@ -1690,7 +1745,7 @@ if __name__ == "__main__":
      path2prj, log_file, et_csv, csv_fid, no_csv) = parse_args()
 
     # Mirror the --path2prj / --log-file that plot_scenarii_withETp_withLAI.sh
-    # already passes to withLAI_results.py for this scenario, instead of the
+    # already passes to plot_run_results.py for this scenario, instead of the
     # module's hardcoded defaults — otherwise --scenario resolves against the
     # wrong project tree and every load below fails to find the ET data.
     WB_PRJ_ROOT = Path(path2prj)
@@ -1734,7 +1789,7 @@ if __name__ == "__main__":
             var_lai   = next(iter(ds_lai_c.data_vars))
             da_lai_ref = compute_lai_zone_reference(ds_lai_c[var_lai])
 
-    # Mirror withLAI_results.py: reuse the resolved (possibly tagged)
+    # Mirror plot_run_results.py: reuse the resolved (possibly tagged)
     # scenario_<N>[_tag] folder name as the figures subfolder, so ET
     # compare plots from different scenarios never overwrite each other
     # and stay easy to match back to their source outputs/ folder.
