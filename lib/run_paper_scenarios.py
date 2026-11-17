@@ -11,6 +11,9 @@ call of run_scenarii_withETp_withLAI_ALL.sh per combination and runs them.
     python run_paper_scenarios.py --only all --skip experimental --stop-on-error
     python run_paper_scenarios.py --extra --start-year 2018  # appended to every call
 
+For the hypothesis studies (layers/Ks, LAI-SCF, initial condition, SW forcing) with
+validation and plots, use run_all_hypotheses.py instead.
+
 Exit code 0 if every call returned 0, 1 otherwise. Stdlib only on Python >= 3.11 (tomllib); older Pythons need `pip install tomli`.
 """
 from __future__ import annotations

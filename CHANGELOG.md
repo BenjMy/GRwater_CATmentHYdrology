@@ -13,6 +13,19 @@ also get a DOI (§1 of the README).
 
 ## [Unreleased]
 
+### Added
+- `lib/data_paths.toml`: every input path in one file (`AGRAMON_DATA_CONFIG` to use another site).
+- Two-layer Ks scenario (`--permx-bottom`, `--ks-layer-depth`).
+- Hypothesis framework: `hypotheses.toml`, `hyp1_layers_Ks.py` .. `hyp4_SW.py`, `run_all_hypotheses.py`
+  (dry-run, validation vs EO energy-balance ETa, plots), `test/test_hypotheses.py`.
+
+### Changed
+- `withLAI_results.py` -> `plot_run_results.py`, `results_plotter.py` -> `plot_results_shared.py`.
+- Fig 8 (ETa/ETp vs psi) moved into `plot_eta.py`; vegetation colormap fixed (5 classes).
+
+### Removed
+- Batch `.log` writing, `to_run_paper.md`, `plot_fig8_ETa_ETp_vs_psi.py`.
+
 
 ---
 
