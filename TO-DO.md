@@ -52,7 +52,7 @@ Two intertwined goals.
 - Compare a **burned catchment** with a nearby **intact (control) catchment**.
 - Quantify the **rate of hydrological recovery** (LAI → ET → soil moisture).
 - Quantify **water redistribution** after the fire: runoff/streamflow vs infiltration vs recharge.
-- Fire date: **2020-07-01** (confirmed; `FIRE_DATE` in `results_plotter.py`). Geophysical data (ERT lines + EM) were collected after the fire and used to infer **bedrock/regolith depth**, which constrains the model domain. Erosion may have changed it between fire and survey, and the inversion did not work very well.
+- Fire date: **2020-07-01** (confirmed; `FIRE_DATE` in `plot_results_shared.py`). Geophysical data (ERT lines + EM) were collected after the fire and used to infer **bedrock/regolith depth**, which constrains the model domain. Erosion may have changed it between fire and survey, and the inversion did not work very well.
 
 **Post-fire Ks scenarios.** Fire changes soil hydraulic conductivity (water repellency, crusting, sealing), which controls infiltration vs runoff. Rather than assuming one value, post-fire Ks is varied in scenarios built from literature changes (§5.3).
 
@@ -80,7 +80,7 @@ The control catchment is not one of the existing `fid_1` plots: delineate it fro
 - **Spin-up:** off vs 3 cycles
 - **ETp input:** satellite ETp vs `ET_0_wet` vs `ET_0_dry` (`--forcing etp_ts`)
 
-### 2.3 Recipe marked "Good one" in `to_run_paper.md`
+### 2.3 Recipe marked "Good one" (formerly in `to_run_paper.md`, file removed)
 ```bash
 KS_VALUES=(1e-4 6e-4 1e-3)
 ZROOT_SETS=("0.3 0.6 2.0 3.0 5.0")
@@ -89,7 +89,7 @@ ZROOT_SETS=("0.3 0.6 2.0 3.0 5.0")
     --outlet both --bottom both --ic both --ic-pressure-head -100 \
     --permx "${KS_VALUES}" --zroot-factors ${ZROOT_SETS}
 ```
-> `--permx "${KS_VALUES}"` expands an array to its **first element only** (runs only `1e-4`). Use `for ks in "${KS_VALUES[@]}"` as in the first blocks of `to_run_paper.md`.
+> `--permx "${KS_VALUES}"` expands an array to its **first element only** (runs only `1e-4`). Use `for ks in "${KS_VALUES[@]}"` as in the first blocks of the old recipe file.
 
 ### 2.4 Validation strategy
 - **Agramon:** no measured ET or discharge. Check is **CATHY water-balance ETa vs energy-balance ETa (pyTSEB)**, implemented in `analysis_ET_compare.py` (monthly, annual, spatial, per-LAI-zone, bias). EB ETa is a model product, so agreement means *consistency*, not proof. Wet/dry matching rule: wet run vs wet reference, dry run vs dry reference.
@@ -148,13 +148,13 @@ Note: some variables lack units/names (`TP-DD`, `LW-IN`, `VZA`, `SZA`); the dms 
 - **Recovery rate:** time for LAI, ETa/ETp and soil moisture in the burned catchment to return to the control level.
 - **Water redistribution** (burned vs control, by year): ETa, recharge (bottom flux / ΔS), outlet hydrograph, infiltration/runoff partition.
 - **Root depth** (proxy for rooting recovery) and **Ks** (post-fire repellency/crusting via the Ks scenarios, cf. Thomas et al. 2021: Ks and LAI).
-- **`hmin`** (surface-routing threshold; ponding vs saturation, roughness/microtopography) as a possible improvement (notes in `to_run_paper.md`).
+- **`hmin`** (surface-routing threshold; ponding vs saturation, roughness/microtopography) as a possible improvement (notes from the removed `to_run_paper.md`).
 
 ---
 
 ## 5. Method design notes
 
-### 5.1 Scientific caveats (CATHY developer discussion, noted in `to_run_paper.md`)
+### 5.1 Scientific caveats (CATHY developer discussion, noted in the removed `to_run_paper.md`)
 - **ETa never reaching 0** in published plots: in the earlier paper, simulated ETa was interpolated in time to compare with measured ETa. Don't expect ETa → 0 in raw CATHY output; compare like with like.
 - **SCF:** designed as 0 (PMIN) or 1 (Feddes). Intermediate values never properly tested and may cause numerical errors; treat `0 < SCF < 1` as experimental, not for main results.
 - ψmin alone cannot split ETa into soil evaporation vs plant transpiration (lumped surface flux).
@@ -273,7 +273,7 @@ giving "'ic' has length N but the mesh has M points"), and the main script works
 - **Water balance:** hydrograph, recharge (bar / xarray), catchment ET.
 - **LAI diagnostics:** monthly by year, spatial maps, annual histogram/mean/median. **Vegetation maps:** history, yearly, GIFs.
 - **ETa evaluation** (`analysis_ET_compare.py`): EO-EB vs WB (monthly-by-year, annual, scatter, spatial maps); same by LAI zone (terciles of pre-fire LAI) with annual bias; for `etp_ts` runs, WB ETa vs treatments CSV (real ET, `ET_0_dry`, `ET_0_wet`) with RMSE/bias/r.
-- **Camporese et al. (2014) Fig. 8:** ETa/ETp vs shallow ψ by scenario and location (`plot_fig8_ETa_ETp_vs_psi.py`; needs `etp_output.nc`, so older runs need a rerun).
+- **Camporese et al. (2014) Fig. 8:** ETa/ETp vs shallow ψ by scenario and location (now `plot_eta.plot_fig8`, run by `plot_run_results.py` as Fig 7k; needs `etp_output.nc`, so older runs need a rerun).
 - Fire date marked on figures (`FIRE_DATE = 2020-07-01`).
 
 ---

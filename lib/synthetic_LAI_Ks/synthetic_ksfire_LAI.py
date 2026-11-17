@@ -24,7 +24,7 @@ Minimal pyCATHY test case that reuses the Agramon pipeline building blocks
   * CONTROL scenarios: --ks-fire-mode off keeps Ks constant before and after
     the fire (the vegetation/LAI still burns), in 1 or 2 layers.
 
-Results are plotted with results_plotter / withLAI_results helpers, plus a
+Results are plotted with plot_results_shared / plot_run_results helpers, plus a
 LAI vs Ks figure.
 
 Usage
@@ -1016,7 +1016,7 @@ def run_pipeline(args: argparse.Namespace) -> None:
     import rioxarray  # noqa: F401
     from pyCATHY import cathy_utils
     import Agramon_withLAI_withETp as AG
-    import results_plotter as plotter
+    import plot_results_shared as plotter
 
     failures: list[str] = []
 
@@ -1502,11 +1502,11 @@ def run_pipeline(args: argparse.Namespace) -> None:
             _safe("recharge", plotter.plot_recharge_xr, xr_rech, fig_dir, dpi=dpi,
                   scenario_id=scenario)
 
-        # withLAI_results helpers (spatial maps / LAI diagnostics)
+        # plot_run_results helpers (spatial maps / LAI diagnostics)
         try:
-            import withLAI_results as WR
+            import plot_run_results as WR
         except Exception as exc:
-            failures.append(f"import withLAI_results: {exc}")
+            failures.append(f"import plot_run_results: {exc}")
             WR = None
         if WR is not None:
             years = sorted({m.year for m in months})

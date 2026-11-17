@@ -11,6 +11,13 @@ pandas inputs and returns the ``Figure``; pass ``out`` to also save a PNG.
 * ``plot_water_balance``   monthly P, ETa, recharge, runoff and the closure residual
 * ``plot_recovery_panels`` burned vs control, ratio with tolerance band and the
                            recovery time (see ``recovery_metrics``)
+
+Hypothesis studies (hyp1..hyp4, run_all_hypotheses.py; one study folder per hypothesis):
+
+* ``plot_variant_matrix``      the runs of a hypothesis as a table (dry-run overview)
+* ``plot_hypothesis_eta``      monthly WB ETa of every variant vs the EO-EB reference + seasonal cycle
+* ``plot_hypothesis_skill``    bias / RMSE / KGE of every variant vs EO-EB (one bar per variant)
+* ``plot_hypothesis_response`` ETa, soil moisture, recharge and psi of every variant (monthly_stats.csv)
 """
 from __future__ import annotations
 
@@ -202,4 +209,113 @@ def plot_recovery_panels(burned: pd.DataFrame, control: pd.DataFrame, fire_date,
             b.set_title(f"{v}: no sustained recovery in the series", fontsize=9)
         b.set_ylabel("burned / control"); b.grid(alpha=0.3); b.legend(fontsize=7)
     fig.autofmt_xdate(); fig.tight_layout()
+    return _finish(fig, out)
+
+
+# ── hypothesis studies ───────────────────────────────────────
+_GROUP_COLORS = ["#0072B2", "#D55E00", "#009E73", "#CC79A7", "#E69F00", "#56B4E9", "#7A7A7A"]
+
+
+def _colors(names, groups=None):
+    """One colour per group (variants of a group share it, lightness varies); per variant if no groups."""
+    groups = groups or {}
+    order = list(dict.fromkeys(groups.get(n, "") or n for n in names))
+    col = {g: _GROUP_COLORS[i % len(_GROUP_COLORS)] for i, g in enumerate(order)}
+    return {n: col[groups.get(n, "") or n] for n in names}
+
+
+def plot_variant_matrix(rows, title: str = "", out: Optional[str] = None):
+    """Table figure of the runs of a hypothesis (rows = list of dicts: variant, group, varying options)."""
+    df = pd.DataFrame(rows)
+    fig, ax = plt.subplots(figsize=(max(6, 1.6 * len(df.columns)), 0.38 * (len(df) + 2) + 0.6))
+    ax.axis("off")
+    cell = df.astype(str).values.tolist()
+    tab = ax.table(cellText=cell, colLabels=list(df.columns), loc="center", cellLoc="left")
+    tab.auto_set_font_size(False)
+    tab.set_fontsize(8)
+    tab.auto_set_column_width(list(range(len(df.columns))))
+    cols = _colors(list(df["variant"]), dict(zip(df["variant"], df.get("group", [""] * len(df)))))
+    for i, name in enumerate(df["variant"], start=1):
+        tab[(i, 0)].set_facecolor(cols[name] + "33")
+    for j in range(len(df.columns)):
+        tab[(0, j)].set_text_props(fontweight="bold")
+        tab[(0, j)].set_facecolor("#dddddd")
+    ax.set_title(f"{title}  ({len(df)} runs)", fontsize=10, fontweight="bold")
+    return _finish(fig, out)
+
+
+def plot_hypothesis_eta(wb: dict, eo: dict, groups: Optional[dict] = None, title: str = "",
+                        out: Optional[str] = None):
+    """
+    Monthly spatial-mean ETa (mm/day): every variant (``wb``: name -> Series) against the EO-EB
+    reference(s) (``eo``: label -> Series, black), left as a time series, right as the mean
+    seasonal cycle (calendar months).
+    """
+    col = _colors(list(wb), groups)
+    fig, (a1, a2) = plt.subplots(1, 2, figsize=(13, 4.2), gridspec_kw={"width_ratios": [2.2, 1]})
+    for name, s in wb.items():
+        a1.plot(s.index, s.values, color=col[name], lw=1.3, alpha=0.9, label=name)
+        c = s.groupby(s.index.month).mean()
+        a2.plot(c.index, c.values, color=col[name], lw=1.3, marker="o", ms=3)
+    for label, s in eo.items():
+        a1.plot(s.index, s.values, color=C_OBS, lw=2.0, ls="--", label=f"EO-EB ({label})")
+        c = s.groupby(s.index.month).mean()
+        a2.plot(c.index, c.values, color=C_OBS, lw=2.0, ls="--", marker="s", ms=3)
+    a1.set_ylabel("ETa (mm/day)")
+    a1.set_title("Monthly mean")
+    a2.set_xticks(range(1, 13))
+    a2.set_xlabel("month")
+    a2.set_title("Seasonal cycle")
+    a1.legend(fontsize=7, ncol=2, frameon=False)
+    for a in (a1, a2):
+        a.grid(alpha=0.25)
+    fig.suptitle(title, fontsize=10, fontweight="bold")
+    fig.tight_layout()
+    return _finish(fig, out)
+
+
+def plot_hypothesis_skill(metrics: pd.DataFrame, title: str = "", out: Optional[str] = None):
+    """
+    Skill of every variant vs EO-EB ETa from the metrics table (columns variant, bias, rmse, kge,
+    optional group): three bar panels sorted by KGE (best on top); bias is sim-obs (mm/day).
+    """
+    d = metrics.sort_values("kge", ascending=True, na_position="first").reset_index(drop=True)
+    col = _colors(list(d["variant"]), dict(zip(d["variant"], d["group"])) if "group" in d else None)
+    fig, axes = plt.subplots(1, 3, figsize=(12, 0.34 * len(d) + 1.8), sharey=True)
+    for ax, (m, lab) in zip(axes, (("kge", "KGE (-)"), ("rmse", "RMSE (mm/day)"), ("bias", "bias sim-obs (mm/day)"))):
+        ax.barh(d["variant"], d[m], color=[col[v] for v in d["variant"]])
+        ax.set_xlabel(lab)
+        ax.grid(axis="x", alpha=0.25)
+        if m in ("kge", "bias"):
+            ax.axvline(0, color="0.4", lw=0.8)
+    axes[0].tick_params(axis="y", labelsize=7)
+    fig.suptitle(title, fontsize=10, fontweight="bold")
+    fig.tight_layout()
+    return _finish(fig, out)
+
+
+def plot_hypothesis_response(stats: dict, groups: Optional[dict] = None, title: str = "",
+                             out: Optional[str] = None):
+    """
+    Hydrological response of every variant from its monthly_stats.csv (``stats``: name -> DataFrame
+    with month, eta_mean / eta_patched_mean, sw_mean, recharge_mean, psi_mean; missing columns skipped).
+    """
+    panels = [("eta_patched_mean", "eta_mean", "ETa (mm/day)"), ("sw_mean", None, "soil moisture (-)"),
+              ("recharge_mean", None, "recharge"), ("psi_mean", None, "mean psi (m)")]
+    col = _colors(list(stats), groups)
+    avail = [p for p in panels if any(p[0] in d or (p[1] and p[1] in d) for d in stats.values())]
+    if not avail:
+        return None
+    fig, axes = plt.subplots(len(avail), 1, figsize=(11, 2.3 * len(avail) + 0.8), sharex=True, squeeze=False)
+    for ax, (c1, c2, lab) in zip(axes[:, 0], avail):
+        for name, d in stats.items():
+            c = c1 if c1 in d else c2
+            if not c or "month" not in d:
+                continue
+            ax.plot(pd.to_datetime(d["month"].astype(str)), d[c], color=col[name], lw=1.2, label=name)
+        ax.set_ylabel(lab, fontsize=8)
+        ax.grid(alpha=0.25)
+    axes[0, 0].legend(fontsize=7, ncol=3, frameon=False)
+    fig.suptitle(title, fontsize=10, fontweight="bold")
+    fig.tight_layout()
     return _finish(fig, out)

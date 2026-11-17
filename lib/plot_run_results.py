@@ -1,5 +1,5 @@
 """
-test_withLAI_results.py — Recharge & LAI Loop Results Viewer
+plot_run_results.py — Recharge & LAI Loop Results Viewer
 =============================================================
 GRwater project — Agramon study site
 
@@ -59,13 +59,13 @@ Figures produced
 
 Usage
 -----
-    python test_withLAI_results.py                              # first withLAI=1 row
-    python test_withLAI_results.py --scenario 3
-    python test_withLAI_results.py --scenario 3 --selected-year 2020
-    python test_withLAI_results.py --scenario 3 --date-start 2019-01-01 --date-end 2020-12-31
-    python test_withLAI_results.py --list-scenarios
-    python test_withLAI_results.py --no-plots --no-gifs --dpi 200
-    python test_withLAI_results.py --outlet-xy 456200 4122500 --uphill-xy 456800 4123200
+    python plot_run_results.py                              # first withLAI=1 row
+    python plot_run_results.py --scenario 3
+    python plot_run_results.py --scenario 3 --selected-year 2020
+    python plot_run_results.py --scenario 3 --date-start 2019-01-01 --date-end 2020-12-31
+    python plot_run_results.py --list-scenarios
+    python plot_run_results.py --no-plots --no-gifs --dpi 200
+    python plot_run_results.py --outlet-xy 456200 4122500 --uphill-xy 456800 4123200
 """
 
 import argparse
@@ -88,21 +88,10 @@ from Agramon_withLAI_withETp import load_dem_from_tif  # or move it to Agramon_u
 
 # ── Path setup ────────────────────────────────────────────────────────────────
 
-# Nextcloud root: AGRAMON_ROOT env var, else the historical default (REFACTORING 2.14)
-_NC = Path(os.environ.get("AGRAMON_ROOT") or "/home/z0272571a@campus.csic.es/Nextcloud").expanduser()
+# All input paths come from agramon_config (lib/data_paths.toml, AGRAMON_* env overrides).
+from agramon_config import EO_PATH, LAI_PATH, PathET, etp_path, rain_path
 
 MODULE_PATH = (Path(__file__).resolve().parent / "utils")
-
-EO_PATH = Path(os.environ.get("AGRAMON_CODES") or (_NC / "BenCSIC/Codes/Tech4agro_org")).expanduser() .resolve() / "GRwater_CATmentHYdrology"
-
-LAI_PATH = Path(os.environ.get("AGRAMON_LAI_PATH") or (_NC / "BenCSIC/Training_Supervision/Supervision/Xela_Carracedo_Practicas_2026_data/301a-biophysical/agramon/input")).expanduser().resolve()
-
-# Satellite ETp + rain forcing (replaces ERA5 for the Fig 6/7 rain/ETp
-# panel — see Agramon_withLAI_withETp.py, which uses the same files to
-# force the ATMBC boundary).
-PathET    = Path(os.environ.get("AGRAMON_PATH_ET") or (_NC / "GRwater/data/satellite/Agramon")).expanduser()
-etp_path  = PathET / "20161001_20241231_ET0.nc"
-rain_path = PathET / "20161001_20241231_TP.nc"
 
 # LAI / ETp / rain source rasters are EPSG:32630 (UTM 30N, WGS84); DEM /
 # shapefiles / mesh are TARGET_CRS = EPSG:25830 (UTM 30N, ETRS89) defined
@@ -119,7 +108,7 @@ from pyCATHY import meshtools as mt   # used to map satellite ETp onto mesh node
 
 # ── Shared plotter module ─────────────────────────────────────────────────────
 
-import results_plotter as plotter
+import plot_results_shared as plotter
 import matplotlib.pyplot as plt
 
 warnings.filterwarnings("ignore", category=DeprecationWarning)
@@ -132,7 +121,7 @@ ET_VAR     = 'ACT. ETRA_patched' #"ACT. ETRA" ACT. ETRA_patched
 ET_SCALE   = 1e3 * 86400                           # m/s → mm/day
 CMAP_ET    = "YlGnBu"
 CMAP_SW    = "Blues"
-CMAP_VEG   = mcolors.ListedColormap(["#d4b483", "#78c679", "#006837"])
+from plot_common import CMAP_VEG   # 5 classes, shared with plot_maps (was a 3-colour copy)
 
 LAI_VAR  = "LAI"
 LAI_CMAP = "YlGn"
@@ -542,7 +531,7 @@ def _prepare_et_ds(
     """
     Return a scaled, plotter-compatible copy of *ET_xr_all*.
 
-    ``results_plotter`` functions expect:
+    ``plot_results_shared`` functions expect:
       • a ``"time"`` dimension (not ``"datetime"`` as in et_output.nc)
       • values already in mm/day (no further scaling needed)
 
@@ -564,7 +553,7 @@ def _prepare_et_ds(
     # Apply unit conversion on the target variable only
     ds = ET_xr_all.assign({variable: ET_xr_all[variable] * scale})
 
-    # Rename 'datetime' → 'time' so results_plotter internals work unchanged.
+    # Rename 'datetime' → 'time' so plot_results_shared internals work unchanged.
     # et_output.nc often carries a scalar/auxiliary coord also called 'time',
     # which makes xarray raise "the new name 'time' conflicts" even though
     # 'time' is not a dimension.  Drop it first in that case.
@@ -577,7 +566,7 @@ def _prepare_et_ds(
 
 
 # =============================================================================
-# ETa cumulated histogram (Fig 8b)  — delegates to results_plotter
+# ETa cumulated histogram (Fig 8b)  — delegates to plot_results_shared
 # =============================================================================
 
 def plot_eta_annual_hist(
@@ -593,7 +582,7 @@ def plot_eta_annual_hist(
 ) -> None:
     """
     Histogram of per-pixel annual ETa sums — thin wrapper around
-    ``results_plotter.plot_eta_annual_hist``.
+    ``plot_results_shared.plot_eta_annual_hist``.
 
     *ET_xr_all* (dims X, Y, datetime; units m/s) is scaled to mm/day and its
     time dimension renamed to ``"time"`` before being forwarded, so the shared
@@ -638,7 +627,7 @@ def plot_eta_annual_hist(
 
 
 # =============================================================================
-# ETa domain-total bar charts (Fig 8c)  — delegates to results_plotter
+# ETa domain-total bar charts (Fig 8c)  — delegates to plot_results_shared
 # =============================================================================
 
 def plot_eta_total(
@@ -653,7 +642,7 @@ def plot_eta_total(
 ) -> None:
     """
     Monthly and annual domain-total ETa bar charts — thin wrapper around
-    ``results_plotter.plot_eta_total``.
+    ``plot_results_shared.plot_eta_total``.
 
     Produces two PNGs in *out_dir*:
         ETa_total_monthly[_<label>].png
@@ -728,7 +717,7 @@ def plot_index_monthly_by_year(
     """
     Spatial-mean vegetation index (unitless) per calendar month, one line per year.
 
-    Thin wrapper around ``results_plotter.plot_lai_monthly_by_year``.
+    Thin wrapper around ``plot_results_shared.plot_lai_monthly_by_year``.
 
     Parameters
     ----------
@@ -782,7 +771,7 @@ def plot_index_spatial_maps_year(
     """
     Monthly spatial maps (4-column mosaic) of a gridded index for *selected_year*.
 
-    Thin wrapper around ``results_plotter.plot_index_spatial_maps_year``.
+    Thin wrapper around ``plot_results_shared.plot_index_spatial_maps_year``.
 
     Parameters
     ----------
@@ -837,7 +826,7 @@ def plot_index_annual_hist(
     """
     Histogram of per-pixel annual mean values for a gridded index.
 
-    Thin wrapper around ``results_plotter.plot_index_annual_hist``.
+    Thin wrapper around ``plot_results_shared.plot_index_annual_hist``.
 
     Parameters
     ----------
@@ -891,7 +880,7 @@ def plot_index_annual_mean(
     """
     Bar chart of domain-mean annual values for a gridded index.
 
-    Thin wrapper around ``results_plotter.plot_index_annual_mean``.
+    Thin wrapper around ``plot_results_shared.plot_index_annual_mean``.
     Produces one PNG:
         <index_var>_annual_mean[_<label>].png
 
@@ -942,7 +931,7 @@ def plot_index_annual_median(
     """
     Yearly time series of the domain-median value for a gridded index.
 
-    Thin wrapper around ``results_plotter.plot_lai_annual_median``.
+    Thin wrapper around ``plot_results_shared.plot_lai_annual_median``.
     Produces one PNG:
         <index_var>_annual_median[_<label>].png
 
@@ -1374,7 +1363,7 @@ def resolve_nodes(
 
     The outlet is always a single reference node. The mid-uphill site is,
     by default, a *band* of nodes within ±2% elevation of the domain's
-    mid-elevation (see ``results_plotter.find_representative_mid_node(...,
+    mid-elevation (see ``plot_results_shared.find_representative_mid_node(...,
     return_band=True)``) rather than a single arbitrarily-chosen point —
     downstream plotting takes the per-timestep median across the band, so
     "mid elevation" reflects the whole band. If the caller pins an exact
@@ -2462,6 +2451,21 @@ def run_pipeline(args: argparse.Namespace) -> None:
                     print(f"  WARNING: plot_catchment_eta_etp_ratio_monthly skipped — {exc}")
             else:
                 print("  Skipped — domain-mean/median ETp series unavailable.")
+
+    # ── Fig 7k: ETa/ETp vs shallow psi (Camporese et al. 2014, Fig. 8) ──────
+    # Formerly the standalone plot_fig8_ETa_ETp_vs_psi.py; now part of plot_eta.py and run for
+    # every scenario (one row; stack several entries with plotter.plot_fig8 for a PMIN comparison).
+    print("-- Fig 7k: ETa/ETp vs shallow psi (cf. Camporese et al. 2014 Fig. 8) --")
+    if not (Path(out_dir) / "etp_output.nc").exists():
+        print("  Skipped — etp_output.nc missing (run predates it; rerun with --forcing etp / etp_ts).")
+    else:
+        try:
+            _pmin = float(log_row["PMIN"]) if "PMIN" in log_row else float("nan")
+            _entry = plotter.fig8_entry_from_artefacts(
+                simu, psi_xr, ET_xr_all, out_dir, pmin=_pmin, et_var=ET_VAR)
+            plotter.plot_fig8({sim_index: _entry}, fig_dir, dpi=dpi, show=show)
+        except Exception as exc:
+            print(f"  WARNING: Fig 7k (ETa/ETp vs psi) skipped — {exc}")
 
     # ── Fig 8: Catchment ET balance (monthly + annual) ─────────────────────
     # plot_catchment_et expects a data-dict with keys:

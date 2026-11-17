@@ -292,12 +292,12 @@ def test_forcing_mode():
 
 
 def test_results_plotter_split():
-    """results_plotter (REFACTORING 2.11) is a facade over plot_*.py: same names, same objects,
+    """plot_results_shared (REFACTORING 2.11) is a facade over plot_*.py: same names, same objects,
     and a figure that crosses two modules (plot_maps -> plot_common helpers) really renders."""
     import tempfile
     import matplotlib
     matplotlib.use("Agg")
-    import results_plotter as RP
+    import plot_results_shared as RP
     import plot_common, plot_maps, plot_monthly, plot_hydro_xr, plot_eta
     for name, mod in (("plot_recharge_bar", plot_maps), ("plot_hydro_xr_monthly", plot_monthly),
                       ("plot_hydro_xr", plot_hydro_xr), ("plot_eta_total", plot_eta),

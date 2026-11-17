@@ -1,10 +1,10 @@
 """
-results_plotter.py — Shared Plotting Module
+plot_results_shared.py — Shared Plotting Module
 ============================================
 GRwater project — Agramon study site
 
 Centralises every figure-generation function used by both:
-  - test_withLAI_results.py   (LAI loop post-processing)
+  - plot_run_results.py   (LAI loop post-processing)
   - LT_SShydro_results.py     (long-term subsurface hydrology post-processing)
 
 All functions are pure: they receive data, produce a matplotlib Figure,
@@ -23,7 +23,7 @@ Shared helpers
     add_fire_vline(ax, d0, d1, label, color)   # marks FIRE_DATE = 2020-07-01
     plot_catchment_et_freq(ET_xr, ET_xr_mean, time_dates, freq, fig_path, dpi, show, et_var)
 
-LAI-loop figures (test_withLAI_results)
+LAI-loop figures (plot_run_results)
     plot_recharge_bar(recharge_monthly, fig_path, dpi, show)
     plot_et_monthly_mean(ET_xr_all, et_var, et_scale, fig_path, dpi, show)
     plot_et_by_veg_type(ET_xr_all, veg_map_history, et_var, et_scale, fig_path, dpi, show)
@@ -33,7 +33,7 @@ LAI-loop figures (test_withLAI_results)
     make_veg_gif(veg_history, cmap_veg, out_path, duration)
     make_et_gif(et_dataset, var, scale, out_path, cmap, duration)
 
-LAI diagnostic figures (analyse_LAI / withLAI_results)
+LAI diagnostic figures (analyse_LAI / plot_run_results)
     plot_lai_monthly_by_year(ds, lai_var, fig_path, dpi, show, fname)
     plot_lai_spatial_maps_year(ds, lai_var, selected_year, fig_path, cmap, vmin, vmax, dpi, show, fname)
     plot_lai_annual_hist(ds, lai_var, fig_path, bins, dpi, show, fname)
@@ -51,7 +51,7 @@ SSHydro figures (LT_SShydro_results)
     plot_recharge(data, fig_path, dpi, show, scenario_id)
     plot_recharge_xr(xr_recharge, fig_path, dpi, show, scenario_id)
 
-LAI-loop xarray-based hydro figures (test_withLAI_results — Fig 6 / 7)
+LAI-loop xarray-based hydro figures (plot_run_results — Fig 6 / 7)
     plot_hydro_xr(psi_xr, sw_xr, pev_series, tp_series, nodes_dict,
                   fig_path, date_start, date_end, ...)
     plot_et_sw_xr(sw_xr, ET_xr_all, et_var, et_scale, nodes_dict,
@@ -76,7 +76,7 @@ LAI + ET + sw + psi + ETa/ETp ratio, at reference nodes (new)
                   nodes_dict, grid3d, fig_path, ...)   # Fig 8 — 5-panel stack
 """
 # Split by figure family (REFACTORING.md 2.11). Every name that used to live in this
-# module is re-exported here, so `import results_plotter as plotter` keeps working.
+# module is re-exported here, so `import plot_results_shared as plotter` keeps working.
 from __future__ import annotations
 
 from plot_common import (  # noqa: F401
@@ -159,6 +159,8 @@ from plot_hydro_xr import (  # noqa: F401
     plot_hydro_xr_weekly,
 )
 from plot_eta import (  # noqa: F401
+    fig8_entry_from_artefacts,
+    plot_fig8,
     _plot_eta_total_freq,
     plot_catchment_eta_etp_ratio,
     plot_eta_annual_hist,

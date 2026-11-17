@@ -53,7 +53,14 @@ This repository is part of the **GRwater** project
 .
 ├── lib/                                     # simulation + post-processing code
 │   ├── Agramon_withLAI_withETp.py           # main simulation driver (documented in §4)
-│   ├── withLAI_results.py                   # per-scenario post-processing ([FILL IN: confirm this lives in ./lib])
+│   ├── data_paths.toml                      # every INPUT path (ETp csv, LAI, EO ETa, DEM, shapefiles); see §7.1
+│   ├── agramon_*.py                         # driver modules (config, forcing, LAI, Ks, mesh, spin-up, outputs, ...)
+│   ├── plot_run_results.py                  # per-scenario post-processing (maps, hydro, monthly)
+│   ├── plot_*.py                            # plotting modules (plot_results_shared = shared figure functions)
+│   ├── analysis_ET_compare.py               # ETa vs EO energy-balance validation
+│   ├── hypotheses.toml                      # the four hypotheses (variants, shared options)
+│   ├── hyp1_layers_Ks.py .. hyp4_SW.py      # one runner per hypothesis (see §7.2)
+│   ├── run_all_hypotheses.py                # runs / dry-runs / validates / plots all hypotheses
 │   ├── run_scenarii_withETp_withLAI.sh      # batch runner: crosses dem-plot × PMIN × outlet/bottom BC × spin-up
 │   └── plot_scenarii_withETp_withLAI.sh     # batch post-processor over sim_index / scenario folders
 ├── data/
@@ -135,10 +142,10 @@ calibrated to the observed Agramon LAI range 0–0.6 m² m⁻²):
 - **`run_scenarii_withETp_withLAI.sh`** — crosses dem-plot(s) × PMIN
   value(s) × outlet BC (free/closed) × bottom BC (free/closed) × spin-up
   (on/off), calling `Agramon_withLAI_withETp.py` once per combination.
-  Logs everything to a timestamped, argument-tagged `.log` file. Run
+  Does not write a batch log file (the per-run CSV log is kept). Run
   `--help` for the full flag reference and worked examples.
 - **`plot_scenarii_withETp_withLAI.sh`** — iterates a hard-coded list of
-  `sim_index` values and calls `withLAI_results.py --scenario N` for
+  `sim_index` values and calls `plot_run_results.py --scenario N` for
   post-processing/plotting. **The `SCENARIOS=(...)` list must be kept in
   sync by hand** with `simulation_log_withETp_withLAI.csv` (or the output
   folder names) whenever more than one BC/spin-up/PMIN combination has
@@ -215,8 +222,52 @@ python Agramon_withLAI_withETp.py --dem-plot 2 --outlet-flux=-1e-6 \
 ./plot_scenarii_withETp_withLAI.sh
 ```
 
-Before running: repoint the hard-coded paths described in §4.3 at the
-`./data` layout in §3, or supply your own data at those locations.
+Before running: repoint the input paths (§7.1) at the `./data` layout in §3,
+or supply your own data at those locations.
+
+### 7.1 Input paths: `lib/data_paths.toml`
+
+All input data paths live in `lib/data_paths.toml` (read by `agramon_config.py`, imported by the
+driver, the post-processing and the hypothesis runners): satellite ETp/rain rasters, the
+**ETp time series CSV** (`forcing.etp_csv`, columns `ET_0_wet` / `ET_0_dry`, used by
+`--forcing etp_ts`), the EO energy-balance ETa, LAI, DEM, shapefiles, CATHY project root.
+To run another catchment copy the file, edit it and point to it:
+
+```bash
+export AGRAMON_DATA_CONFIG=/path/to/my_site.toml
+```
+
+Precedence: `AGRAMON_*` environment variables > data_paths.toml > built-in defaults.
+
+### 7.2 Two-layer Ks
+
+`--permx-bottom <m/s> --ks-layer-depth <m>` sets a two-layer soil: `--permx` above the depth
+(CATHY layers whose centre is shallower), `--permx-bottom` below. Compatible with
+`--ks-fire-mode` (the post-fire Ks drives the top layer).
+
+### 7.3 Hypotheses
+
+Each hypothesis is one Python file reading its table of `lib/hypotheses.toml`:
+
+| file | question | variants |
+|---|---|---|
+| `hyp1_layers_Ks.py` | 1 vs 2 layers, static vs LAI-driven Ks | 9 |
+| `hyp2_LAI_SCF.py` | SCF 0/1 (Feddes / PMIN threshold) x PMIN -15/-150/-1e35 | 6 |
+| `hyp3_ic.py` | initial pressure head / water-table depth, with/without spin-up | 9 |
+| `hyp4_SW.py` | ETp forcing: wet vs dry Shuttleworth-Wallace, satellite ETp | 3 |
+
+```bash
+python run_all_hypotheses.py --dry-run          # list every run + variant-matrix figure, runs nothing
+python run_all_hypotheses.py --only hyp1_layers_Ks hyp3_ic    # run + validate + plot
+python hyp2_LAI_SCF.py --dry-run                # one hypothesis, same options
+```
+
+Each hypothesis writes a single folder `<out_root>/<hyp>/` (default
+`<WB_PRJ_ROOT>/hypotheses`) with `prj/` (all its CATHY runs), `simulation_log.csv`,
+`manifest.json`, `metrics.csv` (bias, RMSE, r, NSE, KGE of each run vs the EO energy-balance
+ETa) and `figures/`. Finished runs are skipped unless `--force`.
+Limitation: only the LAI/SCF CATHY build exists in the pipeline, so hyp2 varies SCF and PMIN
+but cannot run a classic CATHY without LAI.
 
 ---
 

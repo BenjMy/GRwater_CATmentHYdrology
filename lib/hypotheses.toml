@@ -1,0 +1,102 @@
+# hypotheses.toml - one table per hypothesis, read by hyp1..hyp4 and run_all_hypotheses.py
+# =======================================================================================
+# Every key is a CLI option of Agramon_withLAI_withETp.py (without the leading "--"):
+#   scalar -> "--key value" | list -> "--key v1 v2 ..." | true -> "--key" | false -> omitted
+# Write numbers as strings so they reach the driver exactly as typed ("1e-4", "-1e35").
+#
+# Option precedence for one run (lowest -> highest):   [common]  <  [<hyp>.base]  <  grid / variant
+#
+# [<hyp>.grid]       cartesian product of the listed values (name built from the keys)
+# [[<hyp>.variants]] explicit runs; reserved keys: name (required), group (optional, plot colour)
+#
+# Every hypothesis writes ONE study folder, <out_root>/<hyp>/ :
+#   prj/                    CATHY projects + outputs/scenario_*  (all runs of the hypothesis)
+#   simulation_log.csv      run log shared by those runs
+#   manifest.json           variant -> options, scenario folder, status
+#   metrics.csv             skill of each run vs the EO energy-balance ETa (validation)
+#   figures/                hypothesis figures (plot_hypotheses.py)
+#
+#   python run_all_hypotheses.py --dry-run          # list every run + variant matrix figure
+#   python run_all_hypotheses.py --only hyp1 hyp3   # run + validate + plot those
+#   python hyp2_LAI_SCF.py --dry-run                # a single hypothesis, same options
+
+[general]
+out_root = ""                       # "" -> <WB_PRJ_ROOT>/hypotheses (agramon_config / data_paths.toml)
+driver   = "Agramon_withLAI_withETp.py"
+
+[validation]
+# EO energy-balance ETa (EO_ET_PATH in data_paths.toml) is the reference of every hypothesis.
+full_figures = false                # true -> also write analysis_ET_compare Figs A-I per run
+selected_year = 2020                # year of the spatial maps when full_figures = true
+
+# ── options shared by every run (the paper baseline) ───────────────────────────
+[common]
+dem-plot = "3"
+start-year = "2016"
+end-year = "2026"
+forcing = "etp_ts"
+etp-ts-column = "ET_0_wet"
+outlet-flux = "0"                   # closed box
+bottom-flux = "0"
+ic-mode = "pressure"
+ic-pressure-head = "-100"
+pmin = "-50"
+scf = "1"
+permx = "6e-4"
+zroot-factors = ["0.3", "0.6", "2.0", "3.0", "5.0"]
+no-spinup = true
+
+# ── hyp1: vertical layering and Ks handling ─────────────────────────────────────
+# 1L = one Ks for the whole column; 2L = top layer (--permx) over a deeper, tighter layer
+# (--permx-bottom below --ks-layer-depth); "ksfire" = Ks of the top layer driven each month
+# by the observed LAI between a post-fire minimum and the recovered value (agramon_ks.py).
+[hyp1_layers_Ks]
+description = "1 vs 2 soil layers and static vs LAI-driven Ks"
+variants = [
+  { name = "1L_ks1e-4",  group = "1L", permx = "1e-4" },
+  { name = "1L_ks6e-4",  group = "1L", permx = "6e-4" },
+  { name = "1L_ks1e-3",  group = "1L", permx = "1e-3" },
+  { name = "2L_d0.3_b1e-5", group = "2L", permx = "6e-4", permx-bottom = "1e-5", ks-layer-depth = "0.3" },
+  { name = "2L_d0.5_b1e-5", group = "2L", permx = "6e-4", permx-bottom = "1e-5", ks-layer-depth = "0.5" },
+  { name = "2L_d1.0_b1e-5", group = "2L", permx = "6e-4", permx-bottom = "1e-5", ks-layer-depth = "1.0" },
+  { name = "2L_d0.5_b1e-6", group = "2L", permx = "6e-4", permx-bottom = "1e-6", ks-layer-depth = "0.5" },
+  { name = "1L_ksfire_lai", group = "ksfire", permx = "6e-4", ks-fire-mode = "lai", ks-fire-ll = "1e-5", ks-fire-ul = "6e-4" },
+  { name = "2L_ksfire_lai", group = "ksfire", permx = "6e-4", permx-bottom = "1e-5", ks-layer-depth = "0.5", ks-fire-mode = "lai", ks-fire-ll = "1e-5", ks-fire-ul = "6e-4" },
+]
+
+# ── hyp2: LAI-driven root water uptake stress (SCF) and PMIN ────────────────────
+# scf = 1: Feddes approach; scf = 0: PMIN-threshold approach (sparse cover); pmin is the
+# surface pressure-head floor (m). Only the scf_lai CATHY build exists in the pipeline
+# (agramon_backend.BACKENDS), so a classic CATHY (no LAI/SCF) cannot be run here yet.
+[hyp2_LAI_SCF]
+description = "SCF 0/1 x PMIN -15/-150/-1e35"
+[hyp2_LAI_SCF.grid]
+scf = ["0", "1"]
+pmin = ["-15", "-150", "-1e35"]
+
+# ── hyp3: initial condition and spin-up ─────────────────────────────────────────
+[hyp3_ic]
+description = "Initial pressure head / water-table depth, with and without spin-up"
+variants = [
+  { name = "p-10",          group = "pressure", ic-mode = "pressure", ic-pressure-head = "-10" },
+  { name = "p-50",          group = "pressure", ic-mode = "pressure", ic-pressure-head = "-50" },
+  { name = "p-100",         group = "pressure", ic-mode = "pressure", ic-pressure-head = "-100" },
+  { name = "wt0.5",         group = "water table", ic-mode = "wt", ic-wtposition = "0.5" },
+  { name = "wt1",           group = "water table", ic-mode = "wt", ic-wtposition = "1.0" },
+  { name = "wt3",           group = "water table", ic-mode = "wt", ic-wtposition = "3.0" },
+  { name = "wt10",          group = "water table", ic-mode = "wt", ic-wtposition = "10.0" },
+  { name = "p-100_spinup3", group = "spin-up", ic-mode = "pressure", ic-pressure-head = "-100", no-spinup = false, spinup-cycles = "3" },
+  { name = "wt1_spinup3",   group = "spin-up", ic-mode = "wt", ic-wtposition = "1.0", no-spinup = false, spinup-cycles = "3" },
+]
+
+# ── hyp4: ETp forcing (wet vs dry Shuttleworth-Wallace) ─────────────────────────
+# The ETp CSV (data_paths.toml: forcing.etp_csv) carries the wet and dry bounds of the SW
+# model; the validation picks the EO-EB variable that matches each condition when the EO
+# file provides one. "etp_raster" is the gridded satellite ETp (--forcing etp).
+[hyp4_SW]
+description = "ETp forcing: wet vs dry Shuttleworth-Wallace, and the gridded satellite ETp"
+variants = [
+  { name = "SW_wet",        group = "SW", forcing = "etp_ts", etp-ts-column = "ET_0_wet" },
+  { name = "SW_dry",        group = "SW", forcing = "etp_ts", etp-ts-column = "ET_0_dry" },
+  { name = "satellite_etp", group = "satellite", forcing = "etp" },
+]

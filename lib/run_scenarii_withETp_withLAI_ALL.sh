@@ -82,7 +82,7 @@ FORCE_RERUN=0                 # --force: run even if a matching completed
                                # scenario is already found on disk
 
 SCRIPT_SIM="Agramon_withLAI_withETp.py"  # use file (1), with --forcing and --dem-smooth-sigma
-SCRIPT_RES="withLAI_results.py"
+SCRIPT_RES="plot_run_results.py"
 
 # -- Help ----------------------------------------------------------------
 usage() {
@@ -234,10 +234,7 @@ Runs = (#dem-plot) x (#pmin) x (1 or 2 outlet labels) x (1 or 2 bottom
        labels) x (1 or 2 spinup labels) x (1 or 2 ic labels). Scenarios
        that already completed successfully (same params, incl. initial
        condition) are skipped automatically — pass --force to re-run
-       them anyway. All output is logged to
-       batch_run_YYYYMMDD_HHMMSS_plot<N>_pmin<M>_outlet-<mode>_bottom-<mode>_spinup-<mode>_ic-<mode>.log
-       (tee'd to the terminal too), so different argument combos land in
-       distinguishable files instead of only differing by timestamp.
+       them anyway. Output goes to the terminal only (no log file is written).
 
 Examples:
   $(basename "$0")
@@ -521,18 +518,9 @@ if [ -n "${OMGC}" ]; then
     SOIL_ARGS="${SOIL_ARGS} --omgc=${OMGC}"
 fi
 
-# Build a filename tag from the resolved plot list + mode selections, so
-# different argument combos land in distinguishable log files instead of
-# only differing by timestamp.
-PLOTS_TAG=$(IFS=-; echo "${PLOTS[*]}")
-PMINS_TAG=$(IFS=-; echo "${PMINS[*]}")
-LOG_TAG="plot${PLOTS_TAG}_pmin${PMINS_TAG}_outlet-${OUTLET_MODE}_bottom-${BOTTOM_MODE}_spinup-${SPINUP_MODE}_ic-${IC_MODE}"
-LOG_FILE="batch_run_$(date +%Y%m%d_%H%M%S)_${LOG_TAG}.log"
+# (No batch_run_*.log is written any more: output goes to the terminal only.
+#  Redirect yourself if you want a copy: <this script> ... 2>&1 | tee my.log)
 
-# Redirect all stdout and stderr to log file AND terminal
-exec > >(tee -a "${LOG_FILE}") 2>&1
-
-echo "Log file      : ${LOG_FILE}"
 echo "Started       : $(date)"
 echo "dem-plot(s)   : ${PLOTS[*]}"
 echo "PMIN value(s) : ${PMINS[*]} m"
@@ -899,7 +887,7 @@ done
 
 echo
 echo "Finished: $(date)"
-echo "All done. Log saved to ${LOG_FILE}"
+echo "All done."
 
 # =============================================================================
 # Extra scenario batch: PMIN in {-15, -25, -1e35} crossed with outlet

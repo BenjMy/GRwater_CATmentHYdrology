@@ -46,10 +46,10 @@ python post_process.py --scenario 7 8 --forcing etp_ts --dem-res 5
 python post_process.py --scenario 7 --et-csv <ETA_CSV_FROM_HECTOR> --monthly-ts
 ```
 (`./plot_scenarii_withETp_withLAI.sh` is now a thin wrapper around `post_process.py`.)
-`post_process.py` calls `withLAI_results.py` (maps, hydro, monthly) and `analysis_ET_compare.py` (ETa/ETp, validation panel Fig I) per scenario; figures go to `../Analysis/ET_compare/<scenario_dir>/`.
+`post_process.py` calls `plot_run_results.py` (maps, hydro, monthly) and `analysis_ET_compare.py` (ETa/ETp, validation panel Fig I) per scenario; figures go to `../Analysis/ET_compare/<scenario_dir>/`.
 `<ETA_CSV_FROM_HECTOR>` **[MISSING]**: Hector's ETa data, `--et-csv` default is `agramon_treatments_ET.csv`.
 
-Standalone figure script: `python plot_fig8_ETa_ETp_vs_psi.py -h` (Fig. 8, ETa/ETp vs psi). `plot_eta.py`, `plot_maps.py`, `plot_monthly.py` are libraries used by `withLAI_results.py`, not CLIs.
+Fig. 8 (ETa/ETp vs shallow psi) is now produced by `plot_run_results.py` for every scenario (Fig 7k, code in `plot_eta.py`). `plot_eta.py`, `plot_maps.py`, `plot_monthly.py` are libraries used by `plot_run_results.py`, not CLIs.
 
 ## B. Post-fire Ks curves (theory, no run needed)
 

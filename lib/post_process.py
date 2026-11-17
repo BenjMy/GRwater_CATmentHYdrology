@@ -2,7 +2,7 @@
 """
 post_process.py - post-process Agramon scenarios (replaces plot_scenarii_withETp_withLAI.sh)
 ===========================================================================================
-For each sim_index: withLAI_results.py (maps, hydro, monthly) then analysis_ET_compare.py
+For each sim_index: plot_run_results.py (maps, hydro, monthly) then analysis_ET_compare.py
 (ETa vs EO-EB / CSV, validation panel). Also called at the end of a run with
 ``Agramon_withLAI_withETp.py --post-plots``.
 
@@ -43,7 +43,7 @@ def list_logged_scenarios(log_csv, forcing: str = "") -> list[int]:
 def build_commands(idx: int, log_csv, path2prj, dem_res=5, monthly_ts=False,
                    et_csv=None, no_csv=False) -> dict[str, list[str]]:
     """The two subprocess command lines for one scenario (pure, testable)."""
-    res = [sys.executable, str(HERE / "withLAI_results.py"), "--scenario", str(idx),
+    res = [sys.executable, str(HERE / "plot_run_results.py"), "--scenario", str(idx),
            "--log-file", str(log_csv), "--path2prj", str(path2prj), "--dem-res", str(dem_res)]
     if monthly_ts:
         res.append("--monthly-ts")

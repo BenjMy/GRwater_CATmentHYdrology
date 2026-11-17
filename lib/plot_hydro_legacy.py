@@ -1,7 +1,7 @@
 """
 plot_hydro_legacy.py - Pandas-based hydrology figures: hydrographs, recharge, node locations, ET/sw.
 ==================================================================================================
-Split unchanged out of results_plotter.py (REFACTORING.md 2.11); results_plotter re-exports every name.
+Split unchanged out of plot_results_shared.py (REFACTORING.md 2.11); plot_results_shared re-exports every name.
 """
 from __future__ import annotations
 

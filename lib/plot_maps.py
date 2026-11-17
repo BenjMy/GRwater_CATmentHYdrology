@@ -1,7 +1,7 @@
 """
 plot_maps.py - Vegetation / LAI / ET maps, histograms, annual statistics and GIFs.
 ================================================================================
-Split unchanged out of results_plotter.py (REFACTORING.md 2.11); results_plotter re-exports every name.
+Split unchanged out of plot_results_shared.py (REFACTORING.md 2.11); plot_results_shared re-exports every name.
 """
 from __future__ import annotations
 
@@ -20,7 +20,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import xarray as xr
 
-from plot_common import CMAP_ET, CMAP_LAI, LAI_UNITS, LAI_VMAX, _da, _infer_time_dim, _spatial_dims, add_fire_vline, maybe_show, save_fig, time_label, veg_colorbar
+from plot_common import CMAP_ET, CMAP_LAI, LAI_UNITS, LAI_VMAX, VEG_LABELS, _da, _infer_time_dim, _spatial_dims, add_fire_vline, maybe_show, save_fig, time_label, veg_colorbar
 
 
 def plot_recharge_bar(
@@ -196,7 +196,7 @@ def plot_veg_map_samples(
     for d in sample_dates:
         ax = axes[str(d.year)]
         ax.imshow(veg_map_history[d], origin="upper", cmap=cmap_veg,
-                  vmin=0.5, vmax=3.5, aspect="equal")
+                  vmin=0.5, vmax=cmap_veg.N + 0.5, aspect="equal")
         veg_colorbar(ax, cmap_veg)
         ax.set_title(f"{d:%Y-%m}", fontsize=10)
         ax.set_xlabel("Column")
@@ -245,7 +245,7 @@ def plot_veg_map_year(
         ax = axes[k // ncols][k % ncols]
         used.append(ax)
         ax.imshow(veg_map_history[d], origin="upper", cmap=cmap_veg,
-                  vmin=0.5, vmax=3.5, aspect="equal")
+                  vmin=0.5, vmax=cmap_veg.N + 0.5, aspect="equal")
         ax.set_title(f"{d:%B}", fontsize=10, pad=3)
         ax.tick_params(labelsize=7, length=2.5, pad=1.5,
                        labelleft=(k % ncols == 0),
@@ -253,10 +253,11 @@ def plot_veg_map_year(
     for k in range(n, nrows * ncols):
         axes[k // ncols][k % ncols].set_visible(False)
 
-    bounds = [0.5, 1.5, 2.5, 3.5]
+    bounds = [0.5 + i for i in range(cmap_veg.N + 1)]
     sm = cm.ScalarMappable(cmap=cmap_veg, norm=mcolors.BoundaryNorm(bounds, cmap_veg.N))
-    cb = fig.colorbar(sm, ax=used, ticks=[1, 2, 3], shrink=0.7, aspect=25, pad=0.015)
-    cb.ax.set_yticklabels(("Bare", "Moderate veg.", "Dense veg."))
+    cb = fig.colorbar(sm, ax=used, ticks=list(range(1, cmap_veg.N + 1)), shrink=0.7, aspect=25, pad=0.015)
+    cb.ax.set_yticklabels(VEG_LABELS if cmap_veg.N == len(VEG_LABELS)
+                          else [str(i) for i in range(1, cmap_veg.N + 1)])
     fig.supxlabel("Column", fontsize=9)
     fig.supylabel("Row", fontsize=9)
     fig.suptitle(f"Vegetation zone maps — {selected_year} (monthly)",
@@ -705,7 +706,7 @@ def make_veg_gif(
     for i, d in enumerate(dates):
         fig, ax = plt.subplots(figsize=(6, 5))
         ax.imshow(veg_history[d], origin="upper", cmap=cmap_veg,
-                  vmin=0.5, vmax=3.5, aspect="equal")
+                  vmin=0.5, vmax=cmap_veg.N + 0.5, aspect="equal")
         veg_colorbar(ax, cmap_veg)
         ax.set_title(f"Vegetation map — {d:%Y-%m}", fontsize=11)
         ax.set_xlabel("Column")

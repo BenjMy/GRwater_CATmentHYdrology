@@ -1,7 +1,7 @@
 """
 plot_common.py - Shared constants and helpers (fire date, colour maps, time/node helpers, windows).
 =================================================================================================
-Split unchanged out of results_plotter.py (REFACTORING.md 2.11); results_plotter re-exports every name.
+Split unchanged out of plot_results_shared.py (REFACTORING.md 2.11); plot_results_shared re-exports every name.
 """
 from __future__ import annotations
 
@@ -16,7 +16,15 @@ import matplotlib.pyplot as plt
 import xarray as xr
 
 
-CMAP_VEG = mcolors.ListedColormap(["#d4b483", "#78c679", "#006837"])
+# Vegetation classes: follow the pipeline (agramon_config.N_VEG_CLASSES = 5, thresholds
+# LAI_THRESHOLDS). The colormap used to have 3 colours with vmin/vmax hard-coded to 0.5-3.5,
+# so classes 4 and 5 were clipped to the "dense" colour and the legend mislabelled the rest.
+from agramon_config import N_VEG_CLASSES
+
+VEG_LABELS = ("Very low", "Low", "Moderate", "High", "Very high")[:N_VEG_CLASSES]
+VEG_COLORS = ["#d4b483", "#bfd27a", "#78c679", "#238b45", "#00441b"][:N_VEG_CLASSES]
+CMAP_VEG = mcolors.ListedColormap(VEG_COLORS)
+VEG_VMIN, VEG_VMAX = 0.5, N_VEG_CLASSES + 0.5
 
 
 COLORS_HYDRO: dict[str, str] = {
@@ -99,13 +107,16 @@ def et_global_limits(et_dataset: xr.Dataset, var: str) -> tuple[float, float]:
 def veg_colorbar(
     ax: plt.Axes,
     cmap: mcolors.Colormap,
-    labels: tuple[str, ...] = ("Bare", "Moderate veg.", "Dense veg."),
+    labels: tuple[str, ...] | None = None,
 ) -> plt.colorbar:
-    """Attach a discrete 3-class colourbar to *ax*."""
-    bounds = [0.5, 1.5, 2.5, 3.5]
-    norm   = mcolors.BoundaryNorm(bounds, cmap.N)
+    """Attach a discrete colourbar with one tick per class of *cmap* (N_VEG_CLASSES by default)."""
+    n      = cmap.N
+    labels = tuple(labels) if labels is not None else (VEG_LABELS if n == len(VEG_LABELS)
+                                                       else tuple(str(i) for i in range(1, n + 1)))
+    bounds = [0.5 + i for i in range(n + 1)]
+    norm   = mcolors.BoundaryNorm(bounds, n)
     sm     = cm.ScalarMappable(cmap=cmap, norm=norm)
-    cb     = plt.colorbar(sm, ax=ax, ticks=[1, 2, 3])
+    cb     = plt.colorbar(sm, ax=ax, ticks=list(range(1, n + 1)))
     cb.ax.set_yticklabels(labels)
     return cb
 

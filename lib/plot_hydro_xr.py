@@ -1,7 +1,7 @@
 """
 plot_hydro_xr.py - xarray-based hydrology figures at reference nodes (psi, sw, ETa, ETp, LAI) and their fire-window / weekly variants.
 ====================================================================================================================================
-Split unchanged out of results_plotter.py (REFACTORING.md 2.11); results_plotter re-exports every name.
+Split unchanged out of plot_results_shared.py (REFACTORING.md 2.11); plot_results_shared re-exports every name.
 """
 from __future__ import annotations
 
