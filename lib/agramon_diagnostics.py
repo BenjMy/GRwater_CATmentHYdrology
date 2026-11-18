@@ -344,7 +344,7 @@ def save_forcing_diagnostics(
 
             ax.boxplot(
                 data,
-                labels=month_labels,
+                tick_labels=month_labels,
                 showfliers=False,
             )
 
