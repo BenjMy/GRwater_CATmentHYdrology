@@ -179,7 +179,7 @@ def save_forcing_diagnostics(
             )
 
             # Annual totals [mm/year]
-            annual = df.resample("Y").sum()
+            annual = df.resample("YE").sum()
             annual.index = annual.index.year
 
             fig, ax = plt.subplots(figsize=(10, 5))
