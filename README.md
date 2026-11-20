@@ -266,6 +266,14 @@ Each hypothesis writes a single folder `<out_root>/<hyp>/` (default
 `<WB_PRJ_ROOT>/hypotheses`) with `prj/` (all its CATHY runs), `simulation_log.csv`,
 `manifest.json`, `metrics.csv` (bias, RMSE, r, NSE, KGE of each run vs the EO energy-balance
 ETa) and `figures/`. Finished runs are skipped unless `--force`.
+Independently of the EO reference (`--no-balance` to skip) it also writes, from each run's
+`monthly_stats.csv` and `hgraph_output.csv`: `water_balance_monthly.csv`, `annual_totals.csv`,
+`period_totals.csv` (all / pre-fire / post-fire totals and mm/yr of rain, ETa, recharge, runoff, closure
+residual), `variant_summary.csv` (mean ETa, recharge, saturation per variant), balance figures and
+`study_report.md` (failed or skipped items). `run_all_hypotheses.py` joins skill and means in
+`summary_metrics.csv`. Runoff is in m3 unless `[validation] catchment_area_m2` is set; the closure residual
+is flux-only (no storage change). `recovery_metrics.csv` and per-variant recovery figures appear once
+`[validation] control_sim_dir` points to a control-catchment run; until then the report says it was skipped.
 Limitation: only the LAI/SCF CATHY build exists in the pipeline, so hyp2 varies SCF and PMIN
 but cannot run a classic CATHY without LAI.
 

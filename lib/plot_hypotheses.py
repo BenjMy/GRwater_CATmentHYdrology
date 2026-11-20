@@ -18,6 +18,8 @@ Hypothesis studies (hyp1..hyp4, run_all_hypotheses.py; one study folder per hypo
 * ``plot_hypothesis_eta``      monthly WB ETa of every variant vs the EO-EB reference + seasonal cycle
 * ``plot_hypothesis_skill``    bias / RMSE / KGE of every variant vs EO-EB (one bar per variant)
 * ``plot_hypothesis_response`` ETa, soil moisture, recharge and psi of every variant (monthly_stats.csv)
+* ``plot_hypothesis_annual``   annual ETa / recharge / runoff totals of every variant (hypothesis_tables)
+* ``plot_hypothesis_balance``  mm/yr ETa, recharge, runoff and closure residual per variant, one period
 """
 from __future__ import annotations
 
@@ -317,5 +319,68 @@ def plot_hypothesis_response(stats: dict, groups: Optional[dict] = None, title: 
         ax.grid(alpha=0.25)
     axes[0, 0].legend(fontsize=7, ncol=3, frameon=False)
     fig.suptitle(title, fontsize=10, fontweight="bold")
+    fig.tight_layout()
+    return _finish(fig, out)
+
+
+def plot_hypothesis_annual(annual: pd.DataFrame, groups: Optional[dict] = None, fire_date=None,
+                           title: str = "", out: Optional[str] = None):
+    """
+    Annual totals (mm) of every variant from the ``annual_totals`` table (columns variant, year, n_months,
+    eta_mm, recharge_mm, runoff_mm): one panel per flux with data. Only complete calendar years
+    (12 months) are drawn, so the partial first / last year do not read as a drop. None if nothing to draw.
+    """
+    d = annual[annual["n_months"] >= 12] if "n_months" in annual else annual
+    panels = [(c, lab) for c, lab in (("eta_mm", "ETa (mm/yr)"), ("recharge_mm", "recharge (mm/yr)"),
+                                      ("runoff_mm", "runoff (mm/yr)")) if c in d and d[c].notna().any()]
+    if d.empty or not panels:
+        return None
+    names = list(dict.fromkeys(d["variant"]))
+    col = _colors(names, groups)
+    fig, axes = plt.subplots(len(panels), 1, figsize=(9, 2.3 * len(panels) + 0.8), sharex=True, squeeze=False)
+    for ax, (c, lab) in zip(axes[:, 0], panels):
+        for name in names:
+            s = d[d["variant"] == name].sort_values("year")
+            ax.plot(s["year"], s[c], "-o", ms=3, lw=1.2, color=col[name], label=name)
+        if fire_date is not None:
+            f = pd.Timestamp(fire_date)
+            ax.axvline(f.year + (f.dayofyear - 1) / 365.0, color=C_FIRE, ls="--", lw=1)
+        ax.set_ylabel(lab, fontsize=8)
+        ax.grid(alpha=0.25)
+    axes[0, 0].legend(fontsize=7, ncol=3, frameon=False)
+    axes[-1, 0].set_xlabel("year")
+    fig.suptitle(title, fontsize=10, fontweight="bold")
+    fig.tight_layout()
+    return _finish(fig, out)
+
+
+def plot_hypothesis_balance(period: pd.DataFrame, groups: Optional[dict] = None, title: str = "",
+                            period_name: str = "post_fire", out: Optional[str] = None):
+    """
+    Water balance of every variant for one period of the ``period_totals`` table (``post_fire``; ``all``
+    when the record has no post-fire month): bars of mean annual ETa, recharge and runoff (mm/yr) and of
+    the closure residual (% of rain, flux-only: storage change is not included). None if nothing to draw.
+    """
+    d = period[period["period"] == period_name]
+    if d.empty:
+        period_name, d = "all", period[period["period"] == "all"]
+    d = d.drop_duplicates("variant").reset_index(drop=True)
+    panels = [(c, lab) for c, lab in (("annual_eta_mm", "ETa (mm/yr)"), ("annual_recharge_mm", "recharge (mm/yr)"),
+                                      ("annual_runoff_mm", "runoff (mm/yr)"),
+                                      ("closure_pct", "closure residual (% of rain)")) if c in d and d[c].notna().any()]
+    if d.empty or not panels:
+        return None
+    col = _colors(list(d["variant"]), groups)
+    fig, axes = plt.subplots(1, len(panels), figsize=(3.4 * len(panels) + 1, 0.34 * len(d) + 1.8),
+                             sharey=True, squeeze=False)
+    for ax, (c, lab) in zip(axes[0], panels):
+        ax.barh(d["variant"], d[c], color=[col[v] for v in d["variant"]])
+        ax.set_xlabel(lab)
+        ax.grid(axis="x", alpha=0.25)
+        if c == "closure_pct":
+            ax.axvline(0, color="0.4", lw=0.8)
+    axes[0, 0].tick_params(axis="y", labelsize=7)
+    axes[0, 0].invert_yaxis()
+    fig.suptitle(f"{title} [{period_name}]", fontsize=10, fontweight="bold")
     fig.tight_layout()
     return _finish(fig, out)

@@ -18,6 +18,9 @@ also get a DOI (§1 of the README).
 - Two-layer Ks scenario (`--permx-bottom`, `--ks-layer-depth`).
 - Hypothesis framework: `hypotheses.toml`, `hyp1_layers_Ks.py` .. `hyp4_SW.py`, `run_all_hypotheses.py`
   (dry-run, validation vs EO energy-balance ETa, plots), `test/test_hypotheses.py`.
+- `lib/hypothesis_tables.py`: annual / pre- / post-fire water-balance totals (rain, ETa, recharge, runoff,
+  closure), per-variant means, and the recovery hook (`recovery_metrics`, active once a control run is
+  configured); `study_report.md` per study; mean ETa / recharge / saturation columns in `summary_metrics.csv`.
 
 ### Changed
 - `withLAI_results.py` -> `plot_run_results.py`, `results_plotter.py` -> `plot_results_shared.py`.

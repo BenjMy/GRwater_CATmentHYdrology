@@ -11,6 +11,11 @@ aspect (layers/Ks, SCF/PMIN, initial condition, ETp forcing). It is described in
     validate  WB ETa vs the EO energy-balance NetCDF (analysis_ET_compare.validate_against_eb)
     plot      hypothesis figures (plot_hypotheses.py)
 
+and, independent of the EO reference, ``balance_study``: annual / post-fire water-balance totals
+(ETa, recharge, runoff, closure), per-variant means and (when a control run is configured) the
+recovery metrics, all from hypothesis_tables.py, plus a ``study_report.md`` listing what failed or
+was skipped.
+
 Heavy imports (analysis_ET_compare: geopandas/rioxarray, matplotlib) are done lazily, so planning
 and ``--dry-run`` need only the standard library (+ matplotlib for the figure).
 """
@@ -251,6 +256,125 @@ def validate_variants(h: Hypothesis, study: Path, *, validator=None) -> tuple:
     return df, wb, eo
 
 
+# ── water balance, totals and recovery ───────────────────────────────────────
+def _opt_float(value):
+    """float(value), or None when unset ('' / None) or not a number."""
+    try:
+        return float(value) if value not in (None, "") else None
+    except (TypeError, ValueError):
+        return None
+
+
+def balance_study(h: Hypothesis, study: Path, *, loader=None) -> dict:
+    """
+    Water-balance tables of every finished variant (hypothesis_tables.py), written in the study folder:
+    water_balance_monthly.csv, annual_totals.csv, period_totals.csv (all / pre_fire / post_fire),
+    variant_summary.csv and, when [validation] control_sim_dir points to a control run,
+    recovery_metrics.csv. A table with no data removes its stale file instead of leaving it behind.
+
+    Returns {'monthly': {variant: frame}, 'tables': {annual, period, summary}, 'recovery': frame,
+    'control': frame | None, 'notes': [what was skipped and why], 'written': [paths], 'fire_date',
+    'tol', 'sustain'}. ``loader(sim_dir, area_m2) -> (frame, notes)`` defaults to
+    hypothesis_tables.load_monthly_balance (tests pass a fake). Never raises on a bad run.
+    """
+    import pandas as pd
+    import hypothesis_tables as HT
+    v = h.validation
+    fire = str(v.get("fire_date") or HT.default_fire_date())
+    area = _opt_float(v.get("catchment_area_m2"))
+    tol = _opt_float(v.get("recovery_tol"))
+    tol = 0.1 if tol is None else tol
+    sustain = int(v.get("recovery_sustain") or 3)
+    load = loader or HT.load_monthly_balance
+    manifest = load_manifest(study)
+    groups = {x.name: x.group for x in h.variants}
+    notes, monthly = [], {}
+    for x in h.variants:
+        e = manifest.get(x.name)
+        if not e or e.get("status") != "ok" or not e.get("sim_dir"):
+            notes.append(f"{x.name}: no finished run, left out of the water-balance tables")
+            continue
+        try:
+            frame, frame_notes = load(Path(e["sim_dir"]), area)
+        except Exception as exc:                          # one bad run must not stop the study
+            notes.append(f"{x.name}: outputs unreadable ({exc})")
+            continue
+        notes += [f"{x.name}: {m}" for m in frame_notes]
+        if frame is None or frame.empty:
+            notes.append(f"{x.name}: empty monthly balance, left out of the tables")
+            continue
+        monthly[x.name] = frame
+    out = {"monthly": monthly, "tables": {}, "recovery": pd.DataFrame(), "control": None,
+           "notes": notes, "written": [], "fire_date": fire, "tol": tol, "sustain": sustain}
+    if not monthly:
+        return out
+    control_dir = str(v.get("control_sim_dir") or "").strip()
+    if control_dir:
+        try:
+            control, control_notes = load(Path(control_dir).expanduser(), area)
+            notes += [f"control: {m}" for m in control_notes]
+            if control is None or control.empty:
+                notes.append(f"control: no monthly balance in {control_dir}")
+            else:
+                out["control"] = control
+        except Exception as exc:
+            notes.append(f"control: outputs unreadable ({exc})")
+    out["recovery"], recovery_notes = HT.recovery_by_variant(monthly, out["control"], fire, tol, sustain)
+    notes += recovery_notes
+    out["tables"] = HT.tables_by_variant(monthly, fire, groups)
+    study.mkdir(parents=True, exist_ok=True)
+    long = pd.concat(monthly, names=["variant"]).reset_index()
+    for name, frame in (("water_balance_monthly.csv", long), ("annual_totals.csv", out["tables"]["annual"]),
+                        ("period_totals.csv", out["tables"]["period"]),
+                        ("variant_summary.csv", out["tables"]["summary"]),
+                        ("recovery_metrics.csv", out["recovery"])):
+        path = study / name
+        if len(frame):
+            frame.to_csv(path, index=False)
+            out["written"].append(path)
+        else:
+            path.unlink(missing_ok=True)
+    return out
+
+
+def write_report(h: Hypothesis, study: Path, manifest: dict, metrics=None, bal=None) -> Path:
+    """study_report.md: run status, how many variants were scored, files written, and every issue
+    (failed or missing run, finished but unscored, skipped table) so nothing is lost in the console."""
+    names = [x.name for x in h.variants]
+    ok = [n for n in names if manifest.get(n, {}).get("status") == "ok"]
+    issues = []
+    for n in names:
+        e = manifest.get(n)
+        if not e:
+            issues.append(f"{n}: not run")
+        elif e.get("status") != "ok":
+            issues.append(f"{n}: run failed (returncode {e.get('returncode')})")
+    lines = [f"# {h.key}", "", h.description, "", "## Runs", "", "| variant | status | seconds |", "|---|---|---|"]
+    for n in names:
+        e = manifest.get(n) or {}
+        lines.append(f"| {n} | {e.get('status', 'not run')} | {e.get('seconds', '')} |")
+    lines += ["", "## Validation vs EO-EB ETa", ""]
+    if metrics is None:
+        lines.append("not run (--no-validate)")
+    else:
+        scored = set(metrics["variant"]) if len(metrics) else set()
+        lines.append(f"{len(scored)} of {len(ok)} finished variants scored")
+        issues += [f"{n}: finished but not scored against EO-EB (validation failed or skipped)"
+                   for n in ok if n not in scored]
+    lines += ["", "## Water balance", ""]
+    if bal is None:
+        lines.append("not run (--no-balance)")
+    else:
+        lines.append(f"fire date {bal['fire_date']}; tables: " +
+                     (", ".join(p.name for p in bal["written"]) or "none written"))
+        issues += bal["notes"]
+    lines += ["", "## Issues", ""] + ([f"- {m}" for m in issues] or ["none"])
+    path = study / "study_report.md"
+    study.mkdir(parents=True, exist_ok=True)
+    path.write_text("\n".join(lines) + "\n")
+    return path
+
+
 # ── plots ────────────────────────────────────────────────────────────────────
 def monthly_stats_by_variant(h: Hypothesis, study: Path) -> dict:
     import pandas as pd
@@ -293,6 +417,32 @@ def plot_study(h: Hypothesis, study: Path, metrics, wb: dict, eo: dict) -> list:
     return [w for w in written if w]
 
 
+def plot_balance(h: Hypothesis, study: Path, bal: dict) -> list:
+    """Water-balance figures -> study/figures: annual totals, post-fire budget per variant and, when a
+    control run was loaded, one burned-vs-control recovery figure per variant; returns the paths."""
+    import plot_hypotheses as PH
+    fig_dir = study / "figures"
+    groups = {x.name: x.group for x in h.variants}
+    tables = bal.get("tables") or {}
+    written = []
+    if len(tables.get("annual", ())):
+        written.append(_save(PH.plot_hypothesis_annual, tables["annual"], groups=groups,
+                             fire_date=bal["fire_date"], title=f"{h.key}: annual water-balance totals",
+                             out=fig_dir / f"{h.key}_annual_totals.png"))
+    if len(tables.get("period", ())):
+        written.append(_save(PH.plot_hypothesis_balance, tables["period"], groups=groups,
+                             title=f"{h.key}: water balance per variant (mm/yr)",
+                             out=fig_dir / f"{h.key}_water_balance.png"))
+    control, recovery = bal.get("control"), bal.get("recovery")
+    if control is not None and recovery is not None and len(recovery):
+        for name, rows in recovery.groupby("variant", sort=False):
+            cols = list(rows["variable"])
+            written.append(_save(PH.plot_recovery_panels, bal["monthly"][name][cols], control[cols],
+                                 bal["fire_date"], bal["tol"], bal["sustain"],
+                                 out=fig_dir / "recovery" / f"{name}.png"))
+    return [w for w in written if w]
+
+
 def plot_plan(h: Hypothesis, study: Path):
     import plot_hypotheses as PH
     return _save(PH.plot_variant_matrix, plan_table(h), title=f"{h.key}: {h.description}",
@@ -311,6 +461,8 @@ def add_common_args(p: argparse.ArgumentParser,
     p.add_argument("--force", action="store_true", help="rerun variants that already finished")
     p.add_argument("--no-run", action="store_true", help="skip the runs (validate / plot existing ones)")
     p.add_argument("--no-validate", action="store_true", help="skip the EO-EB validation (and its plots)")
+    p.add_argument("--no-balance", action="store_true",
+                   help="skip the water-balance / post-fire totals and recovery tables (and their figures)")
     p.add_argument("--no-figs", action="store_true")
     p.add_argument("--post-plots", action="store_true",
                    help="per-run figures (plot_run_results / ET compare) at the end of each run")
@@ -339,6 +491,7 @@ def run_hypothesis(h: Hypothesis, a) -> int:
         h, study, only=only, force=a.force, extra=a.extra, post_plots=a.post_plots,
         stop_on_error=a.stop_on_error)
     failed = [n for n, e in manifest.items() if e.get("status") != "ok"]
+    metrics = bal = None
     if not a.no_validate:
         metrics, wb, eo = validate_variants(h, study)
         if not a.no_figs:
@@ -346,6 +499,22 @@ def run_hypothesis(h: Hypothesis, a) -> int:
                 print(f"  figure: {p}")
         if len(metrics):
             print("\n" + metrics.drop(columns=["eo_var"], errors="ignore").round(3).to_string(index=False))
+    if not getattr(a, "no_balance", False):       # getattr: namespaces built before the flag existed
+        bal = balance_study(h, study)
+        if not a.no_figs and bal["monthly"]:
+            try:
+                for p in plot_balance(h, study, bal):
+                    print(f"  figure: {p}")
+            except Exception as exc:                          # figures never fail the study
+                bal["notes"].append(f"water-balance figures failed ({exc})")
+        summ = bal["tables"].get("summary") if bal["tables"] else None
+        if summ is not None and len(summ):
+            cols = ["variant", "post_eta_mm_yr", "post_recharge_mm_yr", "post_runoff_mm_yr", "post_closure_pct"]
+            print("\npost-fire water balance (mm/yr)\n" +
+                  summ[[c for c in cols if c in summ]].round(1).to_string(index=False))
+        for note in bal["notes"]:
+            print(f"  note: {note}")
+    print(f"  report: {write_report(h, study, manifest, metrics, bal)}")
     if failed:
         print(f"\n[{h.key}] failed variants: {', '.join(failed)}")
     return 1 if failed else 0

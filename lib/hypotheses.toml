@@ -28,6 +28,14 @@ driver   = "Agramon_withLAI_withETp.py"
 # EO energy-balance ETa (EO_ET_PATH in data_paths.toml) is the reference of every hypothesis.
 full_figures = false                # true -> also write analysis_ET_compare Figs A-I per run
 selected_year = 2020                # year of the spatial maps when full_figures = true
+# water-balance tables (hypothesis_tables.py): annual / pre- / post-fire totals, per-variant means
+fire_date = "2020-07-01"            # splits pre_fire / post_fire (pipeline default: agramon_ks.FIRE_DATE_DEFAULT)
+catchment_area_m2 = ""              # "" -> runoff stays in m3 (outlet volume); a number gives runoff in mm
+# recovery metrics need a run on the control catchment (not delineated yet, TO-DO §4): point this to its
+# scenario folder (monthly_stats.csv + hgraph_output.csv) and recovery_metrics.csv / figures appear
+control_sim_dir = ""                # "" -> recovery skipped, and the study report says so
+recovery_tol = 0.1                  # |burned/control - 1| <= tol counts as recovered (placeholder, to decide)
+recovery_sustain = 3                # ... for this many consecutive months (placeholder, to decide)
 
 # ── options shared by every run (the paper baseline) ───────────────────────────
 [common]
