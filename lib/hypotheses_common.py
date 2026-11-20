@@ -24,6 +24,7 @@ from __future__ import annotations
 import argparse
 import itertools
 import json
+import os
 import subprocess
 import sys
 import time
@@ -178,6 +179,16 @@ def save_manifest(study: Path, manifest: dict) -> None:
     (study / MANIFEST).write_text(json.dumps(manifest, indent=2, default=str))
 
 
+def entry_sim_dir(study: Path, entry: dict):
+    """Scenario folder of a manifest entry, or None. A relative sim_dir is read against
+    <study>/prj; an absolute one (manifests written before the registry) is used as stored."""
+    sd = (entry or {}).get("sim_dir")
+    if not sd:
+        return None
+    p = Path(sd)
+    return p if p.is_absolute() else study / "prj" / p
+
+
 def _scenario_dirs(prj: Path) -> set:
     outs = prj / "outputs"
     return set(outs.glob("scenario_*")) if outs.exists() else set()
@@ -192,7 +203,7 @@ def run_variants(h: Hypothesis, study: Path, *, only=None, force=False, extra=()
         if only and v.name not in only:
             continue
         done = manifest.get(v.name, {})
-        sim_dir = Path(done["sim_dir"]) if done.get("sim_dir") else None
+        sim_dir = entry_sim_dir(study, done)
         if not force and done.get("status") == "ok" and sim_dir and (sim_dir / "et_output.nc").exists():
             print(f"[{h.key}] {v.name}: already done -> {sim_dir.name} (use --force to rerun)")
             continue
@@ -200,12 +211,14 @@ def run_variants(h: Hypothesis, study: Path, *, only=None, force=False, extra=()
         print(f"\n[{h.key}] {v.name}\n  " + " ".join(cmd), flush=True)
         before = _scenario_dirs(study / "prj")
         t0 = time.time()
-        rc = subprocess.run(cmd, cwd=HERE).returncode
+        # the driver stamps these in its registry row (agramon_registry.start_run)
+        env = {**os.environ, "AGRAMON_HYPOTHESIS": h.key, "AGRAMON_VARIANT": v.name}
+        rc = subprocess.run(cmd, cwd=HERE, env=env).returncode
         new = sorted(_scenario_dirs(study / "prj") - before, key=lambda p: p.stat().st_mtime)
         ok = rc == 0 and bool(new)
         manifest[v.name] = {"group": v.group, "args": v.args, "returncode": rc,
                             "status": "ok" if ok else "failed",
-                            "sim_dir": str(new[-1]) if new else None,
+                            "sim_dir": new[-1].relative_to(study / "prj").as_posix() if new else None,
                             "seconds": round(time.time() - t0)}
         save_manifest(study, manifest)
         if not ok:
@@ -242,7 +255,7 @@ def validate_variants(h: Hypothesis, study: Path, *, validator=None) -> tuple:
             print(f"[{h.key}] {v.name}: no finished run, skipped in validation")
             continue
         try:
-            r = validator(Path(e["sim_dir"]))
+            r = validator(entry_sim_dir(study, e))
         except Exception as exc:                          # one bad run must not stop the study
             print(f"[{h.key}] {v.name}: validation failed - {exc}")
             continue
@@ -295,7 +308,7 @@ def balance_study(h: Hypothesis, study: Path, *, loader=None) -> dict:
             notes.append(f"{x.name}: no finished run, left out of the water-balance tables")
             continue
         try:
-            frame, frame_notes = load(Path(e["sim_dir"]), area)
+            frame, frame_notes = load(entry_sim_dir(study, e), area)
         except Exception as exc:                          # one bad run must not stop the study
             notes.append(f"{x.name}: outputs unreadable ({exc})")
             continue
@@ -380,7 +393,7 @@ def monthly_stats_by_variant(h: Hypothesis, study: Path) -> dict:
     import pandas as pd
     out = {}
     for name, e in load_manifest(study).items():
-        p = Path(e["sim_dir"]) / "monthly_stats.csv" if e.get("sim_dir") else None
+        p = entry_sim_dir(study, e) / "monthly_stats.csv" if e.get("sim_dir") else None
         if p is not None and p.exists():
             out[name] = pd.read_csv(p)
     return out
