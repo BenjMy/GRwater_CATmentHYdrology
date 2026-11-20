@@ -4,6 +4,15 @@ Science, experimental design and task tracker. Code structure, CLI and refactori
 
 Legend: ✅ done · 🟡 partly done / needs checking · ⬜ not started · 🐞 known bug · ❓ decision needed
 
+
+
+---
+
+
+- [ ] Add a manifest file to sumum run exectuvtion summary
+- [ ] Refactor path to project: example: /home/ben/Nextcloud/BenCSIC/Codes/Tech4agro_org/GRwater_CATmentHYdrology/data/Agramon_SShydro/hypotheses/hyp1_layers_Ks/prj/scenario_1_plot3_outlet-closed_bottom-closed_spinup-off_pmin-m50_ic-pressure_forcing-etpts-wet-fid2/my_cathy_prj/
+use prj/my_cathy_prj bettwer or remove them ...
+
 ---
 
 ## 0. Context and rules for AI sessions
