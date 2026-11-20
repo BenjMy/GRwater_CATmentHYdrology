@@ -3,7 +3,8 @@
 run_paper_scenarios.py - run the Agramon paper scenarios listed in paper_scenarios.toml
 =======================================================================================
 Reads the TOML (one table per scenario, see its header), expands [name.loop] into one
-call of run_scenarii_withETp_withLAI_ALL.sh per combination and runs them.
+call of scenario_runner.py per combination and runs them (the 925-line shell runner it
+used to wrap is now a wrapper around the same Python file).
 
     python run_paper_scenarios.py --list
     python run_paper_scenarios.py --dry-run                  # default set: tag "paper"
@@ -27,7 +28,7 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 DEFAULT_CONFIG = HERE / "paper_scenarios.toml"
-DEFAULT_RUNNER = HERE / "run_scenarii_withETp_withLAI_ALL.sh"
+DEFAULT_RUNNER = HERE / "scenario_runner.py"
 DEFAULT_TAG = "paper"
 
 
@@ -115,7 +116,8 @@ def main(argv=None) -> int:
                    help=f"names and/or tags ('all' = everything); default: tag '{DEFAULT_TAG}'")
     p.add_argument("--skip", nargs="*", default=[], metavar="NAME_OR_TAG")
     p.add_argument("--list", action="store_true")
-    p.add_argument("--dry-run", action="store_true", help="print the commands, run nothing")
+    p.add_argument("--dry-run", action="store_true",
+                   help="print the commands and which runs would be skipped, run nothing")
     p.add_argument("--stop-on-error", action="store_true")
     p.add_argument("--extra", nargs=argparse.REMAINDER, default=[],
                    help="appended to every runner call (put last)")
@@ -130,12 +132,14 @@ def main(argv=None) -> int:
     if not scs:
         print("Nothing selected.")
         return 1
-    calls = [(s.name, ["bash", str(a.runner), *c, *a.extra]) for s in scs for c in expand(s)]
+    launcher = ["bash"] if a.runner.suffix == ".sh" else [sys.executable]
+    dry = ["--dry-run"] if a.dry_run and a.runner.suffix == ".py" else []
+    calls = [(s.name, [*launcher, str(a.runner), *c, *a.extra, *dry]) for s in scs for c in expand(s)]
     print(f"{len(scs)} scenario(s), {len(calls)} runner call(s)")
     failed = []
     for name, cmd in calls:
         print(f"\n# {name}\n" + " ".join(cmd), flush=True)
-        if a.dry_run:
+        if a.dry_run and not dry:
             continue
         rc = subprocess.run(cmd, cwd=HERE).returncode
         if rc:

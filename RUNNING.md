@@ -24,7 +24,7 @@ python run_paper_scenarios.py --list
 python run_paper_scenarios.py --dry-run                    # default tag "paper"
 ```
 
-**A2. Run them** (each call = `run_scenarii_withETp_withLAI_ALL.sh`, which loops dem-plot × PMIN × outlet × bottom × spin-up)
+**A2. Run them** (each call = `scenario_runner.py`, which loops dem-plot × PMIN × outlet × bottom × spin-up)
 ```bash
 python run_paper_scenarios.py --only paper_good            # one scenario or tag
 python run_paper_scenarios.py --only all --skip experimental --stop-on-error
@@ -38,6 +38,15 @@ python Agramon_withLAI_withETp.py --forcing etp_ts --etp-ts-feature-id <FEATURE_
 `--eta-net-neg-mode gross` is the recommended mode to expose water limitation (see TO-DO §5.2; decision pending).
 
 Each run writes in `<path2prj>/outputs/<scenario_dir>/`: `*_output.nc`, `monthly_stats.csv`, `run_summary.png`, `water_balance.png`, `simulation_log.md`. One row per run goes to `simulation_log_withETp_withLAI.csv` (`sim_index`).
+
+**Clean the log after deleting scenario folders** (drops the rows whose `scenario_<sim_index>_*` folder is gone; writes a `.bak-<date>` copy first)
+```bash
+python clean_log.py --dry-run                         # report only (exit code 2 if something would go)
+python clean_log.py                                   # default log + project
+python clean_log.py --study <out_root>/hyp1_layers_Ks # a hypothesis study (log, prj/, manifest.json)
+python clean_log.py --all-studies                     # every study folder of the hypotheses out_root
+python clean_log.py --incomplete                      # also drop runs without et/psi/sw_output.nc
+```
 
 **A3. Post-process / plot** (also available inside the run: add `--post-plots [--post-et-csv <ETA_CSV>]` to `Agramon_withLAI_withETp.py`, or `--extra --post-plots` with `run_paper_scenarios.py`; `run_summary.png` / `water_balance.png` (incl. the applied-Ks panel) are refreshed every month during the run anyway)
 ```bash

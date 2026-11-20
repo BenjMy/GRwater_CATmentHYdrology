@@ -32,7 +32,7 @@ If the tip is not the commit the user expects, ask before continuing. The sessio
 | File | Role |
 |---|---|
 | `Agramon_withLAI_withETp.py` | **Main simulation script.** Full pyCATHY pipeline: monthly LAI loop, ETp/rain forcing, BCs, ICs, spin-up. |
-| `run_scenarii_withETp_withLAI_ALL.sh` | **Batch runner.** Crosses dem-plot × PMIN × outlet BC × bottom BC × spin-up × IC, forwards the other flags, skips completed scenarios, post-processes. |
+| `scenario_runner.py` | **Batch runner (Python).** Crosses dem-plot × PMIN × outlet BC × bottom BC × spin-up × IC, forwards the other flags, skips completed scenarios. `run_scenarii_withETp_withLAI_ALL.sh` is only a wrapper around it (deprecated). |
 | ~~`to_run_paper.md`~~ | Removed (deprecated): recipes live in `lib/paper_scenarios.toml`. |
 | `Agramon_utils.py` | Helpers: shapefile/treatment plots, DEM loading, EM sensors and stats, ERT profiles, ERA5 point series, notebook plot helpers. |
 | `plot_results_shared.py` | Shared plotting module (hydro, ET, LAI, recharge, hydrograph, node maps, fire-window and weekly variants, Fig. 8-style stack). |
@@ -83,13 +83,13 @@ python Agramon_withLAI_withETp.py --dem-plot 3 --pmin -50 --scf 1 \
     --ic-mode pressure --ic-pressure-head -100 --outlet-flux 0 --bottom-flux 0
 
 # ETp sensitivity (wet vs dry bound)
-./run_scenarii_withETp_withLAI_ALL.sh --forcing etp_ts --etp-ts-column ET_0_wet --dem-plot 3 ...
-./run_scenarii_withETp_withLAI_ALL.sh --forcing etp_ts --etp-ts-column ET_0_dry --dem-plot 3 ...
+python scenario_runner.py --forcing etp_ts --etp-ts-column ET_0_wet --dem-plot 3 ...
+python scenario_runner.py --forcing etp_ts --etp-ts-column ET_0_dry --dem-plot 3 ...
 
 # ETa evaluation
 python analysis_ET_compare.py --plots all --scenario <N>
 ```
-`./run_scenarii_withETp_withLAI_ALL.sh --help` lists all flags; `--force` reruns completed scenarios.
+`python scenario_runner.py --help` describes the options; `--dry-run` lists the runs and what would be skipped, `--force` reruns completed scenarios.
 
 ---
 
@@ -135,7 +135,7 @@ The main script re-imports these names, so `from Agramon_withLAI_withETp import 
 | 2.4 | Replace machine auto-detection in `agramon_config.py` (username check, hard-coded Nextcloud paths) with env vars or a config file | ✅ env vars `AGRAMON_ROOT`, `AGRAMON_CODES`, `AGRAMON_LAI_PATH`, `AGRAMON_PATH_ET`; old auto-detection kept as fallback |
 | 2.5 | Move `run_spinup` / `pick_default_spinup_year` to `agramon_spinup.py` | ✅ moved unchanged with the helpers it needs; the main script re-exports the names. Checked: pyflakes, import under stubs, smoke test; not run with CATHY |
 | 2.6 | Move `save_forcing_diagnostics` (350 lines of plotting) to a diagnostics module | ✅ `agramon_diagnostics.py`, re-exported; same checks as 2.5 |
-| 2.7 | Scenario config files (TOML/YAML) instead of ~40 forwarded CLI flags in the 900-line shell runner; the old `to_run_paper.md` recipes became a list of config files | 🟡 `lib/paper_scenarios.toml` + `lib/run_paper_scenarios.py` wrap the existing shell runner (flags unchanged); the shell runner itself and the Python CLI are not replaced yet |
+| 2.7 | Scenario config files (TOML/YAML) instead of ~40 forwarded CLI flags in the 900-line shell runner; the old `to_run_paper.md` recipes became a list of config files | ✅ `lib/scenario_runner.py` (pure Python) replaces the shell runner: same flags, same run order (plot, PMIN, outlet, bottom, spin-up, IC) and the same skip-if-done rule (CSV log + finished `et/psi/sw_output.nc`). `run_scenarii_withETp_withLAI_ALL.sh` is now a 3-line wrapper, so old command lines still work. `run_paper_scenarios.py` calls the runner directly; its `--dry-run` now prints the real driver calls and which runs would be skipped. New in the runner: `--path2prj`, `--log-file`, `--permx-bottom` / `--ks-layer-depth` (two-layer Ks, part of the skip key) and the pass-through flags `--post-plots`, `--no-plots`, `--debug`, `--post-et-csv`, `--log-level`, `--cathy-backend`. Checked: driver calls identical to the old shell runner in 8 option sets (stubbed `python`); skip check tested on a synthetic log; smoke test `test_scenario_runner`. 🐞 fixed on the way: the old skip check compared `--zroot-factors` as typed (`2.0`) with the driver's `{v:g}` log (`2`), so runs with such factors were never skipped. Not done: the main script has no `--config file.toml` option yet (its own CLI is unchanged); not run with CATHY |
 | 2.8 | Single source for defaults: CLI default period (`--start-year 2022 --end-year 2022`) is empty while the batch runner uses 2016–2026; shell and Python defaults differ; default `ZROOT_FACTORS` (`0.05 0.25 1.0 1.5 2.0`) differ from paper runs (`0.3 0.6 2.0 3.0 5.0`) | ❓ choose the defaults |
 | 2.9 | Typed containers (`Forcing`, `BCConfig`, `KsFireConfig`) instead of long tuples/kwargs; document shapes and units of `ETp_nodes`/`rain_nodes` | ✅ `BCConfig` (agramon_config), `Forcing` (agramon_forcing, validated shapes), `AtmbcSetup.forcing`; `KsFireConfig` already typed in `utils/ks_fire_utils.py`. Not run end-to-end (no pyCATHY here) |
 | 2.10 | Replace `print` banners by `logging` | ✅ `lib/agramon_log.py` (`get_logger`, `setup_logging`); 131 `print` -> `log.info/warning/error` in the Agramon modules (level from the message prefix), stdout format unchanged by default; `--log-level`, `--log-file`. 3 multi-arg debug dumps left as `print`; plot/analysis scripts not converted. Not run end-to-end |

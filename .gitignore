@@ -1,6 +1,6 @@
 # Auto detect text files and perform LF normalization
 * text=auto
-SSHydro_withETp_withLAI
+Agramon_SShydro
 SSHydro
 lib/test_validation_tomas/*.nc
 lib/synthetic_LAI_Ks_wet
@@ -20,3 +20,5 @@ results/
 # Batch / run logs (no longer written by the runner, never tracked)
 *.log
 *conflicted copy*
+Agramon_SShydro/**/outputs/
+Agramon_SShydro/**/outputs/

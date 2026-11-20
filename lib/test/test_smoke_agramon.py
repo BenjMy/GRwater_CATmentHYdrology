@@ -52,6 +52,8 @@ from agramon_lai import lai_to_veg_map          # noqa: E402
 from agramon_runlog import build_scenario_dirname      # noqa: E402
 import ks_fire_utils as K                       # noqa: E402
 import run_paper_scenarios as RP                # noqa: E402
+import scenario_runner as SR                    # noqa: E402
+import clean_log as CL                          # noqa: E402
 import agramon_ks as AK                         # noqa: E402
 import agramon_spinup as SP                     # noqa: E402
 import agramon_diagnostics as DG                # noqa: E402
@@ -170,6 +172,94 @@ def test_paper_scenarios():
         pass
     else:
         raise AssertionError("unknown scenario must stop")
+
+def test_scenario_runner():
+    """Python batch runner (replaces the shell runner): expansion, driver command, skip check."""
+    cfg = SR.parse_args("--dem-plot 1 3 --pmin -15 -1e35 --outlet both --spinup both --ic both".split())
+    runs = SR.expand_runs(cfg)
+    assert len(runs) == 2 * 2 * 2 * 1 * 2 * 2           # plot x pmin x outlet x bottom x spinup x ic
+    assert runs[0].plot == "1" and runs[0].pmin == "-15" and runs[-1].plot == "3"
+    c = SR.driver_command(cfg, SR.Run("3", "-1e35", "free", "closed", "on", "wt", "-1e-6", "0", "on_3cycles"))
+    assert "--pmin=-1e35" in c and "--outlet-flux=-1e-6" in c and "--bottom-flux=0" in c
+    assert c[c.index("--spinup-cycles") + 1] == "3" and "--no-spinup" not in c
+    z = SR.parse_args("--zroot-factors 0.3 0.6 2.0 3.0 5.0 --pmin=-50 --permx 6e-4 --force".split())
+    assert z.lists["zroot_factors"] == ["0.3", "0.6", "2.0", "3.0", "5.0"] and z.flags["force"]
+    assert z.lists["pmin"] == ["-50"]
+    for bad in (["--pmin", "abc"], ["--dem-plot", "14"], ["--zroot-factors", "1", "2"],
+                ["--outlet", "half"], ["--scf", "2"], ["--nope"], ["--permx-bottom", "1e-5"]):
+        try:
+            SR.parse_args(bad)
+        except SystemExit:
+            pass
+        else:
+            raise AssertionError(f"{bad} must be rejected")
+    # every TOML scenario still expands into valid runner calls
+    for sc in RP.load_config(RP.DEFAULT_CONFIG).values():
+        for call in RP.expand(sc):
+            assert SR.expand_runs(SR.parse_args(call))
+    # skip-if-done: logged parameters AND finished outputs; factors logged with "{v:g}"
+    import tempfile
+    import pandas as pd
+    tmp = Path(tempfile.mkdtemp())
+    log, prj = tmp / "log.csv", tmp / "prj"
+    pd.DataFrame([{"sim_index": 7, "start_year": 2016, "end_year": 2026, "ZROOT": 1.0, "PMIN": -50.0,
+                   "SCF": 1.0, "watershed_nb": 3, "withLAI": 1, "outlet_flux": 0.0, "bottom_flux": 0.0,
+                   "spinup": "off", "ic_mode": "pressure", "zroot_factors": "0.3,0.6,2,3,5",
+                   "permx": 6e-4, "permy_ratio": 1.0, "permz_ratio": 1.0, "forcing_mode": "etp_ts",
+                   "etp_ts_column": "ET_0_wet", "etp_ts_feature_id": 2, "ks_fire": "off"}]).to_csv(log, index=False)
+    argv = ["--dem-plot", "3", "--pmin", "-50", "--ic", "pressure", "--permx", "6e-4", "--zroot-factors",
+            "0.3", "0.6", "2.0", "3.0", "5.0", "--log-file", str(log), "--path2prj", str(prj)]
+    cfg = SR.parse_args(argv)
+    run = SR.expand_runs(cfg)[0]
+    assert SR.skip_status(cfg, run) is None, "logged but outputs missing -> must run"
+    out = prj / "outputs" / "scenario_7_plot3_x"
+    out.mkdir(parents=True)
+    for f in ("et", "psi", "sw"):
+        (out / f"{f}_output.nc").touch()
+    assert SR.skip_status(cfg, run) == str(out)
+    assert SR.skip_status(SR.parse_args(argv + ["--force"]), run) is None
+    for other in (["--scf", "0"], ["--permx", "1e-3"], ["--etp-ts-feature-id", "9"],
+                  ["--permx-bottom", "1e-5", "--ks-layer-depth", "0.5"],
+                  ["--ks-fire-mode", "lai", "--ks-fire-ll", "1e-5", "--ks-fire-ul", "6e-4"]):
+        c2 = SR.parse_args(argv + other)
+        assert SR.skip_status(c2, SR.expand_runs(c2)[0]) is None, other
+
+
+def test_clean_log():
+    """Rows whose scenario folder is gone are removed (text kept as is, backup written)."""
+    import json
+    import tempfile
+    tmp = Path(tempfile.mkdtemp())
+    prj, log = tmp / "prj", tmp / "simulation_log.csv"
+    for n in (0, 1, 2, 10):
+        d = prj / "outputs" / f"scenario_{n}_x"
+        d.mkdir(parents=True)
+        if n != 2:                                   # run 2 never finished
+            for f in CL.REQUIRED:
+                (d / f).touch()
+    (prj / "outputs" / "scenario_99_orphan").mkdir()
+    text = 'sim_index,PMIN,zf\n0,-15,"0.3,2"\n1,-1e35,\n2,-5,\n3,-9,\n10,-1,x\n,-3,\n'
+    log.write_text(text)
+    man = tmp / "manifest.json"
+    man.write_text(json.dumps({"a": {"sim_dir": str(prj / "outputs" / "scenario_1_x")},
+                               "b": {"sim_dir": str(prj / "outputs" / "scenario_3_gone")}}))
+    r = CL.clean_log(log, prj, dry_run=True, manifest=man)
+    assert r.removed == [3] and r.orphans == ["scenario_99_orphan"] and r.unreadable == 1
+    assert log.read_text() == text and not r.written, "dry run must not touch anything"
+    r = CL.clean_log(log, prj, manifest=man)
+    assert r.written and r.backup.read_text() == text
+    assert log.read_text() == 'sim_index,PMIN,zf\n0,-15,"0.3,2"\n1,-1e35,\n2,-5,\n10,-1,x\n,-3,\n'
+    assert list(json.loads(man.read_text())) == ["a"] and r.manifest_removed == ["b"]
+    r = CL.clean_log(log, prj, incomplete=True, backup=False)
+    assert r.removed == [2] and r.incomplete == [2]
+    assert CL.clean_log(log, prj).removed == [], "nothing left to clean"
+    assert CL.main(["--log-file", str(log), "--path2prj", str(prj), "--dry-run"]) == 0
+    try:
+        CL.clean_log(tmp / "missing.csv", prj)
+    except FileNotFoundError:
+        pass
+    else:
+        raise AssertionError("missing log must raise")
 
 
 def _ks_args(argv):

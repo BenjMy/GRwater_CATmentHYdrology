@@ -61,7 +61,8 @@ This repository is part of the **GRwater** project
 │   ├── hypotheses.toml                      # the four hypotheses (variants, shared options)
 │   ├── hyp1_layers_Ks.py .. hyp4_SW.py      # one runner per hypothesis (see §7.2)
 │   ├── run_all_hypotheses.py                # runs / dry-runs / validates / plots all hypotheses
-│   ├── run_scenarii_withETp_withLAI.sh      # batch runner: crosses dem-plot × PMIN × outlet/bottom BC × spin-up
+│   ├── scenario_runner.py                   # batch runner: crosses dem-plot × PMIN × outlet/bottom BC × spin-up
+│   ├── run_scenarii_withETp_withLAI_ALL.sh  # deprecated wrapper around scenario_runner.py
 │   └── plot_scenarii_withETp_withLAI.sh     # batch post-processor over sim_index / scenario folders
 ├── data/
 │   ├── satellite/Agramon/
@@ -139,7 +140,7 @@ calibrated to the observed Agramon LAI range 0–0.6 m² m⁻²):
 
 ### 4.2 Batch scripts
 
-- **`run_scenarii_withETp_withLAI.sh`** — crosses dem-plot(s) × PMIN
+- **`scenario_runner.py`** (the old `run_scenarii_withETp_withLAI.sh` is a wrapper around it) — crosses dem-plot(s) × PMIN
   value(s) × outlet BC (free/closed) × bottom BC (free/closed) × spin-up
   (on/off), calling `Agramon_withLAI_withETp.py` once per combination.
   Does not write a batch log file (the per-run CSV log is kept). Run

@@ -21,8 +21,15 @@ also get a DOI (§1 of the README).
 - `lib/hypothesis_tables.py`: annual / pre- / post-fire water-balance totals (rain, ETa, recharge, runoff,
   closure), per-variant means, and the recovery hook (`recovery_metrics`, active once a control run is
   configured); `study_report.md` per study; mean ETa / recharge / saturation columns in `summary_metrics.csv`.
+- `lib/clean_log.py`: removes the run-log rows (and stale hypothesis-manifest entries) whose scenario
+  folder no longer exists; `--dry-run`, backup of the CSV, `--study` / `--all-studies`, `--incomplete`.
+- `lib/scenario_runner.py`: Python batch runner (REFACTORING 2.7), same flags as the old shell runner;
+  `run_paper_scenarios.py --dry-run` now shows the real driver calls and the runs it would skip.
 
 ### Changed
+- `run_scenarii_withETp_withLAI_ALL.sh` is a thin wrapper around `scenario_runner.py` (deprecated).
+- Skip-if-done check: `--zroot-factors` are compared as the driver logs them (`2`, not `2.0`);
+  before, runs with such factors were never skipped.
 - `withLAI_results.py` -> `plot_run_results.py`, `results_plotter.py` -> `plot_results_shared.py`.
 - Fig 8 (ETa/ETp vs psi) moved into `plot_eta.py`; vegetation colormap fixed (5 classes).
 

@@ -239,7 +239,7 @@ giving "'ic' has length N but the mesh has M points"), and the main script works
 - [x] ✅ Self-describing scenario folders, skip-if-done, markdown + CSV run logs, batch runner
 - [x] ✅ Comparison against EO-EB ETa and treatments CSV; `etp_output.nc` + Camporese Fig. 8
 - [x] ✅ Post-fire Ks equations and presets in `ks_fire_utils.py`
-- [ ] 🟡 `ks_fire_utils` wired into the main script (`agramon_ks.py`, opt-in `--ks-fire-mode`; unburned Ks before the fire; all zones). The shell runner forwards `--ks-fire-*` and its skip-if-done check uses a new `ks_fire` log column (mock-log test only). Still to do: define the Ks scenario list (preset × mode, add to `paper_scenarios.toml`), run it. Presets come from another site (§5.3)
+- [ ] 🟡 `ks_fire_utils` wired into the main script (`agramon_ks.py`, opt-in `--ks-fire-mode`; unburned Ks before the fire; all zones). `scenario_runner.py` (formerly the shell runner) forwards `--ks-fire-*` and its skip-if-done check uses a new `ks_fire` log column (mock-log test only). Still to do: define the Ks scenario list (preset × mode, add to `paper_scenarios.toml`), run it. Presets come from another site (§5.3)
 - [ ] ⬜ Replace placeholder dNBR→Ks relation if burn-severity mode is used
 - [ ] 🟡 `pyCATHY` wrapper fixes for BCs (`update_nansfdirbc`, `update_nansfneubc`, `update_sfbc`): in progress
 - [ ] 🟡 Validate `pyCATHY` fixes for the `map_prop2mesh` bug and the stale `mesh_pv_attributes` cache (both fixes are already in the code: `np.isscalar` check, `_mesh_is_stale()`/`_mesh_dirty` and the nnod3 guard; still to confirm on a real run with `--mesh-props`)

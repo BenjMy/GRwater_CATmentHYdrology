@@ -1,0 +1,283 @@
+{
+  "1L_ks1e-4": {
+    "group": "1L",
+    "args": {
+      "dem-plot": "3",
+      "start-year": "2016",
+      "end-year": "2026",
+      "forcing": "etp_ts",
+      "etp-ts-column": "ET_0_wet",
+      "outlet-flux": "0",
+      "bottom-flux": "0",
+      "ic-mode": "pressure",
+      "ic-pressure-head": "-100",
+      "pmin": "-50",
+      "scf": "1",
+      "permx": "1e-4",
+      "zroot-factors": [
+        "0.3",
+        "0.6",
+        "2.0",
+        "3.0",
+        "5.0"
+      ],
+      "no-spinup": true
+    },
+    "returncode": 0,
+    "status": "ok",
+    "sim_dir": "/home/z0272571a@campus.csic.es/Nextcloud/BenCSIC/Codes/Tech4agro_org/GRwater_CATmentHYdrology/Agramon_SShydro/hypotheses/hyp1_layers_Ks/prj/outputs/scenario_2_plot3_outlet-closed_bottom-closed_spinup-off_pmin-m50_ic-pressure_forcing-etpts-wet-fid2",
+    "seconds": 2622
+  },
+  "1L_ks6e-4": {
+    "group": "1L",
+    "args": {
+      "dem-plot": "3",
+      "start-year": "2016",
+      "end-year": "2026",
+      "forcing": "etp_ts",
+      "etp-ts-column": "ET_0_wet",
+      "outlet-flux": "0",
+      "bottom-flux": "0",
+      "ic-mode": "pressure",
+      "ic-pressure-head": "-100",
+      "pmin": "-50",
+      "scf": "1",
+      "permx": "6e-4",
+      "zroot-factors": [
+        "0.3",
+        "0.6",
+        "2.0",
+        "3.0",
+        "5.0"
+      ],
+      "no-spinup": true
+    },
+    "returncode": 0,
+    "status": "ok",
+    "sim_dir": "/home/z0272571a@campus.csic.es/Nextcloud/BenCSIC/Codes/Tech4agro_org/GRwater_CATmentHYdrology/Agramon_SShydro/hypotheses/hyp1_layers_Ks/prj/outputs/scenario_4_plot3_outlet-closed_bottom-closed_spinup-off_pmin-m50_ic-pressure_forcing-etpts-wet-fid2",
+    "seconds": 2667
+  },
+  "1L_ks1e-3": {
+    "group": "1L",
+    "args": {
+      "dem-plot": "3",
+      "start-year": "2016",
+      "end-year": "2026",
+      "forcing": "etp_ts",
+      "etp-ts-column": "ET_0_wet",
+      "outlet-flux": "0",
+      "bottom-flux": "0",
+      "ic-mode": "pressure",
+      "ic-pressure-head": "-100",
+      "pmin": "-50",
+      "scf": "1",
+      "permx": "1e-3",
+      "zroot-factors": [
+        "0.3",
+        "0.6",
+        "2.0",
+        "3.0",
+        "5.0"
+      ],
+      "no-spinup": true
+    },
+    "returncode": 0,
+    "status": "ok",
+    "sim_dir": "/home/z0272571a@campus.csic.es/Nextcloud/BenCSIC/Codes/Tech4agro_org/GRwater_CATmentHYdrology/Agramon_SShydro/hypotheses/hyp1_layers_Ks/prj/outputs/scenario_6_plot3_outlet-closed_bottom-closed_spinup-off_pmin-m50_ic-pressure_forcing-etpts-wet-fid2_ks2L-d0.3m-b1e-5",
+    "seconds": 2686
+  },
+  "2L_d0.3_b1e-5": {
+    "group": "2L",
+    "args": {
+      "dem-plot": "3",
+      "start-year": "2016",
+      "end-year": "2026",
+      "forcing": "etp_ts",
+      "etp-ts-column": "ET_0_wet",
+      "outlet-flux": "0",
+      "bottom-flux": "0",
+      "ic-mode": "pressure",
+      "ic-pressure-head": "-100",
+      "pmin": "-50",
+      "scf": "1",
+      "permx": "6e-4",
+      "zroot-factors": [
+        "0.3",
+        "0.6",
+        "2.0",
+        "3.0",
+        "5.0"
+      ],
+      "no-spinup": true,
+      "permx-bottom": "1e-5",
+      "ks-layer-depth": "0.3"
+    },
+    "returncode": 0,
+    "status": "ok",
+    "sim_dir": "/home/z0272571a@campus.csic.es/Nextcloud/BenCSIC/Codes/Tech4agro_org/GRwater_CATmentHYdrology/Agramon_SShydro/hypotheses/hyp1_layers_Ks/prj/outputs/scenario_8_plot3_outlet-closed_bottom-closed_spinup-off_pmin-m50_ic-pressure_forcing-etpts-wet-fid2_ks2L-d0.5m-b1e-5",
+    "seconds": 2783
+  },
+  "2L_d0.5_b1e-5": {
+    "group": "2L",
+    "args": {
+      "dem-plot": "3",
+      "start-year": "2016",
+      "end-year": "2026",
+      "forcing": "etp_ts",
+      "etp-ts-column": "ET_0_wet",
+      "outlet-flux": "0",
+      "bottom-flux": "0",
+      "ic-mode": "pressure",
+      "ic-pressure-head": "-100",
+      "pmin": "-50",
+      "scf": "1",
+      "permx": "6e-4",
+      "zroot-factors": [
+        "0.3",
+        "0.6",
+        "2.0",
+        "3.0",
+        "5.0"
+      ],
+      "no-spinup": true,
+      "permx-bottom": "1e-5",
+      "ks-layer-depth": "0.5"
+    },
+    "returncode": 1,
+    "status": "failed",
+    "sim_dir": null,
+    "seconds": 0
+  },
+  "2L_d1.0_b1e-5": {
+    "group": "2L",
+    "args": {
+      "dem-plot": "3",
+      "start-year": "2016",
+      "end-year": "2026",
+      "forcing": "etp_ts",
+      "etp-ts-column": "ET_0_wet",
+      "outlet-flux": "0",
+      "bottom-flux": "0",
+      "ic-mode": "pressure",
+      "ic-pressure-head": "-100",
+      "pmin": "-50",
+      "scf": "1",
+      "permx": "6e-4",
+      "zroot-factors": [
+        "0.3",
+        "0.6",
+        "2.0",
+        "3.0",
+        "5.0"
+      ],
+      "no-spinup": true,
+      "permx-bottom": "1e-5",
+      "ks-layer-depth": "1.0"
+    },
+    "returncode": 1,
+    "status": "failed",
+    "sim_dir": null,
+    "seconds": 0
+  },
+  "2L_d0.5_b1e-6": {
+    "group": "2L",
+    "args": {
+      "dem-plot": "3",
+      "start-year": "2016",
+      "end-year": "2026",
+      "forcing": "etp_ts",
+      "etp-ts-column": "ET_0_wet",
+      "outlet-flux": "0",
+      "bottom-flux": "0",
+      "ic-mode": "pressure",
+      "ic-pressure-head": "-100",
+      "pmin": "-50",
+      "scf": "1",
+      "permx": "6e-4",
+      "zroot-factors": [
+        "0.3",
+        "0.6",
+        "2.0",
+        "3.0",
+        "5.0"
+      ],
+      "no-spinup": true,
+      "permx-bottom": "1e-6",
+      "ks-layer-depth": "0.5"
+    },
+    "returncode": 1,
+    "status": "failed",
+    "sim_dir": null,
+    "seconds": 0
+  },
+  "1L_ksfire_lai": {
+    "group": "ksfire",
+    "args": {
+      "dem-plot": "3",
+      "start-year": "2016",
+      "end-year": "2026",
+      "forcing": "etp_ts",
+      "etp-ts-column": "ET_0_wet",
+      "outlet-flux": "0",
+      "bottom-flux": "0",
+      "ic-mode": "pressure",
+      "ic-pressure-head": "-100",
+      "pmin": "-50",
+      "scf": "1",
+      "permx": "6e-4",
+      "zroot-factors": [
+        "0.3",
+        "0.6",
+        "2.0",
+        "3.0",
+        "5.0"
+      ],
+      "no-spinup": true,
+      "ks-fire-mode": "lai",
+      "ks-fire-lai-ll": "0.05",
+      "ks-fire-lai-ul": "0.55",
+      "ks-fire-ll": "1e-5",
+      "ks-fire-ul": "6e-4"
+    },
+    "returncode": 1,
+    "status": "failed",
+    "sim_dir": null,
+    "seconds": 0
+  },
+  "2L_ksfire_lai": {
+    "group": "ksfire",
+    "args": {
+      "dem-plot": "3",
+      "start-year": "2016",
+      "end-year": "2026",
+      "forcing": "etp_ts",
+      "etp-ts-column": "ET_0_wet",
+      "outlet-flux": "0",
+      "bottom-flux": "0",
+      "ic-mode": "pressure",
+      "ic-pressure-head": "-100",
+      "pmin": "-50",
+      "scf": "1",
+      "permx": "6e-4",
+      "zroot-factors": [
+        "0.3",
+        "0.6",
+        "2.0",
+        "3.0",
+        "5.0"
+      ],
+      "no-spinup": true,
+      "permx-bottom": "1e-5",
+      "ks-layer-depth": "0.5",
+      "ks-fire-mode": "lai",
+      "ks-fire-lai-ll": "0.05",
+      "ks-fire-lai-ul": "0.55",
+      "ks-fire-ll": "1e-5",
+      "ks-fire-ul": "6e-4"
+    },
+    "returncode": 1,
+    "status": "failed",
+    "sim_dir": null,
+    "seconds": 0
+  }
+}
