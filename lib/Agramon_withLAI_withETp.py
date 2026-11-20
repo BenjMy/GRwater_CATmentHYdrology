@@ -134,6 +134,7 @@ from agramon_lai import (
 from agramon_outputs import save_combined_outputs
 from agramon_runlog import MarkdownLog, build_scenario_dirname, log_simulation
 from agramon_log import get_logger, setup_logging
+from agramon_registry import finish_run, safe as registry_safe
 
 log = get_logger(__name__)
 
@@ -1622,17 +1623,32 @@ def run_pipeline(args: argparse.Namespace) -> None:
 
     inp = setup_inputs(args)
 
-    ks_cfg = ks_config_from_args(args)   # per-month post-fire Ks (off by default)
+    # registry bookkeeping: status/duration/folder of this run in the CSV run log
+    import time
+    import traceback
+    t0 = time.monotonic()
+    reg_log = Path(".").resolve() / args.log_file
+    reg_dir = Path(args.path2prj) / "outputs" / inp.scenario_dirname
+    try:
+        ks_cfg = ks_config_from_args(args)   # per-month post-fire Ks (off by default)
 
-    # ── [4/9]–[7/9] DEM, CATHY project, mesh, preprocessor ────
-    ms = setup_mesh_and_dem(args, inp)
+        # ── [4/9]–[7/9] DEM, CATHY project, mesh, preprocessor ────
+        ms = setup_mesh_and_dem(args, inp)
 
-    # ── [8/9] ATMBC forcing arrays ────────────────────────────
-    atm = build_atmbc(args, inp, ms)
+        # ── [8/9] ATMBC forcing arrays ────────────────────────────
+        atm = build_atmbc(args, inp, ms)
 
-    cfg = configure_model(args, inp, ms, atm)
-    run_monthly_loop(args, inp, ms, atm, ks_cfg, cfg.ds_LAI_raster,
-                     cfg.first_iteration, cfg.spinup_done)
+        cfg = configure_model(args, inp, ms, atm)
+        run_monthly_loop(args, inp, ms, atm, ks_cfg, cfg.ds_LAI_raster,
+                         cfg.first_iteration, cfg.spinup_done)
+    except BaseException as exc:
+        registry_safe(finish_run, reg_log, inp.sim_index, "failed",
+                      seconds=time.monotonic() - t0, sim_dir=reg_dir, path2prj=args.path2prj,
+                      error_tail=f"{type(exc).__name__}: {exc} | "
+                                 + " ".join(traceback.format_exc().splitlines()[-4:]))
+        raise
+    registry_safe(finish_run, reg_log, inp.sim_index, "ok",
+                  seconds=time.monotonic() - t0, sim_dir=reg_dir, path2prj=args.path2prj)
     if getattr(args, "post_plots", False):
         try:
             from post_process import post_process_scenario
