@@ -111,7 +111,8 @@ def clean_log(log: Path, prj: Path, *, incomplete: bool = False, dry_run: bool =
     if manifest is not None and Path(manifest).exists():
         man = json.loads(Path(manifest).read_text())
         stale = [k for k, e in man.items()
-                 if e.get("sim_dir") and not Path(e["sim_dir"]).exists()]
+                 if e.get("sim_dir") and not (Path(e["sim_dir"]) if Path(e["sim_dir"]).is_absolute()
+                                              else Path(prj) / e["sim_dir"]).exists()]
         res.manifest_removed = stale
     if dry_run:
         return res
