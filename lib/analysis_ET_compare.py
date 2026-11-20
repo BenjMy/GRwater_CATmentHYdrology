@@ -124,7 +124,7 @@ MODULE_PATH = Path(os.environ.get("AGRAMON_MODULE_PATH") or (CODES / "GRwater_ge
 if str(MODULE_PATH) not in sys.path:
     sys.path.append(str(MODULE_PATH))
 
-import Agramon_utils as AgUtils
+from utils import Agramon_utils as AgUtils
 
 TARGET_CRS  = "EPSG:25830"
 NATIVE_CRS  = "EPSG:32630"

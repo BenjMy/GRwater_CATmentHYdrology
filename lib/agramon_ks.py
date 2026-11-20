@@ -38,6 +38,9 @@ def ks_config_from_args(args):
     if cfg.mode != "off":
         if cfg.ks_ul is None:
             raise ValueError("--ks-fire-mode needs --ks-fire-ul (or --ks-fire-preset)")
+        if cfg.mode == "lai" and (cfg.lai_ll is None or cfg.lai_ul is None):
+            raise ValueError("--ks-fire-mode lai needs --ks-fire-lai-ll and --ks-fire-lai-ul "
+                             "(LAI right after the fire / fully recovered LAI)")
         probe_date = cfg.fire_date or date(2000, 1, 1)
         KsFire.compute_permx_for_month(cfg, probe_date, cfg.lai_ul)   # raises if incomplete
     return cfg
@@ -121,7 +124,13 @@ def layers_from_simu(simu):
     dp = getattr(simu, "dem_parameters", None) or {}
     zr = dp.get("zratio(i),i=1,nstr", CATHY_ZRATIO_DEFAULT)
     base = dp.get("base", CATHY_BASE_DEFAULT)
-    return [float(v) for v in zr], float(base)
+    if isinstance(zr, str):                  # pyCATHY may store it as "0.1 0.2 ..." (or comma separated)
+        zr = zr.replace(",", " ").split()
+    elif np.isscalar(zr):
+        zr = [zr]
+    if isinstance(base, (list, tuple)):
+        base = base[0]
+    return [float(v) for v in zr], float(str(base).split()[0]) if isinstance(base, str) else float(base)
 
 
 def layer_centres(zratio, base):

@@ -15,7 +15,7 @@
 
 [general]
 root  = ""                                 # data root (Nextcloud). "" = machine auto-detection
-codes = "BenCSIC/Codes/Tech4agro_org"      # relative to root; holds the GRwater_* repos
+codes = "/home/z0272571a@campus.csic.es/Nextcloud/BenCSIC/Codes/Tech4agro_org"      # relative to root; holds the GRwater_* repos
 
 [crs]
 target = "EPSG:25830"      # everything is reprojected to this CRS before any operation
@@ -30,7 +30,7 @@ etp_csv     = "agramon_treatments_ET.csv"   # --forcing etp_ts : ETp (ET_0_wet /
 et_csv      = "agramon_ET.csv"              # single-series ET csv (same folder)
 
 [vegetation]
-dir  = "BenCSIC/Training_Supervision/Supervision/Xela_Carracedo_Practicas_2026_data/301a-biophysical/agramon/input"   # relative to root
+dir  = "/home/z0272571a@campus.csic.es/Nextcloud/BenCSIC/Codes/Tech4agro_org/GRwater_CATmentHYdrology/data/biophysical/agramon/input"   # relative to root
 file = "lai_monthly.nc"                     # monthly LAI
 
 [terrain]                                   # relative to the repo root unless absolute
@@ -40,4 +40,7 @@ shapefile_names = ["microcuencas_13"]
 
 [outputs]
 # CATHY project tree read by the post-processing (analysis_ET_compare, hypothesis validation)
-wb_prj_root = "BenCSIC/Training_Supervision/Supervision/Xela_Carracedo_Practicas_2026_data/SSHydro_withETp_withLAI"   # relative to root
+wb_prj_root = "BenCSIC/Codes/Tech4agro_org/GRwater_CATmentHYdrology/Agramon_SShydro"   # relative to root
+
+
+

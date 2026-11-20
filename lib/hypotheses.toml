@@ -60,8 +60,8 @@ variants = [
   { name = "2L_d0.5_b1e-5", group = "2L", permx = "6e-4", permx-bottom = "1e-5", ks-layer-depth = "0.5" },
   { name = "2L_d1.0_b1e-5", group = "2L", permx = "6e-4", permx-bottom = "1e-5", ks-layer-depth = "1.0" },
   { name = "2L_d0.5_b1e-6", group = "2L", permx = "6e-4", permx-bottom = "1e-6", ks-layer-depth = "0.5" },
-  { name = "1L_ksfire_lai", group = "ksfire", permx = "6e-4", ks-fire-mode = "lai", ks-fire-ll = "1e-5", ks-fire-ul = "6e-4" },
-  { name = "2L_ksfire_lai", group = "ksfire", permx = "6e-4", permx-bottom = "1e-5", ks-layer-depth = "0.5", ks-fire-mode = "lai", ks-fire-ll = "1e-5", ks-fire-ul = "6e-4" },
+  { name = "1L_ksfire_lai", group = "ksfire", permx = "6e-4", ks-fire-mode = "lai", ks-fire-lai-ll = "0.05", ks-fire-lai-ul = "0.55", ks-fire-ll = "1e-5", ks-fire-ul = "6e-4" },
+  { name = "2L_ksfire_lai", group = "ksfire", permx = "6e-4", permx-bottom = "1e-5", ks-layer-depth = "0.5", ks-fire-mode = "lai", ks-fire-lai-ll = "0.05", ks-fire-lai-ul = "0.55", ks-fire-ll = "1e-5", ks-fire-ul = "6e-4" },
 ]
 
 # ── hyp2: LAI-driven root water uptake stress (SCF) and PMIN ────────────────────
