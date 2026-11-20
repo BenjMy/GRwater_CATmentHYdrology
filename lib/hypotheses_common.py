@@ -194,6 +194,19 @@ def _scenario_dirs(prj: Path) -> set:
     return set(outs.glob("scenario_*")) if outs.exists() else set()
 
 
+def _run_tee(cmd, cwd, env, keep: int = 15) -> tuple:
+    """Run ``cmd``; stdout is inherited, stderr is echoed live and its last ``keep`` lines are
+    returned as one line: ``(returncode, stderr_tail)`` (what the manifest keeps for a failed run)."""
+    import collections
+    tail = collections.deque(maxlen=keep)
+    p = subprocess.Popen(cmd, cwd=cwd, env=env, stderr=subprocess.PIPE, text=True, errors="replace")
+    for line in p.stderr:
+        sys.stderr.write(line)
+        sys.stderr.flush()
+        tail.append(line.rstrip())
+    return p.wait(), " | ".join(t for t in tail if t)[-500:]
+
+
 def run_variants(h: Hypothesis, study: Path, *, only=None, force=False, extra=(),
                  post_plots=False, stop_on_error=False) -> dict:
     """Run the variants (skipping finished ones); returns the updated manifest."""
@@ -213,13 +226,15 @@ def run_variants(h: Hypothesis, study: Path, *, only=None, force=False, extra=()
         t0 = time.time()
         # the driver stamps these in its registry row (agramon_registry.start_run)
         env = {**os.environ, "AGRAMON_HYPOTHESIS": h.key, "AGRAMON_VARIANT": v.name}
-        rc = subprocess.run(cmd, cwd=HERE, env=env).returncode
+        rc, err_tail = _run_tee(cmd, HERE, env)
         new = sorted(_scenario_dirs(study / "prj") - before, key=lambda p: p.stat().st_mtime)
         ok = rc == 0 and bool(new)
         manifest[v.name] = {"group": v.group, "args": v.args, "returncode": rc,
                             "status": "ok" if ok else "failed",
                             "sim_dir": new[-1].relative_to(study / "prj").as_posix() if new else None,
                             "seconds": round(time.time() - t0)}
+        if not ok:
+            manifest[v.name]["error_tail"] = err_tail or "no stderr (rc=0 but no new scenario folder)"
         save_manifest(study, manifest)
         if not ok:
             print(f"!! [{h.key}] {v.name} failed (rc={rc})", flush=True)
