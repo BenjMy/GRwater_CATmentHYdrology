@@ -160,6 +160,31 @@ calibrated to the observed Agramon LAI range 0–0.6 m² m⁻²):
   `[FILL IN: are these published elsewhere / should they be vendored into
   ./lib or cited as a separate repository?]`.
 
+### 4.4 Run registry and comparing runs
+
+The CSV run log (`simulation_log*.csv`) is the single registry of runs. Besides the parameters it
+now records, per run, `status` (running / ok / failed), `seconds`, `n_months`, `sim_dir` (relative to
+`path2prj`, so the project can be moved), `param_hash`, `git_commit`, `error_tail` of a failed run and,
+for hypothesis runs, the `hypothesis` / `variant` names. It is written by `agramon_registry.py` (called
+from `agramon_runlog.log_simulation` and `run_pipeline`); a registry error never stops a run. Old logs
+still load: `python backfill_registry.py --study <study>` fills `param_hash`, `sim_dir`, `status` and
+`n_months` for them (a backup is written unless `--no-backup`).
+
+- **`run_catalog.py`** — one table of the runs (status, duration, months, outputs on disk, duplicates,
+  which parameters vary, optional ETa / recharge / closure): `python run_catalog.py --study <study> --metrics`,
+  filters `--where "PMIN == -50"`, `--status ok`, `--unique`, `--csv runs_summary.csv`.
+- **`plot_compare_runs.py`** — comparison figures (response, annual totals, water balance, optional ETa
+  vs EO-EB with `--eo`) for runs picked by `--sim 2 4 6` or `--where`; labels show only the parameters that
+  differ. Default selection: finished, not partial, latest of each parameter set.
+- **Reuse**: `scenario_runner.py` and the hypothesis runner skip a run only when a matching one finished.
+  Runs marked failed/running never count, and neither do **partial** runs (fewer than 90 % of the months of
+  the longest run with the same period): the pipeline writes all NetCDFs even when months were skipped, so
+  "outputs exist" alone is not proof that a run completed. `agramon_registry.find_run(log, params, path2prj)`
+  does the same lookup by `param_hash` from Python.
+- The hash covers the logged parameters only. It does not cover code version (see `git_commit`) or options
+  that are not in the log (e.g. `--dem-smooth-sigma`), so identical hashes are a strong hint, not a proof.
+- `python lib/test/test_registry.py` runs the registry smoke test (no CATHY needed).
+
 ---
 
 ## 5. Data description

@@ -108,5 +108,46 @@ def main():
     print("test_registry: all assertions passed")
 
 
+def test_catalog_and_helpers():
+    """run_catalog on a toy log + the hypothesis-runner helpers (no CATHY needed)."""
+    import os
+
+    import hypotheses_common as hc
+    import run_catalog as rc
+
+    with tempfile.TemporaryDirectory() as tmp:
+        tmp = Path(tmp)
+        prj, log = tmp / "prj", tmp / "simulation_log.csv"
+        for idx, pmin, months in ((0, -50.0, 107), (1, -50.0, 107), (2, -15.0, 107), (3, -15.0, 20)):
+            p = {**BASE, "PMIN": pmin}
+            _log(log, idx, p)
+            reg.start_run(log, idx, p)
+            d = _finished_dir(prj, idx)
+            (d / "monthly_stats.csv").write_text("month\n" + "\n".join(f"m{m}" for m in range(months)))
+            reg.finish_run(log, idx, "ok", seconds=1, sim_dir=d, path2prj=prj)
+        runs = rc.load_runs(log, prj)
+        assert list(runs["partial"]) == [False, False, False, True]
+        assert list(runs["dup_of"].astype("Int64").fillna(-1)) == [-1, 0, -1, 2]
+        assert rc.varying_params(runs) == ["PMIN"]
+        assert rc.run_labels(runs)[2] == "#2 PMIN=-15"
+        assert len(rc.load_runs(log, prj, unique=True)) == 2
+        assert list(rc.load_runs(log, prj, where="PMIN == -50")["sim_index"]) == [0, 1]
+        assert not rc.load_runs(log, prj, status="failed").shape[0]
+
+        # study folder layout: relative manifest paths resolve against <study>/prj
+        s = tmp / "study"
+        assert hc.entry_sim_dir(s, {"sim_dir": "outputs/x"}) == s / "prj/outputs/x"
+        assert hc.entry_sim_dir(s, {"sim_dir": "/abs/x"}) == Path("/abs/x")
+        assert hc.entry_sim_dir(s, {}) is None
+
+        # failed runs keep the end of stderr (echoed live)
+        code, tail = hc._run_tee([sys.executable, "-c",
+                                  "import sys\nfor i in range(30): print(i, file=sys.stderr)\nraise ValueError('boom')"],
+                                 ".", dict(os.environ), keep=3)
+        assert code == 1 and tail.endswith("ValueError: boom") and tail.count(" | ") == 2
+    print("test_catalog_and_helpers: all assertions passed")
+
+
 if __name__ == "__main__":
     main()
+    test_catalog_and_helpers()
