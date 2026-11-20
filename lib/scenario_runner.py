@@ -348,14 +348,22 @@ def check_already_done(cfg: BatchConfig, run: Run) -> str:
     hits = df[mask]
     if hits.empty:
         return "MISSING (no matching logged run)"
-    sim_index = int(hits.iloc[-1]["sim_index"])
+    # registry: a run marked failed/running never counts as done (legacy rows have no status)
+    if "status" in hits.columns:
+        hits = hits[~hits["status"].isin(["failed", "running"])]
+        if hits.empty:
+            return "MISSING (matching runs failed or are still running)"
+    from agramon_registry import outputs_ok, partial_rows, resolve_sim_dir
+    hits = hits[~partial_rows(df).reindex(hits.index, fill_value=False)]   # stopped early
+    if hits.empty:
+        return "MISSING (matching runs are partial)"
     prj = Path(o["path2prj"])
-    out_root = (prj if prj.is_absolute() else HERE / prj) / "outputs"
-    required = ("et_output.nc", "psi_output.nc", "sw_output.nc")
-    for d in sorted(out_root.glob(f"scenario_{sim_index}_*")) + [out_root / f"scenario_{sim_index}"]:
-        if d.is_dir() and all((d / f).exists() for f in required):
+    prj = prj if prj.is_absolute() else HERE / prj
+    for _, row in hits.iloc[::-1].iterrows():       # newest matching run first
+        d = resolve_sim_dir(row, prj)
+        if d is not None and outputs_ok(d):
             return f"DONE {d}"
-    return f"MISSING (sim_index={sim_index} logged but outputs incomplete)"
+    return f"MISSING (sim_index={int(hits.iloc[-1]['sim_index'])} logged but outputs incomplete)"
 
 
 def skip_status(cfg: BatchConfig, run: Run) -> str | None:

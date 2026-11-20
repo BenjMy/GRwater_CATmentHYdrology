@@ -33,6 +33,8 @@ def list_logged_scenarios(log_csv, forcing: str = "") -> list[int]:
     """sim_index values in the run log; rows without forcing_mode count as 'etp'."""
     import pandas as pd
     df = pd.read_csv(log_csv)
+    if "status" in df.columns:                      # registry: failed / running runs have no results
+        df = df[~df["status"].isin(["failed", "running"])]
     if forcing:
         fm = df["forcing_mode"].fillna("etp").astype(str) if "forcing_mode" in df.columns \
             else pd.Series("etp", index=df.index)

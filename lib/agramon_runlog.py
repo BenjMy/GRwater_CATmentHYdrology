@@ -17,6 +17,7 @@ import numpy as np
 import pandas as pd
 
 from agramon_log import get_logger
+from agramon_registry import safe as _registry_safe, start_run as _registry_start_run
 
 log = get_logger(__name__)
 
@@ -220,6 +221,8 @@ def log_simulation(log_path: Path, start_year: int, end_year: int,
         sim_index = uCATHY.log_simulation(log_path, params)
     else:
         sim_index = _fallback_log_simulation(log_path, params)
+    # registry columns (status=running, param_hash, created_at, git_commit); never stops a run
+    _registry_safe(_registry_start_run, log_path, sim_index, params)
     log.info(f"  sim_index = {sim_index}  (withLAI={with_lai})")
     return sim_index
 

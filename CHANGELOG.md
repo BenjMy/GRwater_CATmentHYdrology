@@ -14,6 +14,18 @@ also get a DOI (§1 of the README).
 ## [Unreleased]
 
 ### Added
+- Run registry on top of the CSV run log (`agramon_registry.py`): status, seconds, n_months,
+  relative `sim_dir`, `param_hash`, `git_commit`, `error_tail`; `backfill_registry.py` for old logs.
+- `run_catalog.py` (summary table of runs) and `plot_compare_runs.py` (comparison figures from the log).
+- Partial-run detection: runs that stopped early are never reused.
+- `manifest.json` of a hypothesis study keeps the stderr tail (`error_tail`) of failed variants.
+
+### Changed
+- `manifest.json` stores `sim_dir` relative to the study `prj/` (absolute paths still read).
+- `scenario_runner.py` skip check ignores failed, running and partial runs.
+- `clean_log.py` and `post_process.py` read relative manifest paths and skip failed/running runs.
+
+### Added
 - `lib/data_paths.toml`: every input path in one file (`AGRAMON_DATA_CONFIG` to use another site).
 - Two-layer Ks scenario (`--permx-bottom`, `--ks-layer-depth`).
 - Hypothesis framework: `hypotheses.toml`, `hyp1_layers_Ks.py` .. `hyp4_SW.py`, `run_all_hypotheses.py`
