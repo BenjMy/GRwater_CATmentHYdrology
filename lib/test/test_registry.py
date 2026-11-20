@@ -81,6 +81,22 @@ def main():
         assert reg.find_run(log, p1, prj) is None
         assert reg.find_run(log, p1, prj, require_outputs=False) == 2
 
+        # partial runs: n_months far below the longest run of the same period are never reused
+        p3 = {**BASE, "PMIN": -5.0}
+        for idx, months in ((3, 107), (4, 24)):          # 4 stopped early but wrote all outputs
+            _log(log, idx, p3)
+            reg.start_run(log, idx, p3)
+            d = _finished_dir(prj, idx)
+            for f in (d / "monthly_stats.csv",):
+                f.write_text("month\n" + "\n".join(f"2016-{m % 12 + 1:02d}" for m in range(months)))
+            reg.finish_run(log, idx, "ok", seconds=5, sim_dir=d, path2prj=prj)
+        df = reg.load_registry(log)
+        assert list(df.loc[df.sim_index.isin([3, 4]), "n_months"]) == [107, 24]
+        pm = reg.partial_rows(df)
+        assert bool(pm[df.index[df.sim_index == 4][0]]) and not bool(pm[df.index[df.sim_index == 3][0]])
+        assert reg.find_run(log, p3, prj) == 3            # latest run (4) is partial -> falls back to 3
+        assert reg.count_months(prj / "no-such-dir") is None
+
         # unknown row id -> False, status validation, safe() swallows errors
         assert reg.finish_run(log, 99, "ok") is False
         try:

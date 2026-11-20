@@ -47,7 +47,8 @@ IDENTITY_COLS = (
     "forcing_mode", "etp_ts_column", "etp_ts_feature_id", "ks_fire",
 )
 REGISTRY_COLS = ("created_at", "finished_at", "status", "seconds", "sim_dir", "param_hash",
-                 "hypothesis", "variant", "git_commit", "error_tail")
+                 "n_months", "hypothesis", "variant", "git_commit", "error_tail")
+PARTIAL_BELOW = 0.9   # a run with fewer months than this x the longest run of its period is partial
 
 
 # ── identity ──────────────────────────────────────────────────────────────────
@@ -87,8 +88,28 @@ def load_registry(log_path) -> pd.DataFrame:
         if c not in df.columns:
             df[c] = pd.Series([None] * len(df), dtype=object)
     df["seconds"] = pd.to_numeric(df["seconds"], errors="coerce")
+    df["n_months"] = pd.to_numeric(df["n_months"], errors="coerce")
     df["status"] = df["status"].where(df["status"].notna(), "unknown")
     return df
+
+
+def count_months(sim_dir) -> Optional[int]:
+    """Months a run simulated = rows of its monthly_stats.csv (None if unreadable)."""
+    try:
+        return int(len(pd.read_csv(Path(sim_dir) / "monthly_stats.csv", usecols=["month"])))
+    except Exception:
+        return None
+
+
+def partial_rows(df: pd.DataFrame) -> pd.Series:
+    """True for runs that stopped early: ``n_months`` below PARTIAL_BELOW x the longest run with
+    the same start/end year. A finished-looking folder (all NetCDFs) can still be partial, because
+    the pipeline writes the outputs even when months were skipped. Unknown n_months -> False."""
+    if "n_months" not in df.columns:
+        return pd.Series(False, index=df.index)
+    n = pd.to_numeric(df["n_months"], errors="coerce")
+    longest = n.groupby([df["start_year"], df["end_year"]]).transform("max")
+    return (n < PARTIAL_BELOW * longest).fillna(False)
 
 
 def _write_atomic(df: pd.DataFrame, path: Path) -> None:
@@ -157,6 +178,7 @@ def finish_run(log_path, sim_index: int, status: str, seconds: Optional[float] =
         finished_at=_now(), status=status,
         seconds=None if seconds is None else round(float(seconds), 1),
         sim_dir=rel, error_tail=tail,
+        n_months=None if sim_dir is None else count_months(sim_dir),
     )
 
 
@@ -190,16 +212,17 @@ def resolve_sim_dir(row, path2prj) -> Optional[Path]:
 def find_run(log_path, params, path2prj=None, require_outputs: bool = True) -> Optional[int]:
     """sim_index of the latest finished run with the same parameters, or None.
 
-    Rows marked failed/running never match. Legacy rows (status unknown) match when their
+    Rows marked failed/running, and partial runs (see ``partial_rows``), never match. Legacy rows (status unknown) match when their
     outputs are on disk, so ``path2prj`` is needed unless ``require_outputs`` is False.
     """
     path = Path(log_path)
     if not path.exists() or path.stat().st_size == 0:
         return None
     df = load_registry(path)
+    partial = partial_rows(df)
     h = param_hash(params)
-    for _, row in df.iloc[::-1].iterrows():
-        if row["status"] in ("failed", "running"):
+    for i, row in df.iloc[::-1].iterrows():
+        if row["status"] in ("failed", "running") or partial[i]:
             continue
         rh = row["param_hash"] if isinstance(row["param_hash"], str) and row["param_hash"] \
             else param_hash(row)

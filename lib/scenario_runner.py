@@ -353,7 +353,10 @@ def check_already_done(cfg: BatchConfig, run: Run) -> str:
         hits = hits[~hits["status"].isin(["failed", "running"])]
         if hits.empty:
             return "MISSING (matching runs failed or are still running)"
-    from agramon_registry import outputs_ok, resolve_sim_dir
+    from agramon_registry import outputs_ok, partial_rows, resolve_sim_dir
+    hits = hits[~partial_rows(df).reindex(hits.index, fill_value=False)]   # stopped early
+    if hits.empty:
+        return "MISSING (matching runs are partial)"
     prj = Path(o["path2prj"])
     prj = prj if prj.is_absolute() else HERE / prj
     for _, row in hits.iloc[::-1].iterrows():       # newest matching run first

@@ -7,6 +7,8 @@ For every row of a CSV run log that lacks them, fills (never overwrites)
     param_hash   from the parameter columns
     sim_dir      scenario folder relative to the project (found by ``scenario_<sim_index>[_tag]``)
     status       'ok' when the folder holds et/psi/sw_output.nc, else left 'unknown'
+    n_months     months simulated (rows of monthly_stats.csv); runs far shorter than the longest
+                 run of their period are then treated as partial and never reused
 
 Not filled on purpose: seconds / created_at / finished_at (nothing reliable to read them from:
 file times change with a git checkout) and anything taken from manifest.json, whose sim_dir
@@ -29,8 +31,8 @@ from pathlib import Path
 
 import pandas as pd
 
-from agramon_registry import (REGISTRY_COLS, _write_atomic, load_registry, outputs_ok,
-                              param_hash, resolve_sim_dir)
+from agramon_registry import (REGISTRY_COLS, _write_atomic, count_months, load_registry,
+                              outputs_ok, param_hash, resolve_sim_dir)
 
 
 def _empty(v) -> bool:
@@ -41,7 +43,7 @@ def backfill(log: Path, prj: Path, *, dry_run: bool = False, backup: bool = True
     """Fill missing registry values; returns counts and the rows that have no scenario folder."""
     df = load_registry(log)
     df = df.astype({c: object for c in REGISTRY_COLS if c != "seconds"})
-    n = {"hash": 0, "sim_dir": 0, "ok": 0}
+    n = {"hash": 0, "sim_dir": 0, "ok": 0, "months": 0}
     no_dir, no_outputs = [], []
     for i, row in df.iterrows():
         if _empty(row["param_hash"]):
@@ -54,6 +56,11 @@ def backfill(log: Path, prj: Path, *, dry_run: bool = False, backup: bool = True
         if _empty(row["sim_dir"]):
             df.at[i, "sim_dir"] = d.resolve().relative_to(prj.resolve()).as_posix()
             n["sim_dir"] += 1
+        if _empty(row["n_months"]):
+            m = count_months(d)
+            if m is not None:
+                df.at[i, "n_months"] = m
+                n["months"] += 1
         if _empty(row["status"]):
             if outputs_ok(d):
                 df.at[i, "status"] = "ok"
@@ -86,7 +93,7 @@ def main(argv=None) -> int:
         return 1
     res = backfill(log, prj, dry_run=a.dry_run, backup=not a.no_backup)
     print(f"{log}  ({res['rows']} rows)")
-    print(f"  param_hash filled: {res['hash']} | sim_dir filled: {res['sim_dir']} | status ok: {res['ok']}")
+    print(f"  param_hash filled: {res['hash']} | sim_dir filled: {res['sim_dir']} | status ok: {res['ok']} | n_months: {res['months']}")
     if res["no_folder"]:
         print(f"  no scenario folder for sim_index: {res['no_folder']}")
     if res["no_outputs"]:
