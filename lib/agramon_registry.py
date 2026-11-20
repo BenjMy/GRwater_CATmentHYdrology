@@ -148,15 +148,30 @@ def _now() -> str:
     return datetime.now().isoformat(timespec="seconds")
 
 
+_LAST_STARTED: dict = {}   # {"log": path, "idx": sim_index} of the run started by this process
+
+
 def start_run(log_path, sim_index: int, params) -> bool:
     """Mark a freshly logged run as running and stamp its identity, time and code version."""
-    return _update_row(
+    ok = _update_row(
         log_path, sim_index,
         created_at=_now(), status="running", param_hash=param_hash(params),
         hypothesis=os.environ.get("AGRAMON_HYPOTHESIS", ""),
         variant=os.environ.get("AGRAMON_VARIANT", ""),
         git_commit=_git_commit(),
     )
+    if ok:
+        _LAST_STARTED.update(log=str(log_path), idx=int(sim_index))
+    return ok
+
+
+def fail_last_started(error_tail: str = "", seconds: Optional[float] = None) -> bool:
+    """Close as failed the run this process started (for errors raised before its sim_index was
+    returned to the caller, e.g. inside setup_inputs). False when no run was started."""
+    if not _LAST_STARTED:
+        return False
+    return finish_run(_LAST_STARTED["log"], _LAST_STARTED["idx"], "failed",
+                      seconds=seconds, error_tail=error_tail)
 
 
 def finish_run(log_path, sim_index: int, status: str, seconds: Optional[float] = None,

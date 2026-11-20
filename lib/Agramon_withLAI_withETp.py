@@ -134,7 +134,7 @@ from agramon_lai import (
 from agramon_outputs import save_combined_outputs
 from agramon_runlog import MarkdownLog, build_scenario_dirname, log_simulation
 from agramon_log import get_logger, setup_logging
-from agramon_registry import finish_run, safe as registry_safe
+from agramon_registry import fail_last_started, finish_run, safe as registry_safe
 
 log = get_logger(__name__)
 
@@ -1621,12 +1621,19 @@ def run_pipeline(args: argparse.Namespace) -> None:
     """Execute the full pyCATHY + LAI + ETp simulation pipeline."""
     setup_logging(getattr(args, "log_level", "INFO"), getattr(args, "log_to_file", None))
 
-    inp = setup_inputs(args)
-
-    # registry bookkeeping: status/duration/folder of this run in the CSV run log
     import time
     import traceback
     t0 = time.monotonic()
+    try:
+        inp = setup_inputs(args)
+    except BaseException as exc:
+        # the run may already have its CSV row (log_simulation) without a returned sim_index
+        registry_safe(fail_last_started, seconds=time.monotonic() - t0,
+                      error_tail=f"{type(exc).__name__}: {exc} | "
+                                 + " ".join(traceback.format_exc().splitlines()[-4:]))
+        raise
+
+    # registry bookkeeping: status/duration/folder of this run in the CSV run log
     reg_log = Path(".").resolve() / args.log_file
     reg_dir = Path(args.path2prj) / "outputs" / inp.scenario_dirname
     try:

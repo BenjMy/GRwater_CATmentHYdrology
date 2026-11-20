@@ -97,6 +97,17 @@ def main():
         assert reg.find_run(log, p3, prj) == 3            # latest run (4) is partial -> falls back to 3
         assert reg.count_months(prj / "no-such-dir") is None
 
+        # error before the caller got its sim_index: the run this process started is closed as failed
+        reg._LAST_STARTED.clear()
+        assert reg.fail_last_started("nothing started") is False
+        p5 = {**BASE, "PMIN": -1.0}
+        _log(log, 5, p5)
+        reg.start_run(log, 5, p5)
+        assert reg.fail_last_started("ValueError: bad input\n  in setup", seconds=0.4)
+        df = reg.load_registry(log)
+        r5 = df[df.sim_index == 5].iloc[0]
+        assert r5["status"] == "failed" and r5["error_tail"] == "ValueError: bad input | in setup"
+
         # unknown row id -> False, status validation, safe() swallows errors
         assert reg.finish_run(log, 99, "ok") is False
         try:
