@@ -19,3 +19,4 @@ results/
 
 # Batch / run logs (no longer written by the runner, never tracked)
 *.log
+*conflicted copy*
