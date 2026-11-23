@@ -41,7 +41,7 @@ import xarray as xr
 import sys as _sys
 from pathlib import Path as _P
 _sys.path.insert(0, str(_P(__file__).resolve().parents[1]))   # lib/ (agramon_config)
-from agramon_config import EO_ET_PATH, etp_path as _ETP_PATH, TARGET_CRS, NATIVE_CRS, CODES  # paths: lib/data_paths.toml
+from agramon_config import EO_ET_PATH, etp_path as _ETP_PATH, TARGET_CRS, NATIVE_CRS, CODES, SHAPEFILE_DIR, SHAPEFILE_NAMES  # paths: lib/data_paths.toml
 
 MODULE_PATH = Path(os.environ.get("AGRAMON_MODULE_PATH") or (CODES / "GRwater_geophy")).expanduser().resolve()
 if str(MODULE_PATH) not in sys.path:
@@ -70,8 +70,7 @@ DEFAULT_RATIO_MONTH_YEARS = None  # None = [DEFAULT_YEAR] (or --year if given)
 
 def load_shapefiles() -> gpd.GeoDataFrame:
     """Load Agramon plot shapefiles, reproject to TARGET_CRS."""
-    gdf = AgUtils.load_plot_shapefiles(['microcuencas_13'], 
-                                               MODULE_PATH / "shapefiles")
+    gdf = AgUtils.load_plot_shapefiles(SHAPEFILE_NAMES, SHAPEFILE_DIR)
     if gdf.crs is None:
         raise ValueError("Shapefile has no CRS — assign one before proceeding.")
     if str(gdf.crs) != TARGET_CRS:

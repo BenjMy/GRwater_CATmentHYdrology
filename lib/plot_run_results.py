@@ -89,7 +89,8 @@ from Agramon_withLAI_withETp import load_dem_from_tif  # or move it to Agramon_u
 # ── Path setup ────────────────────────────────────────────────────────────────
 
 # All input paths come from agramon_config (lib/data_paths.toml, AGRAMON_* env overrides).
-from agramon_config import EO_PATH, LAI_PATH, PathET, etp_path, rain_path
+from agramon_config import (EO_PATH, LAI_PATH, PathET, etp_path, rain_path,
+                            SHAPEFILE_DIR, SHAPEFILE_NAMES)
 
 MODULE_PATH = (Path(__file__).resolve().parent / "utils")
 
@@ -1854,8 +1855,7 @@ def run_pipeline(args: argparse.Namespace) -> None:
         try:
             ds_etp  = load_etp()
             ds_rain = load_rain()
-            gdf_Agramon = AgUtils.load_plot_shapefiles(['microcuencas_13'],
-                                                       MODULE_PATH / "shapefiles")
+            gdf_Agramon = AgUtils.load_plot_shapefiles(SHAPEFILE_NAMES, SHAPEFILE_DIR)
             pev_series        = _domain_mean_daily_series(ds_etp,  "ET_0-gf", gdf_Agramon)
             pev_series_median = _domain_mean_daily_series(ds_etp,  "ET_0-gf", gdf_Agramon,
                                                             stat="median")

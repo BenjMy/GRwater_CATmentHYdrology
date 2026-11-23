@@ -109,7 +109,8 @@ import xarray as xr
 # =============================================================================
 
 # All input paths come from agramon_config (lib/data_paths.toml, AGRAMON_* env overrides).
-from agramon_config import CODES, EO_ET_PATH, ETP_CSV_PATH, LAI_FILE, WB_PRJ_ROOT   # noqa: E402
+from agramon_config import (CODES, EO_ET_PATH, ETP_CSV_PATH, LAI_FILE, WB_PRJ_ROOT,   # noqa: E402
+                            SHAPEFILE_DIR, SHAPEFILE_NAMES)
 
 # Root of CATHY project - simulation artefacts live under <WB_PRJ_ROOT>/outputs/scenario_*/
 
@@ -283,8 +284,7 @@ def _load_log_row(path2prj: Path, log_file: str, scenario: int | None) -> tuple[
 # =============================================================================
 
 def load_shapefiles() -> gpd.GeoDataFrame:
-    gdf = AgUtils.load_plot_shapefiles(['microcuencas_13'],
-                                       MODULE_PATH / "shapefiles")
+    gdf = AgUtils.load_plot_shapefiles(SHAPEFILE_NAMES, SHAPEFILE_DIR)   # lib/data_paths.toml [terrain]
     if gdf.crs is None:
         raise ValueError("Shapefile has no CRS.")
     if str(gdf.crs) != TARGET_CRS:

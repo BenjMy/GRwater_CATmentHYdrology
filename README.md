@@ -158,7 +158,8 @@ calibrated to the observed Agramon LAI range 0–0.6 m² m⁻²):
   (`AgUtils`) and `geoutils.uCATHY` are imported from `MODULE_PATH`
   (`Tech4agro_org/GRwater_geophy`) and are **not included here** —
   `[FILL IN: are these published elsewhere / should they be vendored into
-  ./lib or cited as a separate repository?]`.
+  ./lib or cited as a separate repository?]`. (Plot shapefiles no longer need `GRwater_geophy`: they are
+  read from `[terrain]` in `lib/data_paths.toml`.)
 
 ### 4.4 Run registry and comparing runs
 
@@ -185,6 +186,69 @@ still load: `python backfill_registry.py --study <study>` fills `param_hash`, `s
   that are not in the log (e.g. `--dem-smooth-sigma`), so identical hashes are a strong hint, not a proof.
 - `python lib/test/test_registry.py` runs the registry smoke test (no CATHY needed).
 
+### 4.5 Plot and compare results
+
+Three levels, from one run to many. All commands run from `lib/`. A *study* is a hypothesis folder,
+e.g. `<WB_PRJ_ROOT>/hypotheses/hyp1_layers_Ks` (contains `prj/`, `simulation_log.csv`, `manifest.json`).
+
+**a) One run: figures per scenario**
+
+```bash
+python post_process.py --scenario 8          # maps, hydrographs, monthly, ETa vs EO-EB (Fig I)
+```
+
+Figures go to `../Analysis/ET_compare/<scenario_dir>/`. Needs the EO ETa file and the shapefile (§7.1).
+
+**b) Several runs: side-by-side comparison from the run log**
+
+```bash
+# list what exists first (status, months, which parameters vary)
+python run_catalog.py --study <study> --metrics
+
+# compare everything that finished (latest of each parameter set)
+python plot_compare_runs.py --study <study>
+
+# pick runs, filter, add the EO energy-balance comparison (slower)
+python plot_compare_runs.py --study <study> --sim 2 4 6 --out figs/ks --title "1 vs 2 layers"
+python plot_compare_runs.py --study <study> --where "PMIN == -50" --fire-date 2022-08-01
+python plot_compare_runs.py --study <study> --eo
+```
+
+Without a study: `--log-file simulation_log_withETp_withLAI.csv --path2prj ../prj`.
+Output in `<study>/figures/compare_sim-<ids>/`:
+
+| File | Content | Needs |
+|---|---|---|
+| `response.png` | ETa, soil moisture, recharge, psi per run | `monthly_stats.csv` |
+| `annual.png` | annual ETa / recharge / runoff totals | monthly balance |
+| `balance.png` | mean annual ETa, recharge, runoff, closure residual | monthly balance |
+| `eta_eo.png`, `skill.png`, `metrics.csv` | ETa vs EO-EB, KGE / NSE / RMSE per run | `--eo` (shapefile + EO file) |
+| `runs.csv` | runs plotted, with the labels used in the legends | always |
+
+Labels show only the parameters that differ between the runs (`#4 permx=0.0006`). Failed, running and
+partial runs are skipped unless `--include-partial` / `--sim` names them; `--all` keeps duplicates.
+
+**c) A whole hypothesis**
+
+```bash
+python run_all_hypotheses.py --only hyp1_layers_Ks   # runs missing variants, validates, plots
+python hyp1_layers_Ks.py --dry-run                   # variant matrix only, runs nothing
+```
+
+Writes `metrics.csv`, `water_balance_monthly.csv`, `annual_totals.csv`, `variant_summary.csv`,
+`study_report.md` and `figures/` into the study folder (§7.3).
+
+**Troubleshooting `--eo` / validation: `DataSourceError ... microcuencas_13.shp: No such file`.**
+Shapefile paths come from `lib/data_paths.toml` (`[terrain] shapefile_dir`, relative to the repo root,
+default `data/microcuencas_13`). Check with:
+
+```bash
+python -c "import agramon_config as C; print(C.SHAPEFILE_DIR, (C.SHAPEFILE_DIR/'microcuencas_13.shp').exists())"
+```
+
+If this prints `False`, fix `shapefile_dir` in your TOML (or point `AGRAMON_DATA_CONFIG` at your own
+copy). Older versions looked in `GRwater_geophy/shapefiles` regardless of the TOML; that is fixed.
+
 ---
 
 ## 5. Data description
@@ -194,8 +258,8 @@ still load: `python backfill_registry.py --study <study>` fills `param_hash`, `s
 | Potential ET (ETp) | `data/satellite/Agramon/20161001_20241231_ET0.nc` | NetCDF | EPSG:32630 | 2016-10-01 – 2024-12-31 | satellite-derived potential evapotranspiration; reprojected to EPSG:25830 at load time |
 | Rainfall | `data/satellite/Agramon/20161001_20241231_TP.nc` | NetCDF | EPSG:32630 | 2016-10-01 – 2024-12-31 | reprojected to EPSG:25830 at load time |
 | Leaf Area Index (LAI) | `data/biophysical/agramon/input/lai_monthly.nc` | NetCDF | EPSG:32630 | `[FILL IN: date range]` | monthly composite; drives the vegetation/root-depth zone map (§4.1) |
-| DEM (9 Agramon sub-plots) | `[FILL IN — see §3]` | `.adf` raster | EPSG:25830 | — | selected via `--dem-plot 1`–`9` |
-| Plot boundaries (`microcuencas_13`) | `[FILL IN — see §3]` | Shapefile | EPSG:25830 | — | |
+| DEM (Agramon, 100 m) | `data/DTMplots/` (`[terrain] dem_tif` in `lib/data_paths.toml`) | GeoTIFF / `.adf` | EPSG:25830 | — | sub-plot selected via `--dem-plot 1`–`9` |
+| Plot boundaries (`microcuencas_13`) | `data/microcuencas_13/microcuencas_13.shp` (`[terrain] shapefile_dir` / `shapefile_names` in `lib/data_paths.toml`) | Shapefile | EPSG:25830 | — | read through `agramon_config.SHAPEFILE_DIR`; no `GRwater_geophy` checkout needed |
 | ERA5 (optional alternate forcing) | external, not in `./data` | NetCDF | — | `[FILL IN]` | Copernicus C3S; used only if `USE_ETP_FORCING = False` |
 
 **Model outputs** written per scenario folder (not versioned in this
