@@ -21,6 +21,12 @@ also get a DOI (§1 of the README).
 - `manifest.json` of a hypothesis study keeps the stderr tail (`error_tail`) of failed variants.
 
 ### Changed
+- `--study` of `run_catalog.py`, `plot_compare_runs.py`, `clean_log.py` and the new `post_process.py --study`
+  accepts the hypothesis name (`hyp4`, `hyp4_SW`) as well as a folder; resolved from the config by
+  `hypotheses_common.resolve_study`.
+- Hypothesis figures: variants of one group differ in shade, dash pattern and width (they were all one colour);
+  the legend of `response` / `annual` / `eta_vs_EB` is a single wrapped block under the plots; `balance` wraps
+  its y labels.
 - `manifest.json` stores `sim_dir` relative to the study `prj/` (absolute paths still read).
 - `scenario_runner.py` skip check ignores failed, running and partial runs.
 - `clean_log.py` and `post_process.py` read relative manifest paths and skip failed/running runs.

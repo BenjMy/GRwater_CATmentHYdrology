@@ -43,7 +43,7 @@ Each run writes in `<path2prj>/outputs/<scenario_dir>/`: `*_output.nc`, `monthly
 ```bash
 python clean_log.py --dry-run                         # report only (exit code 2 if something would go)
 python clean_log.py                                   # default log + project
-python clean_log.py --study <out_root>/hyp1_layers_Ks # a hypothesis study (log, prj/, manifest.json)
+python clean_log.py --study hyp1                      # a hypothesis study by name (or its folder): log, prj/, manifest.json
 python clean_log.py --all-studies                     # every study folder of the hypotheses out_root
 python clean_log.py --incomplete                      # also drop runs without et/psi/sw_output.nc
 ```
@@ -54,6 +54,7 @@ python post_process.py                                  # every sim_index in the
 python post_process.py --scenario 7 8 --forcing etp_ts --dem-res 5
 python post_process.py --scenario 7 --et-csv <ETA_CSV_FROM_HECTOR> --monthly-ts
 ```
+Hypothesis studies: `python post_process.py --study hyp4 [--scenario 0 1] [--list]` (name looked up under the hypotheses out_root; a folder path also works); compare runs with `python plot_compare_runs.py --study hyp4`, list them with `python run_catalog.py --study hyp4 --metrics`.
 (`./plot_scenarii_withETp_withLAI.sh` is now a thin wrapper around `post_process.py`.)
 `post_process.py` calls `plot_run_results.py` (maps, hydro, monthly) and `analysis_ET_compare.py` (ETa/ETp, validation panel Fig I) per scenario; figures go to `../Analysis/ET_compare/<scenario_dir>/`.
 `<ETA_CSV_FROM_HECTOR>` **[MISSING]**: Hector's ETa data, `--et-csv` default is `agramon_treatments_ET.csv`.

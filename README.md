@@ -191,13 +191,26 @@ still load: `python backfill_registry.py --study <study>` fills `param_hash`, `s
 Three levels, from one run to many. All commands run from `lib/`. A *study* is a hypothesis folder,
 e.g. `<WB_PRJ_ROOT>/hypotheses/hyp1_layers_Ks` (contains `prj/`, `simulation_log.csv`, `manifest.json`).
 
+`--study` (in `run_catalog.py`, `plot_compare_runs.py`, `post_process.py`, `clean_log.py`) takes either that
+folder or just the hypothesis name: `--study hyp4` or `--study hyp4_SW`. The name is looked up under the
+hypotheses `out_root` (`[general] out_root` in `hypotheses.toml`, else `<wb_prj_root>/hypotheses` from
+`data_paths.toml`); a unique prefix is enough, and an ambiguous or unknown name prints the available studies.
+Print the folder in use with `python -c "from hypotheses_common import default_out_root as d; print(d())"`.
+
 **a) One run: figures per scenario**
 
 ```bash
 python post_process.py --scenario 8          # maps, hydrographs, monthly, ETa vs EO-EB (Fig I)
+
+# a run of a hypothesis study (log and prj/ come from the study)
+python post_process.py --study hyp4 --list              # sim_index values of the study
+python post_process.py --study hyp4 --scenario 0 1
 ```
 
 Figures go to `../Analysis/ET_compare/<scenario_dir>/`. Needs the EO ETa file and the shapefile (§7.1).
+Without `--study` the script reads `simulation_log_withETp_withLAI.csv` in the current folder. `--dem-res`
+(default 5) must equal the run's `resample_resolution`; `--forcing etp|etp_ts` restricts the default
+selection to one forcing (hyp4 mixes both).
 
 **b) Several runs: side-by-side comparison from the run log**
 
@@ -227,6 +240,11 @@ Output in `<study>/figures/compare_sim-<ids>/`:
 
 Labels show only the parameters that differ between the runs (`#4 permx=0.0006`). Failed, running and
 partial runs are skipped unless `--include-partial` / `--sim` names them; `--all` keeps duplicates.
+
+Figure layout: the legend is one block under the plots (long labels are wrapped, the figure grows to fit it);
+in `balance.png` the labels are wrapped on the y axis. Variants of one `group` (hypotheses.toml) share a hue and
+differ in shade, dash pattern and line width, so identical curves stay visible; with more groups than the 7 base
+colours, the colours repeat and the dash pattern changes.
 
 **c) A whole hypothesis**
 

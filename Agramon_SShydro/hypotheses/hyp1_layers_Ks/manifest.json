@@ -23,10 +23,11 @@
       ],
       "no-spinup": true
     },
-    "returncode": 0,
-    "status": "ok",
-    "sim_dir": "/home/z0272571a@campus.csic.es/Nextcloud/BenCSIC/Codes/Tech4agro_org/GRwater_CATmentHYdrology/Agramon_SShydro/hypotheses/hyp1_layers_Ks/prj/outputs/scenario_2_plot3_outlet-closed_bottom-closed_spinup-off_pmin-m50_ic-pressure_forcing-etpts-wet-fid2",
-    "seconds": 2622
+    "returncode": 1,
+    "status": "failed",
+    "sim_dir": null,
+    "seconds": 15,
+    "error_tail": "#1  0x769ee5824a71 in ??? | #2  0x769ee58256dc in ??? | #3  0x769ee5ab0e91 in ??? | #4  0x769ee5ab41ca in ??? | #5  0x769ee5ab502f in ??? | #6  0x645535310650 in ??? | #7  0x64553536382b in ??? | #8  0x64553536fcf8 in ??? | #9  0x769ee542a1c9 in __libc_start_call_main | \tat ../sysdeps/nptl/libc_start_call_main.h:58 | #10  0x769ee542a28a in __libc_start_main_impl | \tat ../csu/libc-start.c:360 | #11  0x645535303274 in ??? | #12  0xffffffffffffffff in ???"
   },
   "1L_ks6e-4": {
     "group": "1L",
@@ -52,10 +53,11 @@
       ],
       "no-spinup": true
     },
-    "returncode": 0,
-    "status": "ok",
-    "sim_dir": "/home/z0272571a@campus.csic.es/Nextcloud/BenCSIC/Codes/Tech4agro_org/GRwater_CATmentHYdrology/Agramon_SShydro/hypotheses/hyp1_layers_Ks/prj/outputs/scenario_4_plot3_outlet-closed_bottom-closed_spinup-off_pmin-m50_ic-pressure_forcing-etpts-wet-fid2",
-    "seconds": 2667
+    "returncode": 1,
+    "status": "failed",
+    "sim_dir": null,
+    "seconds": 13,
+    "error_tail": "#1  0x7e1ee8a24a71 in ??? | #2  0x7e1ee8a256dc in ??? | #3  0x7e1ee8cb0e91 in ??? | #4  0x7e1ee8cb41ca in ??? | #5  0x7e1ee8cb502f in ??? | #6  0x602e5bc07650 in ??? | #7  0x602e5bc5a82b in ??? | #8  0x602e5bc66cf8 in ??? | #9  0x7e1ee862a1c9 in __libc_start_call_main | \tat ../sysdeps/nptl/libc_start_call_main.h:58 | #10  0x7e1ee862a28a in __libc_start_main_impl | \tat ../csu/libc-start.c:360 | #11  0x602e5bbfa274 in ??? | #12  0xffffffffffffffff in ???"
   },
   "1L_ks1e-3": {
     "group": "1L",
@@ -81,10 +83,11 @@
       ],
       "no-spinup": true
     },
-    "returncode": 0,
-    "status": "ok",
-    "sim_dir": "/home/z0272571a@campus.csic.es/Nextcloud/BenCSIC/Codes/Tech4agro_org/GRwater_CATmentHYdrology/Agramon_SShydro/hypotheses/hyp1_layers_Ks/prj/outputs/scenario_6_plot3_outlet-closed_bottom-closed_spinup-off_pmin-m50_ic-pressure_forcing-etpts-wet-fid2_ks2L-d0.3m-b1e-5",
-    "seconds": 2686
+    "returncode": 1,
+    "status": "failed",
+    "sim_dir": null,
+    "seconds": 13,
+    "error_tail": "#1  0x73625b624a71 in ??? | #2  0x73625b6256dc in ??? | #3  0x73625b8b0e91 in ??? | #4  0x73625b8b41ca in ??? | #5  0x73625b8b502f in ??? | #6  0x5a07c98bc650 in ??? | #7  0x5a07c990f82b in ??? | #8  0x5a07c991bcf8 in ??? | #9  0x73625b22a1c9 in __libc_start_call_main | \tat ../sysdeps/nptl/libc_start_call_main.h:58 | #10  0x73625b22a28a in __libc_start_main_impl | \tat ../csu/libc-start.c:360 | #11  0x5a07c98af274 in ??? | #12  0xffffffffffffffff in ???"
   },
   "2L_d0.3_b1e-5": {
     "group": "2L",
@@ -113,9 +116,10 @@
       "ks-layer-depth": "0.3"
     },
     "returncode": 0,
-    "status": "ok",
-    "sim_dir": "/home/z0272571a@campus.csic.es/Nextcloud/BenCSIC/Codes/Tech4agro_org/GRwater_CATmentHYdrology/Agramon_SShydro/hypotheses/hyp1_layers_Ks/prj/outputs/scenario_8_plot3_outlet-closed_bottom-closed_spinup-off_pmin-m50_ic-pressure_forcing-etpts-wet-fid2_ks2L-d0.5m-b1e-5",
-    "seconds": 2783
+    "status": "failed",
+    "sim_dir": null,
+    "seconds": 3,
+    "error_tail": "\ud83c\udfc1 Initiate CATHY object | \ud83d\ude1f src files not found | working directory | is:/home/z0272571a@campus.csic.es/Nextcloud/BenCSIC/Codes/Tech4agro_org/GRwater_CATmentHYdrology/Agramon_SShydro/hypotheses/hyp1_layers_Ks/prj/scenario_0_plot3_outlet-closed_bottom-clo | sed_spinup-off_pmin-m50_ic-pressure_forcing-etpts-wet-fid2_ks2L-d0.3m-b1e-5"
   },
   "2L_d0.5_b1e-5": {
     "group": "2L",
@@ -146,7 +150,8 @@
     "returncode": 1,
     "status": "failed",
     "sim_dir": null,
-    "seconds": 0
+    "seconds": 17,
+    "error_tail": "|     simu.run_preprocessor(verbose=False) |   File \"/home/z0272571a@campus.csic.es/pycathy_wrapper/pyCATHY/cathy_tools.py\", line 431, in run_preprocessor |     os.chdir(self.workdir) | FileNotFoundError: [Errno 2] No such file or directory: '/home/z0272571a@campus.csic.es/Nextcloud/BenCSIC/Codes/Tech4agro_org/GRwater_CATmentHYdrology/Agramon_SShydro/hypotheses/hyp1_layers_Ks/prj/scenario_0_plot3_outlet-closed_bottom-closed_spinup-off_pmin-m50_ic-pressure_forcing-etpts-wet-fid2_ks2L-d0.5m-b1e-5'"
   },
   "2L_d1.0_b1e-5": {
     "group": "2L",
@@ -177,7 +182,8 @@
     "returncode": 1,
     "status": "failed",
     "sim_dir": null,
-    "seconds": 0
+    "seconds": 7,
+    "error_tail": "|     self.run_preprocessor(verbose=verbose) |   File \"/home/z0272571a@campus.csic.es/pycathy_wrapper/pyCATHY/cathy_tools.py\", line 431, in run_preprocessor |     os.chdir(self.workdir) | FileNotFoundError: [Errno 2] No such file or directory: '/home/z0272571a@campus.csic.es/Nextcloud/BenCSIC/Codes/Tech4agro_org/GRwater_CATmentHYdrology/Agramon_SShydro/hypotheses/hyp1_layers_Ks/prj/scenario_0_plot3_outlet-closed_bottom-closed_spinup-off_pmin-m50_ic-pressure_forcing-etpts-wet-fid2_ks2L-d1m-b1e-5'"
   },
   "2L_d0.5_b1e-6": {
     "group": "2L",
@@ -208,7 +214,8 @@
     "returncode": 1,
     "status": "failed",
     "sim_dir": null,
-    "seconds": 0
+    "seconds": 14,
+    "error_tail": "|   File \"/home/z0272571a@campus.csic.es/pycathy_wrapper/pyCATHY/cathy_tools.py\", line 705, in run_processor |     os.chdir(os.path.join(self.workdir, self.project_name)) | FileNotFoundError: [Errno 2] No such file or directory: '/home/z0272571a@campus.csic.es/Nextcloud/BenCSIC/Codes/Tech4agro_org/GRwater_CATmentHYdrology/Agramon_SShydro/hypotheses/hyp1_layers_Ks/prj/scenario_0_plot3_outlet-closed_bottom-closed_spinup-off_pmin-m50_ic-pressure_forcing-etpts-wet-fid2_ks2L-d0.5m-b1e-6/my_cathy_prj'"
   },
   "1L_ksfire_lai": {
     "group": "ksfire",
@@ -242,7 +249,8 @@
     "returncode": 1,
     "status": "failed",
     "sim_dir": null,
-    "seconds": 0
+    "seconds": 71,
+    "error_tail": "   File \"/home/z0272571a@campus.csic.es/pycathy_wrapper/pyCATHY/cathy_tools.py\", line 705, in run_processor |     os.chdir(os.path.join(self.workdir, self.project_name)) | FileNotFoundError: [Errno 2] No existe el archivo o el directorio: '/home/z0272571a@campus.csic.es/Nextcloud/BenCSIC/Codes/Tech4agro_org/GRwater_CATmentHYdrology/Agramon_SShydro/hypotheses/hyp1_layers_Ks/prj/scenario_0_plot3_outlet-closed_bottom-closed_spinup-off_pmin-m50_ic-pressure_forcing-etpts-wet-fid2_ks-lai/my_cathy_prj'"
   },
   "2L_ksfire_lai": {
     "group": "ksfire",
@@ -275,9 +283,9 @@
       "ks-fire-ll": "1e-5",
       "ks-fire-ul": "6e-4"
     },
-    "returncode": 1,
-    "status": "failed",
-    "sim_dir": null,
-    "seconds": 0
+    "returncode": 0,
+    "status": "ok",
+    "sim_dir": "outputs/scenario_0_plot3_outlet-closed_bottom-closed_spinup-off_pmin-m50_ic-pressure_forcing-etpts-wet-fid2_ks-lai_ks2L-d0.5m-b1e-5",
+    "seconds": 11845
   }
 }
