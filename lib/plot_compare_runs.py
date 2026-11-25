@@ -144,7 +144,7 @@ def main(argv=None) -> int:
                                  formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     ap.add_argument("--log-file", default="simulation_log_withETp_withLAI.csv", help="CSV run log")
     ap.add_argument("--path2prj", default="../SSHydro_withETp_withLAI", help="project folder holding outputs/")
-    ap.add_argument("--study", help="hypothesis study folder (uses its simulation_log.csv and prj/)")
+    ap.add_argument("--study", help="hypothesis study: folder, or just its name from the config (hyp4, hyp4_SW); uses its simulation_log.csv and prj/")
     ap.add_argument("--sim", nargs="+", type=int, help="sim_index values to compare (default: automatic selection)")
     ap.add_argument("--where", help='pandas query on the log columns, e.g. "PMIN == -50"')
     ap.add_argument("--all", action="store_true", help="keep runs that repeat an earlier parameter set")
@@ -155,6 +155,9 @@ def main(argv=None) -> int:
     ap.add_argument("--title", default="", help="figure title")
     ap.add_argument("--dpi", type=int, default=150)
     a = ap.parse_args(argv)
+    if a.study:
+        from hypotheses_common import resolve_study
+        a.study = resolve_study(a.study)
     log, prj = (Path(a.study) / "simulation_log.csv", Path(a.study) / "prj") if a.study \
         else (Path(a.log_file), Path(a.path2prj))
     if not log.exists():

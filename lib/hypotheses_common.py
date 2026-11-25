@@ -116,6 +116,34 @@ def default_out_root() -> Path:
     return Path(WB_PRJ_ROOT) / "hypotheses"
 
 
+def resolve_study(arg, config: Path = DEFAULT_CONFIG) -> Path:
+    """
+    Study folder from ``--study``: either a path, or just the hypothesis name / prefix (``hyp4``,
+    ``hyp4_SW``), looked up under the hypotheses out_root of the config (hypotheses.toml
+    ``[general] out_root``, else ``<wb_prj_root>/hypotheses`` from data_paths.toml). An existing folder,
+    or anything that looks like a path, is used as given. Exits with the list of choices if the name
+    matches nothing or several studies.
+    """
+    text = str(arg)
+    path = Path(text).expanduser()
+    if path.is_dir() or any(c in text for c in "/\\") or text.startswith((".", "~")):
+        return path
+    try:
+        hyps = load_hypotheses(config)
+    except Exception:                                  # unreadable config: fall back to the folders on disk
+        hyps = {}
+    root = Path(next((h.out_root for h in hyps.values() if h.out_root), None) or default_out_root())
+    on_disk = [d.name for d in sorted(root.iterdir()) if d.is_dir() and (d / "simulation_log.csv").exists()] \
+        if root.is_dir() else []
+    names = list(dict.fromkeys(on_disk + list(hyps)))
+    hits = [n for n in names if n == text] or [n for n in names if n.startswith(text)]
+    if len(hits) == 1:
+        return root / hits[0]
+    choices = ", ".join(names) or "none found"
+    raise SystemExit(f"--study {text!r}: " + ("ambiguous" if hits else "no study of that name")
+                     + f" under {root}\n  available: {choices}")
+
+
 def study_dir(h: Hypothesis, out_root: Path | None = None) -> Path:
     return Path(out_root or h.out_root or default_out_root()) / h.key
 

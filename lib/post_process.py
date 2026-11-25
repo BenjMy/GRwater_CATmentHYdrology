@@ -10,6 +10,7 @@ For each sim_index: plot_run_results.py (maps, hydro, monthly) then analysis_ET_
     python post_process.py --scenario 7 8 --forcing etp_ts --dem-res 5
     python post_process.py --scenario 7 --et-csv <ETA_CSV> --monthly-ts
     python post_process.py --list                           # only print the sim_index values
+    python post_process.py --study hyp4 --scenario 0 1      # a hypothesis study, found via the config
 
 Exit code 0 if every step succeeded, 1 otherwise.
 """
@@ -85,8 +86,15 @@ def main(argv=None) -> int:
     p.add_argument("--monthly-ts", action="store_true")
     p.add_argument("--log-file", default=DEFAULT_LOG)
     p.add_argument("--path2prj", default=DEFAULT_PRJ)
+    p.add_argument("--study", default=None,
+                   help="hypothesis study: folder, or just its name from the config (hyp4, hyp4_SW); "
+                        "sets --log-file and --path2prj from its simulation_log.csv and prj/")
     p.add_argument("--list", action="store_true")
     a = p.parse_args(argv)
+    if a.study:
+        from hypotheses_common import resolve_study
+        study = resolve_study(a.study)
+        a.log_file, a.path2prj = str(study / "simulation_log.csv"), str(study / "prj")
     if a.et_csv and not Path(a.et_csv).is_file():
         p.error(f"--et-csv file not found: {a.et_csv}")
     scen = a.scenario

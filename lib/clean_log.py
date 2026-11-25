@@ -159,8 +159,9 @@ def main(argv=None) -> int:
                                 formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     p.add_argument("--log-file", default=DEFAULT_LOG, help="CSV run log")
     p.add_argument("--path2prj", default=DEFAULT_PRJ, help="project folder holding outputs/")
-    p.add_argument("--study", type=Path, default=None,
-                   help="hypothesis study folder (uses its simulation_log.csv, prj/, manifest.json)")
+    p.add_argument("--study", default=None,
+                   help="hypothesis study: folder, or just its name from the config (hyp1, hyp4_SW); "
+                        "uses its simulation_log.csv, prj/, manifest.json")
     p.add_argument("--all-studies", nargs="?", const="", default=None, metavar="OUT_ROOT",
                    help="every study folder under OUT_ROOT (default: the hypotheses out_root)")
     p.add_argument("--incomplete", action="store_true",
@@ -182,7 +183,8 @@ def main(argv=None) -> int:
             print(f"No study folder with a simulation_log.csv under {root}")
             return 1
     elif a.study:
-        targets = [study_paths(a.study)]
+        from hypotheses_common import resolve_study
+        targets = [study_paths(resolve_study(a.study))]
     else:
         targets = [(_abs(a.log_file), _abs(a.path2prj), None)]
 

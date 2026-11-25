@@ -116,13 +116,16 @@ def main(argv=None) -> int:
                                  formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     ap.add_argument("--log-file", default="simulation_log_withETp_withLAI.csv", help="CSV run log")
     ap.add_argument("--path2prj", default="../SSHydro_withETp_withLAI", help="project folder holding outputs/")
-    ap.add_argument("--study", help="hypothesis study folder (uses its simulation_log.csv and prj/)")
+    ap.add_argument("--study", help="hypothesis study: folder, or just its name from the config (hyp4, hyp4_SW); uses its simulation_log.csv and prj/")
     ap.add_argument("--where", help='pandas query on the log columns, e.g. "PMIN == -50"')
     ap.add_argument("--status", help="keep one status: ok, failed, running, unknown")
     ap.add_argument("--unique", action="store_true", help="only the latest run of each parameter set")
     ap.add_argument("--metrics", action="store_true", help="add ETa / recharge / closure from monthly_stats.csv")
     ap.add_argument("--csv", help="also write the table to this CSV")
     a = ap.parse_args(argv)
+    if a.study:
+        from hypotheses_common import resolve_study
+        a.study = resolve_study(a.study)
     log, prj = (Path(a.study) / "simulation_log.csv", Path(a.study) / "prj") if a.study \
         else (Path(a.log_file), Path(a.path2prj))
     if not log.exists():

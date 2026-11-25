@@ -23,6 +23,8 @@ Hypothesis studies (hyp1..hyp4, run_all_hypotheses.py; one study folder per hypo
 """
 from __future__ import annotations
 
+import math
+import textwrap
 from pathlib import Path
 from typing import Optional
 
@@ -218,12 +220,78 @@ def plot_recovery_panels(burned: pd.DataFrame, control: pd.DataFrame, fire_date,
 _GROUP_COLORS = ["#0072B2", "#D55E00", "#009E73", "#CC79A7", "#E69F00", "#56B4E9", "#7A7A7A"]
 
 
-def _colors(names, groups=None):
-    """One colour per group (variants of a group share it, lightness varies); per variant if no groups."""
+def _shade(hex_color: str, frac: float) -> str:
+    """Mix a '#rrggbb' colour with white (frac 0 = unchanged, 1 = white); still '#rrggbb'."""
+    rgb = [int(hex_color[i:i + 2], 16) for i in (1, 3, 5)]
+    return "#" + "".join(f"{round(c + (255 - c) * frac):02x}" for c in rgb)
+
+
+def _members(names, groups=None):
+    """name -> (group key, rank of the name inside its group, size of the group)."""
     groups = groups or {}
-    order = list(dict.fromkeys(groups.get(n, "") or n for n in names))
-    col = {g: _GROUP_COLORS[i % len(_GROUP_COLORS)] for i, g in enumerate(order)}
-    return {n: col[groups.get(n, "") or n] for n in names}
+    key = {n: (groups.get(n, "") or n) for n in names}
+    by_group = {}
+    for n in names:
+        by_group.setdefault(key[n], []).append(n)
+    return {n: (key[n], by_group[key[n]].index(n), len(by_group[key[n]])) for n in names}
+
+
+def _colors(names, groups=None):
+    """One hue per group; variants of a group are shaded from dark to light so they can be told apart."""
+    mem = _members(names, groups)
+    order = list(dict.fromkeys(g for g, _, _ in mem.values()))
+    hue = {g: _GROUP_COLORS[i % len(_GROUP_COLORS)] for i, g in enumerate(order)}
+    return {n: _shade(hue[g], 0.0 if size == 1 else 0.55 * k / (size - 1)) for n, (g, k, size) in mem.items()}
+
+
+_LINESTYLES = ["-", "--", ":", "-."]
+
+
+def _wrap(label: str, width: int = 28) -> str:
+    """Break a long run label over several lines (at spaces only) so it does not widen the figure."""
+    return "\n".join(textwrap.wrap(str(label), width=width, break_long_words=False,
+                                   break_on_hyphens=False)) or str(label)
+
+
+def _legend_below(fig, axes, fontsize: float = 7, wrap: int = 28, rect_top: float = 1.0):
+    """
+    One legend for the whole figure, placed under the plots (instead of inside an axes, where long labels
+    cover the curves). Entries are wrapped at ``wrap`` characters and laid out in as many columns as fit the
+    figure width; the figure is made taller by exactly the height the legend needs, so the plots keep
+    their size. Replaces ``fig.tight_layout()``.
+    """
+    seen = {}
+    for ax in np.ravel(axes):
+        for h, l in zip(*ax.get_legend_handles_labels()):
+            if l and not l.startswith("_") and l not in seen:
+                seen[l] = h
+    if not seen:
+        fig.tight_layout(rect=(0, 0, 1, rect_top))
+        return
+    labels = [_wrap(l, wrap) for l in seen]
+    w, h0 = fig.get_size_inches()
+    n_lines = max(l.count("\n") + 1 for l in labels)
+    col_w = (min(max(len(x) for l in labels for x in l.split("\n")), wrap) * fontsize * 0.55 + 46) / 72  # inches
+    ncol = max(1, min(len(labels), int(w / col_w)))
+    rows = math.ceil(len(labels) / ncol)
+    leg_h = (rows * (n_lines * fontsize * 1.25 + 4) + 12) / 72                                      # inches
+    fig.set_size_inches(w, h0 + leg_h)
+    fig.tight_layout(rect=(0, leg_h / (h0 + leg_h), 1, rect_top))
+    fig.legend(list(seen.values()), labels, loc="lower center", ncol=ncol, fontsize=fontsize,
+               frameon=False, handlelength=2.6, columnspacing=1.4, labelspacing=0.5,
+               bbox_to_anchor=(0.5, 0.0))
+
+
+def _line_kw(names, groups=None):
+    """name -> dict(color, ls, lw) for line plots: shade + dash pattern + width vary inside a group, so
+    variants stay distinguishable even where their curves (almost) coincide. When there are more groups
+    than base colours, the colours repeat and the dash pattern changes instead."""
+    mem = _members(names, groups)
+    col = _colors(names, groups)
+    order = list(dict.fromkeys(g for g, _, _ in mem.values()))
+    lap = {g: i // len(_GROUP_COLORS) for i, g in enumerate(order)}
+    return {n: dict(color=col[n], ls=_LINESTYLES[(k + lap[g]) % len(_LINESTYLES)], lw=max(1.0, 2.2 - 0.4 * k))
+            for n, (g, k, _s) in mem.items()}
 
 
 def plot_variant_matrix(rows, title: str = "", out: Optional[str] = None):
@@ -253,12 +321,12 @@ def plot_hypothesis_eta(wb: dict, eo: dict, groups: Optional[dict] = None, title
     reference(s) (``eo``: label -> Series, black), left as a time series, right as the mean
     seasonal cycle (calendar months).
     """
-    col = _colors(list(wb), groups)
+    kw = _line_kw(list(wb), groups)
     fig, (a1, a2) = plt.subplots(1, 2, figsize=(13, 4.2), gridspec_kw={"width_ratios": [2.2, 1]})
     for name, s in wb.items():
-        a1.plot(s.index, s.values, color=col[name], lw=1.3, alpha=0.9, label=name)
+        a1.plot(s.index, s.values, alpha=0.9, label=name, **kw[name])
         c = s.groupby(s.index.month).mean()
-        a2.plot(c.index, c.values, color=col[name], lw=1.3, marker="o", ms=3)
+        a2.plot(c.index, c.values, marker="o", ms=3, **kw[name])
     for label, s in eo.items():
         a1.plot(s.index, s.values, color=C_OBS, lw=2.0, ls="--", label=f"EO-EB ({label})")
         c = s.groupby(s.index.month).mean()
@@ -268,11 +336,10 @@ def plot_hypothesis_eta(wb: dict, eo: dict, groups: Optional[dict] = None, title
     a2.set_xticks(range(1, 13))
     a2.set_xlabel("month")
     a2.set_title("Seasonal cycle")
-    a1.legend(fontsize=7, ncol=2, frameon=False)
     for a in (a1, a2):
         a.grid(alpha=0.25)
     fig.suptitle(title, fontsize=10, fontweight="bold")
-    fig.tight_layout()
+    _legend_below(fig, [a1], rect_top=0.95)
     return _finish(fig, out)
 
 
@@ -304,7 +371,7 @@ def plot_hypothesis_response(stats: dict, groups: Optional[dict] = None, title: 
     """
     panels = [("eta_patched_mean", "eta_mean", "ETa (mm/day)"), ("sw_mean", None, "soil moisture (-)"),
               ("recharge_mean", None, "recharge"), ("psi_mean", None, "mean psi (m)")]
-    col = _colors(list(stats), groups)
+    kw = _line_kw(list(stats), groups)
     avail = [p for p in panels if any(p[0] in d or (p[1] and p[1] in d) for d in stats.values())]
     if not avail:
         return None
@@ -314,12 +381,11 @@ def plot_hypothesis_response(stats: dict, groups: Optional[dict] = None, title: 
             c = c1 if c1 in d else c2
             if not c or "month" not in d:
                 continue
-            ax.plot(pd.to_datetime(d["month"].astype(str)), d[c], color=col[name], lw=1.2, label=name)
+            ax.plot(pd.to_datetime(d["month"].astype(str)), d[c], label=name, **kw[name])
         ax.set_ylabel(lab, fontsize=8)
         ax.grid(alpha=0.25)
-    axes[0, 0].legend(fontsize=7, ncol=3, frameon=False)
     fig.suptitle(title, fontsize=10, fontweight="bold")
-    fig.tight_layout()
+    _legend_below(fig, axes, rect_top=0.96)
     return _finish(fig, out)
 
 
@@ -336,21 +402,20 @@ def plot_hypothesis_annual(annual: pd.DataFrame, groups: Optional[dict] = None, 
     if d.empty or not panels:
         return None
     names = list(dict.fromkeys(d["variant"]))
-    col = _colors(names, groups)
+    kw = _line_kw(names, groups)
     fig, axes = plt.subplots(len(panels), 1, figsize=(9, 2.3 * len(panels) + 0.8), sharex=True, squeeze=False)
     for ax, (c, lab) in zip(axes[:, 0], panels):
         for name in names:
             s = d[d["variant"] == name].sort_values("year")
-            ax.plot(s["year"], s[c], "-o", ms=3, lw=1.2, color=col[name], label=name)
+            ax.plot(s["year"], s[c], marker="o", ms=3, label=name, **kw[name])
         if fire_date is not None:
             f = pd.Timestamp(fire_date)
             ax.axvline(f.year + (f.dayofyear - 1) / 365.0, color=C_FIRE, ls="--", lw=1)
         ax.set_ylabel(lab, fontsize=8)
         ax.grid(alpha=0.25)
-    axes[0, 0].legend(fontsize=7, ncol=3, frameon=False)
     axes[-1, 0].set_xlabel("year")
     fig.suptitle(title, fontsize=10, fontweight="bold")
-    fig.tight_layout()
+    _legend_below(fig, axes, rect_top=0.96)
     return _finish(fig, out)
 
 
@@ -371,15 +436,19 @@ def plot_hypothesis_balance(period: pd.DataFrame, groups: Optional[dict] = None,
     if d.empty or not panels:
         return None
     col = _colors(list(d["variant"]), groups)
-    fig, axes = plt.subplots(1, len(panels), figsize=(3.4 * len(panels) + 1, 0.34 * len(d) + 1.8),
+    ylabels = [_wrap(v, 34) for v in d["variant"]]
+    row_h = max(0.34, 0.17 * max(l.count("\n") + 1 for l in ylabels) + 0.1)      # inches per bar: room for the label
+    fig, axes = plt.subplots(1, len(panels), figsize=(3.4 * len(panels) + 1.6, row_h * len(d) + 1.8),
                              sharey=True, squeeze=False)
+    ypos = np.arange(len(d))
     for ax, (c, lab) in zip(axes[0], panels):
-        ax.barh(d["variant"], d[c], color=[col[v] for v in d["variant"]])
+        ax.barh(ypos, d[c], color=[col[v] for v in d["variant"]])
         ax.set_xlabel(lab)
         ax.grid(axis="x", alpha=0.25)
         if c == "closure_pct":
             ax.axvline(0, color="0.4", lw=0.8)
-    axes[0, 0].tick_params(axis="y", labelsize=7)
+    axes[0, 0].set_yticks(ypos)
+    axes[0, 0].set_yticklabels(ylabels, fontsize=7)
     axes[0, 0].invert_yaxis()
     fig.suptitle(f"{title} [{period_name}]", fontsize=10, fontweight="bold")
     fig.tight_layout()
